@@ -152,6 +152,34 @@ refreshPlayers()
 
 -- === ESP SYSTEM ===
 local espHighlights = {}
+local pcldHighlights = {}
+
+local function updatePCLDESP()
+    if not Config.PCLD_ESPEnabled then
+        for _, hl in pairs(pcldHighlights) do
+            if hl then hl:Destroy() end
+        end
+        pcldHighlights = {}
+        return
+    end
+
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector") then
+            if not pcldHighlights[obj] then
+                local hl = Instance.new("Highlight")
+                hl.Name = "PCLD_ESP_Highlight"
+                hl.Adornee = obj
+                hl.FillColor = Color3.fromRGB(255, 0, 0)
+                hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                hl.FillTransparency = 0.3
+                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                hl.Parent = CoreGui
+                pcldHighlights[obj] = hl
+            end
+        end
+    end
+end
+
 local function updateESPHighlights()
     if not Config.ESPEnabled then
         for _, hl in pairs(espHighlights) do
@@ -322,6 +350,14 @@ Tabs.Visuals:AddButton({
     end
 })
 
+Tabs.Visuals:AddToggle("PCLDESPToggle", {
+    Title = "PCLD ESP (Hidden Hitboxes)",
+    Default = false,
+    Callback = function(Value)
+        Config.PCLD_ESPEnabled = Value
+    end
+})
+
 -- === MASS / TROLL TAB ===
 Tabs.Mass:AddSection("Server Interaction & Kill")
 
@@ -476,6 +512,23 @@ Tabs.Protection:AddButton({
     end
 })
 
+Tabs.Protection:AddToggle("TouchQueryToggle", {
+    Title = "Ignore Hazards (CanTouch/CanQuery Off)",
+    Default = false,
+    Callback = function(Value)
+        Config.TouchQuerySafe = Value
+        local char = LocalPlayer.Character
+        if char then
+            for _, v in ipairs(char:GetChildren()) do
+                if v:IsA("BasePart") then
+                    v.CanTouch = not Value
+                    v.CanQuery = not Value
+                end
+            end
+        end
+    end
+})
+
 -- === AURAS TAB ===
 Tabs.Auras:AddSection("Proximity Auras")
 
@@ -573,6 +626,11 @@ RunService.RenderStepped:Connect(function()
     -- ESP highlights update
     if Config.ESPEnabled then
         updateESPHighlights()
+    end
+
+    -- PCLD ESP update
+    if Config.PCLD_ESPEnabled then
+        updatePCLDESP()
     end
 end)
 
