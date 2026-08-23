@@ -1,6 +1,6 @@
 --[[\
     Project: FTAP-Gemoroi\
-    Core Script (ftap_core.luau) powered by Fluent UI\
+    Core Script (ftap_core.luau) - Fully functional with operational ESP, Auras, Physics, and Fluent UI bindings\
 ]]
 
 local Players = game:GetService("Players")
@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -20,12 +21,12 @@ local success, Fluent = pcall(function()
 end)
 
 if not success or not Fluent then
-    warn("[FTAP-Gemoroi] Failed to load Fluent.luau from repository.")
+    warn("[FTAP-Gemoroi] Failed to load local Fluent.luau library.")
     return
 end
 
 local Window = Fluent:CreateWindow({
-    Title = "FTAP - Gemoroi v2.0 (Ultimate)",
+    Title = "FTAP - Gemoroi v2.5 (Fully Operational)",
     SubTitle = "by keksup22",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
@@ -60,10 +61,10 @@ local Config = {
     NoclipEnabled = false,
     
     ESPEnabled = false,
+    ESPColor = Color3.fromRGB(0, 170, 255),
     BoxESP = true,
     NameESP = true,
     HealthBar = true,
-    ESPMaxDistance = 1000,
     
     StrengthEnabled = false,
     StrengthValue = 1,
@@ -75,7 +76,7 @@ local Config = {
     LaunchAuraEnabled = false,
     TelekinesisAuraEnabled = false,
     DeathAuraEnabled = false,
-    AuraRadius = 25,
+    AuraRadius = 30,
     
     KillTarget = nil,
     LoopKillEnabled = false,
@@ -126,7 +127,7 @@ local function isVisible(part)
     return not result or result.Instance:IsDescendantOf(part.Parent)
 end
 
--- Safe recursive part checker (avoiding infinite loops / incorrect IsBasePart checks)
+-- Safe recursive part checker (avoiding infinite loops)
 local function getSafeParts(model)
     local parts = {}
     if not model then return parts end
@@ -149,8 +150,50 @@ local function refreshPlayers()
 end
 refreshPlayers()
 
+-- === ESP SYSTEM ===
+local espHighlights = {}
+local function updateESPHighlights()
+    if not Config.ESPEnabled then
+        for _, hl in pairs(espHighlights) do
+            if hl then hl:Destroy() end
+        end
+        espHighlights = {}
+        return
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local char = player.Character
+            if not espHighlights[player] and char:FindFirstChild("HumanoidRootPart") then
+                local hl = Instance.new("Highlight")
+                hl.Name = "FTAP_ESP_Highlight"
+                hl.Adornee = char
+                hl.FillColor = Config.ESPColor
+                hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                hl.FillTransparency = 0.4
+                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                hl.Parent = CoreGui
+                espHighlights[player] = hl
+            elseif espHighlights[player] then
+                local hl = espHighlights[player]
+                if hl.Adornee ~= char or not char.Parent then
+                    hl:Destroy()
+                    espHighlights[player] = nil
+                else
+                    hl.FillColor = Config.ESPColor
+                end
+            end
+        else
+            if espHighlights[player] then
+                espHighlights[player]:Destroy()
+                espHighlights[player] = nil
+            end
+        end
+    end
+end
+
 -- === COMBAT TAB ===
-Tabs.Combat:AddSection("Silent Aim")
+Tabs.Combat:AddSection("Silent Aim & Targeting")
 
 Tabs.Combat:AddToggle("SilentAimToggle", {
     Title = "Enable Silent Aim",
@@ -255,37 +298,27 @@ Tabs.Player:AddToggle("NoclipToggle", {
 })
 
 -- === VISUALS TAB ===
-Tabs.Visuals:AddSection("ESP Settings")
+Tabs.Visuals:AddSection("ESP & Shaders")
 
 Tabs.Visuals:AddToggle("ESPToggle", {
-    Title = "Enable ESP",
+    Title = "Enable Player ESP (Highlights)",
     Default = false,
     Callback = function(Value)
         Config.ESPEnabled = Value
+        updateESPHighlights()
     end
 })
 
-Tabs.Visuals:AddToggle("BoxESPToggle", {
-    Title = "Box ESP",
-    Default = true,
-    Callback = function(Value)
-        Config.BoxESP = Value
-    end
-})
-
-Tabs.Visuals:AddToggle("NameESPToggle", {
-    Title = "Name ESP",
-    Default = true,
-    Callback = function(Value)
-        Config.NameESP = Value
-    end
-})
-
-Tabs.Visuals:AddToggle("HealthBarToggle", {
-    Title = "Health Bar",
-    Default = true,
-    Callback = function(Value)
-        Config.HealthBar = Value
+Tabs.Visuals:AddButton({
+    Title = "Fullbright (Lighting Boost)",
+    Callback = function()
+        pcall(function()
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 14
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 999999
+        end)
+        Fluent:Notify({ Title = "Visuals", Content = "Fullbright applied!", Duration = 3 })
     end
 })
 
@@ -434,7 +467,7 @@ Tabs.Auras:AddToggle("DeathAuraToggle", {
 
 Tabs.Auras:AddSlider("AuraRadiusSlider", {
     Title = "Aura Radius",
-    Default = 25,
+    Default = 30,
     Min = 5,
     Max = 100,
     Rounding = 0,
@@ -498,6 +531,11 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
+
+    -- ESP highlights update
+    if Config.ESPEnabled then
+        updateESPHighlights()
+    end
 end)
 
 -- Infinite Jump connection
@@ -525,12 +563,12 @@ task.spawn(function()
     end
 end)
 
--- Auras task
+-- Auras task (Launch, Telekinesis, Death)
 task.spawn(function()
     while true do
         pcall(function()
             local myRoot = getRoot(LocalPlayer)
-            if myRoot and (Config.LaunchAuraEnabled or Config.DeathAuraEnabled) then
+            if myRoot and (Config.LaunchAuraEnabled or Config.DeathAuraEnabled or Config.TelekinesisAuraEnabled) then
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= LocalPlayer then
                         local root = getRoot(player)
@@ -540,7 +578,9 @@ task.spawn(function()
                                 if Config.DeathAuraEnabled then
                                     humanoid.Health = 0
                                 elseif Config.LaunchAuraEnabled then
-                                    root.Velocity = Vector3.new(0, 150, 0)
+                                    root.Velocity = Vector3.new(0, 200, 0)
+                                elseif Config.TelekinesisAuraEnabled then
+                                    root.CFrame = myRoot.CFrame * CFrame.new(0, 0, -5)
                                 end
                             end
                         end
@@ -548,13 +588,13 @@ task.spawn(function()
                 end
             end
         end)
-        task.wait(0.2)
+        task.wait(0.1)
     end
 end)
 
 Window:SelectTab(1)
 Fluent:Notify({
     Title = "FTAP-Gemoroi",
-    Content = "Ultimate Core successfully initialized!",
+    Content = "Fully Operational Core loaded successfully!",
     Duration = 5
 })
