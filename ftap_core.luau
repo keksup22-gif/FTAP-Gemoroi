@@ -592,7 +592,7 @@ task.spawn(function()
     end
 end)
 
--- Defense & Anti-Grab background task (Omega EZ & Amethyst defense ported)
+-- Supercharged Anti-Grab & Defense background task
 task.spawn(function()
     pcall(function()
         Workspace.DescendantAdded:Connect(function(d)
@@ -611,14 +611,28 @@ task.spawn(function()
             if Config.AntiGrabEnabled then
                 local isHeldVal = LocalPlayer:FindFirstChild("IsHeld")
                 if isHeldVal and isHeldVal.Value then
-                    local struggleEvent = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
-                    if struggleEvent then
-                        struggleEvent:FireServer()
-                    end
-                    if hrp then
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                        hrp.AssemblyAngularVelocity = Vector3.zero
-                    end
+                    pcall(function()
+                        local struggleEvent = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
+                        if struggleEvent then
+                            struggleEvent:FireServer()
+                            struggleEvent:FireServer()
+                        end
+                        local destroyLine = ReplicatedStorage:FindFirstChild("GrabEvents") and ReplicatedStorage.GrabEvents:FindFirstChild("DestroyGrabLine")
+                        if destroyLine then
+                            destroyLine:FireServer()
+                        end
+                        if hrp then
+                            hrp.Anchored = true
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+                            hrp.AssemblyAngularVelocity = Vector3.zero
+                        end
+                    end)
+                else
+                    pcall(function()
+                        if hrp and hrp.Anchored then
+                            hrp.Anchored = false
+                        end
+                    end)
                 end
             end
 
@@ -636,7 +650,7 @@ task.spawn(function()
                 end
             end
         end)
-        task.wait(0.1)
+        task.wait(0.02)
     end
 end)
 
