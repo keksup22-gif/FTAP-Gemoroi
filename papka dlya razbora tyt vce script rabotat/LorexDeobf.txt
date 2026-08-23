@@ -1,0 +1,1188 @@
+-- By FTAP Reverse Bot
+-- t.me/ReverseFTAP
+
+local Env = getfenv();
+local w = {};
+v4 = game;
+r24 = loadstring(v4.HttpGet(v4, "https://raw.githubusercontent.com/katnaa-debug/SolarisUI/refs/heads/main/Lib.lua"))();
+O = game;
+r25 = O.GetService(O, "Players");
+v4 = game;
+v4 = game;
+r26 = v4.GetService(v4, "Workspace");
+v6 = game;
+r27 = v6.GetService(v6, "TweenService");
+B = game;
+r28 = B.GetService(B, "Lighting");
+T = game;
+r29 = T.GetService(T, "TeleportService");
+N = game;
+E = N.GetService(N, "ReplicatedStorage");
+r30 = r25.LocalPlayer;
+r31 = r26.CurrentCamera;
+r32 = {
+    ["ClockTime"] = r28.ClockTime,
+    ["Brightness"] = r28.Brightness,
+    ["Ambient"] = r28.Ambient,
+    ["OutdoorAmbient"] = r28.OutdoorAmbient,
+    ["FogColor"] = r28.FogColor,
+    ["FogStart"] = r28.FogStart,
+    ["FogEnd"] = r28.FogEnd,
+    ["GlobalShadows"] = r28.GlobalShadows
+};
+r33 = {};
+A = r28;
+n = A[3];
+for n, A in A[1], pairs(A.GetChildren(A)) do
+    N = n;
+    v7 = w[e];
+    if A.IsA(A, "Sky") or A.IsA(A, "Atmosphere") then
+        table.insert(r33, A.Clone(A));
+    end; 
+end;
+r34 = {
+    ["OutlineEnabled"] = false,
+    ["OutlineFillColor"] = Color3.fromRGB(150, 80, 255),
+    ["NoOutlineEnabled"] = false,
+    ["NoOutlineFillColor"] = Color3.fromRGB(150, 80, 255)
+};
+r35 = {
+    ["Enabled"] = false,
+    ["BeamColor"] = Color3.fromRGB(255, 255, 255),
+    ["Width"] = 1,
+    ["TextureID"] = "rbxassetid://446111271",
+    ["TextureSpeed"] = 2
+};
+r36 = {
+    ["Color"] = Color3.fromRGB(139, 69, 19),
+    ["Image"] = "",
+    ["AutoApply"] = false,
+    ["CustomMaterial"] = false,
+    ["Material"] = Enum.Material.Plastic,
+    ["XRayEnabled"] = false,
+    ["XRayColor"] = Color3.fromRGB(100, 200, 255),
+    ["XRayTransparency"] = 60
+};
+r37 = {
+    ["FovValue"] = 90,
+    ["FovEnabled"] = false,
+    ["DefaultFov"] = r31.FieldOfView,
+    ["FogEnabled"] = false,
+    ["FogColor"] = r28.FogColor,
+    ["FogStart"] = r28.FogStart,
+    ["FogEnd"] = r28.FogEnd
+};
+r38 = {};
+r39 = {};
+N = {};
+fT = Enum.Material;
+vT = fT[3];
+for vT, fT in fT[1], ipairs(fT.GetEnumItems(fT)) do
+    x = vT;
+    table.insert(N, fT.Name); 
+end;
+table.sort(N);
+x = r30.Name .. "SpawnedInToys";
+vT = r26;
+r40 = vT.FindFirstChild(vT, x) or vT.WaitForChild(vT, x);
+fT = E.FindFirstChild(E, "MenuToys");
+if fT then
+    fT = E.MenuToys;
+    C = fT.FindFirstChild(fT, "DestroyToy");
+end;
+v7 = w[e];
+r42 = fT;
+C = r24;
+fT = C.CreateWindow(C, {
+    ["Title"] = "Omnius Visuals",
+    ["Theme"] = {
+        ["Font"] = "Roboto",
+        ["ImageTransparency"] = 15,
+        ["BGTransparency"] = 65,
+        ["OrbsTransparency"] = 100,
+        ["BackgroundID"] = "1288582613",
+        ["Main"] = Color3.fromRGB(20, 15, 30),
+        ["Second"] = Color3.fromRGB(30, 25, 45),
+        ["ElementAccent"] = Color3.fromRGB(90, 60, 130),
+        ["TextColor"] = Color3.fromRGB(210, 190, 230),
+        ["GradientStart"] = Color3.fromRGB(120, 70, 180),
+        ["GradientEnd"] = Color3.fromRGB(40, 20, 60)
+    },
+    ["ToggleKey"] = Enum.KeyCode.RightShift,
+    ["Transparency"] = 0.25,
+    ["ShowWatermark"] = {
+        ["Enabled"] = true,
+        ["Title"] = false,
+        ["User"] = false,
+        ["FPS"] = true,
+        ["Time"] = false,
+        ["Ping"] = true
+    },
+    ["AutoSave"] = true,
+    ["ConfigFolder"] = "Omnius-Visual",
+    ["CustomIcon"] = "1288582613"
+});
+local function r43(arg1_2, ...)
+    v1 = arg1_2;
+    if not r39[v1] then
+        r39[v1] = {
+            ["Material"] = v1.Material,
+            ["Color"] = v1.Color,
+            ["Transparency"] = v1.Transparency
+        };
+    end;
+    return; 
+end;
+local function r44(arg1_3, ...)
+    r45 = arg1_3;
+    e = r45;
+    O = e.IsA(e, "BasePart");
+    if O then
+        v3 = r45.Name ~= "HoldPart";
+    end;
+    if O then
+        r43(r45);
+        pcall(function(...)
+            e = r15;
+            if r36.XRayEnabled then
+                v7 = r27;
+                e = v7.Create(v7, r45, TweenInfo.new(0.5), {
+                    ["Color"] = r36.XRayColor,
+                    ["Transparency"] = r36.XRayTransparency / 100
+                });
+                e.Play(e);
+                r45.Material = Enum.Material.ForceField;
+                v7 = r45;
+                O = v7.FindFirstChild(v7, "XRayGlow");
+                if not O then
+                    O = Instance.new("PointLight");
+                    O.Name = "XRayGlow";
+                    O.Parent = r45;
+                    O.Range = 6;
+                    O.Brightness = 0.5;
+                    O.Shadows = false;
+                end;
+                O.Color = r36.XRayColor;
+                v2 = r45;
+                v6 = {
+                    v2.GetChildren(v2)
+                };
+                Q = v2[2];
+                p = v2[1];
+                for v4, v6 in pairs(g(v6)) do
+                    v2 = v4;
+                    if v6.IsA(v6, "Decal") or v6.IsA(v6, "Texture") then
+                        v6.Transparency = 1;
+                    end; 
+                end;
+                return;
+            end;
+            v7 = r45;
+            v1 = v7.FindFirstChild(v7, "XRayGlow");
+            if v1 then
+                v1.Destroy(v1);
+            end;
+            if r36.CustomMaterial then
+                r45.Material = r36.Material;
+            else
+                r45.Material = r39[r45].Material;
+            end;
+            if r36.AutoApply then
+                v7 = r27;
+                e = v7.Create(v7, r45, TweenInfo.new(0.5), {
+                    ["Color"] = r36.Color,
+                    ["Transparency"] = r39[r45].Transparency
+                });
+                e.Play(e);
+                if r36.Image ~= "" then
+                    v4 = r45;
+                    v2 = {
+                        v4.GetChildren(v4)
+                    };
+                    p = v4[2];
+                    Q = v4[3];
+                    for Q, v2 in pairs(g(v2)) do
+                        v4 = Q;
+                        if v2.IsA(v2, "Decal") or v2.IsA(v2, "Texture") then
+                            v2.Destroy(v2);
+                        end; 
+                    end;
+                    O = Instance.new("Decal");
+                    O.Texture = r36.Image;
+                    O.Face = Enum.NormalId.Top;
+                    O.Parent = r45;
+                end;
+            else
+                v4 = r16;
+                if not r36.CustomMaterial then
+                    v7 = r27;
+                    e = v7.Create(v7, r45, TweenInfo.new(0.5), {
+                        ["Color"] = r39[r45].Color,
+                        ["Transparency"] = r39[r45].Transparency
+                    });
+                    e.Play(e);
+                    v4 = r45;
+                    v2 = {
+                        v4.GetChildren(v4)
+                    };
+                    Q = v4[3];
+                    for Q, v2 in v4[1], pairs(g(v2)) do
+                        v4 = Q;
+                        if v2.IsA(v2, "Decal") or v2.IsA(v2, "Texture") then
+                            v2.Transparency = 0;
+                        end; 
+                    end;
+                end;
+                return;
+            end; 
+        end);
+    end;
+    return; 
+end;
+local function r46(arg1_4, ...)
+    r47 = arg1_4;
+    O = r47;
+    if not O.IsA(O, "Model") or not O.find(O, "Pallet") then
+        return;
+    end;
+    if r38[r47] then
+        return;
+    end;
+    r38[r47] = true;
+    p = r47;
+    O = p[3];
+    e = p[2];
+    for O, v4 in pairs(p.GetDescendants(p)) do
+        Q = O;
+        r44(v4); 
+    end;
+    v7 = r47.DescendantAdded;
+    r48 = v7.Connect(v7, function(arg1_5, ...)
+        task.wait();
+        r44(arg1_5);
+        return; 
+    end);
+    v7 = r47.AncestryChanged;
+    v7.Connect(v7, function(...)
+        if not r47.Parent then
+            v7 = r48;
+            if v7 then
+                v7 = r48;
+                v7.Disconnect(v7);
+            end;
+            r38[r47] = nil;
+            O = r47;
+            e = O[3];
+            v1 = O[2];
+            O = "pairs";
+            for e, Q in pairs(O.GetDescendants(O)) do
+                r38[Q] = nil;
+                p = e; 
+            end;
+        end;
+        return; 
+    end);
+    return; 
+end;
+local function r49(...)
+    v7 = pairs;
+    O = r40;
+    v1 = O[2];
+    O = O[1];
+    for e, Q in v7(O.GetChildren(O)) do
+        p = e;
+        v7 = Q.Name;
+        if v7.find(v7, "Pallet") then
+            T = Q.GetDescendants;
+            v2 = T[2];
+            v6 = T[3];
+            for v6, T in pairs(T(Q)) do
+                B = v6;
+                r44(T); 
+            end;
+        end; 
+    end;
+    return; 
+end;
+(function(...)
+    O = r40;
+    v1 = O[2];
+    e = O[3];
+    O = "pairs";
+    for e, Q in pairs(O.GetChildren(O)) do
+        p = e;
+        r50 = Q;
+        task.spawn(function(...)
+            r46(r50);
+            return; 
+        end); 
+    end;
+    v7 = not r41;
+    if v7 then
+        v7 = r40.ChildAdded;
+        r41 = v7.Connect(v7, function(arg1_6, ...)
+            task.wait(.1);
+            r46(arg1_6);
+            return; 
+        end);
+    end;
+    return; 
+end)();
+local function r51(arg1_7, ...)
+    v1 = arg1_7;
+    if v1 == "" or v1 == nil then
+        return;
+    end;
+    r52 = tonumber(v1);
+    if not r52 then
+        return;
+    end;
+    Q = r28;
+    O = Q[2];
+    Q = Q[1];
+    for p, v2 in pairs(Q.GetChildren(Q)) do
+        v4 = p;
+        if v2.IsA(v2, "Sky") or v2.IsA(v2, "Atmosphere") then
+            v2.Destroy(v2);
+        end; 
+    end;
+    pcall(function(...)
+        v7 = game;
+        v1 = v7.GetObjects(v7, "rbxassetid://" .. r52);
+        if v1 then
+            v3 = v1[1];
+        end;
+        if v1 then
+            v1[1].Parent = r28;
+        end;
+        return; 
+    end);
+    return; 
+end;
+local function r53(...)
+    if r37.FogEnabled then
+        r28.FogColor = r37.FogColor;
+        r28.FogStart = r37.FogStart;
+        r28.FogEnd = r37.FogEnd;
+    else
+        r28.FogColor = r32.FogColor;
+        r28.FogStart = r32.FogStart;
+        r28.FogEnd = r32.FogEnd;
+    end;
+    return; 
+end;
+local function r54(...)
+    r28.ClockTime = r32.ClockTime;
+    r28.Brightness = r32.Brightness;
+    r28.Ambient = r32.Ambient;
+    r28.OutdoorAmbient = r32.OutdoorAmbient;
+    r28.FogColor = r32.FogColor;
+    r28.FogStart = r32.FogStart;
+    r28.FogEnd = r32.FogEnd;
+    r28.GlobalShadows = r32.GlobalShadows;
+    O = r28;
+    v1 = O[2];
+    O = O[1];
+    for e, Q in pairs(O.GetChildren(O)) do
+        p = e;
+        if Q.IsA(Q, "Sky") or Q.IsA(Q, "Atmosphere") then
+            Q.Destroy(Q);
+        end; 
+    end;
+    O = Q[3];
+    for O, Q in Q[1], pairs(r33) do
+        p = O;
+        Q.Clone(Q).Parent = r28; 
+    end;
+    r37.FogEnabled = false;
+    v7 = r24;
+    v7.Notify(v7, {
+        ["Title"] = "World",
+        ["Content"] = "Restored to Defaults",
+        ["Duration"] = 2
+    });
+    return; 
+end;
+zT = fT.CreateTab(fT, "Players", true);
+JT = zT.CreateBlock(zT, {
+    ["Name"] = "ESP With Outline",
+    ["Side"] = "Left"
+});
+eT = zT.CreateBlock(zT, {
+    ["Name"] = "ESP Without Outline",
+    ["Side"] = "Right"
+});
+JT.CreateToggle(JT, {
+    ["Name"] = "Enable ESP (Outline)",
+    ["Default"] = false,
+    ["Callback"] = function(arg1_8, ...)
+        r34.OutlineEnabled = arg1_8;
+        return; 
+    end
+});
+JT.CreateColorPicker(JT, {
+    ["Name"] = "Fill Color",
+    ["Default"] = r34.OutlineFillColor,
+    ["Callback"] = function(arg1_9, ...)
+        r34.OutlineFillColor = arg1_9;
+        return; 
+    end
+});
+eT.CreateToggle(eT, {
+    ["Name"] = "Enable ESP (Fill Only)",
+    ["Default"] = false,
+    ["Callback"] = function(arg1_10, ...)
+        r34.NoOutlineEnabled = arg1_10;
+        return; 
+    end
+});
+eT.CreateColorPicker(eT, {
+    ["Name"] = "Fill Color",
+    ["Default"] = r34.NoOutlineFillColor,
+    ["Callback"] = function(arg1_11, ...)
+        r34.NoOutlineFillColor = arg1_11;
+        return; 
+    end
+});
+OT = fT.CreateTab(fT, "Line", true);
+pT = OT.CreateBlock(OT, {
+    ["Name"] = "Visual Settings",
+    ["Side"] = "Left"
+});
+mT = OT.CreateBlock(OT, {
+    ["Name"] = "Properties",
+    ["Side"] = "Right"
+});
+pT.CreateToggle(pT, {
+    ["Name"] = "Enable Custom Line",
+    ["Default"] = false,
+    ["Callback"] = function(arg1_12, ...)
+        r35.Enabled = arg1_12;
+        return; 
+    end
+});
+pT.CreateInput(pT, {
+    ["Name"] = "Texture Image (ID)",
+    ["Placeholder"] = "ID",
+    ["Default"] = "",
+    ["Callback"] = function(arg1_13, ...)
+        v1 = arg1_13;
+        if tonumber(v1) then
+            r35.TextureID = "rbxassetid://" .. v1;
+        else
+            if arg1_13 == "" then
+                r35.TextureID = "rbxassetid://446111271";
+            else
+                r35.TextureID = arg1_13;
+            end;
+            return;
+        end; 
+    end
+});
+pT.CreateColorPicker(pT, {
+    ["Name"] = "Beam Color",
+    ["Default"] = r35.BeamColor,
+    ["Callback"] = function(arg1_14, ...)
+        r35.BeamColor = arg1_14;
+        return; 
+    end
+});
+mT.CreateSlider(mT, {
+    ["Name"] = "Line Width",
+    ["Min"] = 1,
+    ["Max"] = 50,
+    ["Default"] = 10,
+    ["Callback"] = function(arg1_15, ...)
+        r35.Width = arg1_15 / 10;
+        return; 
+    end
+});
+mT.CreateSlider(mT, {
+    ["Name"] = "Anim Speed",
+    ["Min"] = 0,
+    ["Max"] = 10,
+    ["Default"] = 2,
+    ["Callback"] = function(arg1_16, ...)
+        r35.TextureSpeed = arg1_16;
+        return; 
+    end
+});
+QT = fT.CreateTab(fT, "Pallets", true);
+ZT = QT.CreateBlock(QT, {
+    ["Name"] = "X-Ray & Vision",
+    ["Side"] = "Left"
+});
+cT = QT.CreateBlock(QT, {
+    ["Name"] = "Material & Texture",
+    ["Side"] = "Right"
+});
+ZT.CreateToggle(ZT, {
+    ["Name"] = "X-Ray Mode",
+    ["Default"] = false,
+    ["Callback"] = function(arg1_17, ...)
+        r36.XRayEnabled = arg1_17;
+        r49();
+        return; 
+    end
+});
+ZT.CreateColorPicker(ZT, {
+    ["Name"] = "X-Ray Color",
+    ["Default"] = r36.XRayColor,
+    ["Callback"] = function(arg1_18, ...)
+        e = arg1_18;
+        r36.XRayColor = e;
+        if r36.XRayEnabled then
+            r49();
+        end;
+        return; 
+    end
+});
+ZT.CreateSlider(ZT, {
+    ["Name"] = "Transparency",
+    ["Min"] = 0,
+    ["Max"] = 100,
+    ["Default"] = 60,
+    ["Callback"] = function(arg1_19, ...)
+        e = arg1_19;
+        r36.XRayTransparency = e;
+        if r36.XRayEnabled then
+            r49();
+        end;
+        return; 
+    end
+});
+cT.CreateSection(cT, "Material Override");
+cT.CreateToggle(cT, {
+    ["Name"] = "Custom Material",
+    ["Default"] = false,
+    ["Callback"] = function(arg1_20, ...)
+        r36.CustomMaterial = arg1_20;
+        r49();
+        return; 
+    end
+});
+cT.CreateDropdown(cT, {
+    ["Name"] = "Select Material",
+    ["Items"] = N,
+    ["Default"] = "Plastic",
+    ["Callback"] = function(arg1_21, ...)
+        r36.Material = Enum.Material[arg1_21];
+        if r36.CustomMaterial then
+            r49();
+        end;
+        return; 
+    end
+});
+cT.CreateSection(cT, "Texture Override");
+cT.CreateToggle(cT, {
+    ["Name"] = "Auto Apply (Color/Img)",
+    ["Default"] = false,
+    ["Callback"] = function(arg1_22, ...)
+        r36.AutoApply = arg1_22;
+        r49();
+        return; 
+    end
+});
+cT.CreateColorPicker(cT, {
+    ["Name"] = "Pallet Color",
+    ["Default"] = r36.Color,
+    ["Callback"] = function(arg1_23, ...)
+        e = arg1_23;
+        r36.Color = e;
+        if r36.AutoApply then
+            r49();
+        end;
+        return; 
+    end
+});
+cT.CreateInput(cT, {
+    ["Name"] = "Pallet Image ID",
+    ["Placeholder"] = "ID",
+    ["Default"] = "",
+    ["Callback"] = function(arg1_24, ...)
+        v1 = arg1_24;
+        if tonumber(v1) then
+            r36.Image = "rbxassetid://" .. v1;
+        else
+            e = arg1_24;
+            r36.Image = e;
+        end;
+        if r36.AutoApply then
+            r49();
+        end;
+        return; 
+    end
+});
+HT = fT.CreateTab(fT, "World", true);
+rT = HT.CreateBlock(HT, {
+    ["Name"] = "Environment",
+    ["Side"] = "Left"
+});
+aT = HT.CreateBlock(HT, {
+    ["Name"] = "Map Customizer",
+    ["Side"] = "Left"
+});
+VT = HT.CreateBlock(HT, {
+    ["Name"] = "Fog & System",
+    ["Side"] = "Right"
+});
+r55 = {};
+r56 = {
+    ["Snow"] = {},
+    ["Sand"] = {},
+    ["Grass"] = {},
+    ["LushGrass"] = {},
+    ["Rock"] = {},
+    ["WasteGrass"] = {}
+};
+ET = workspace;
+dT = ET[1];
+jT = ET[2];
+for TT, ET in ipairs(ET.GetDescendants(ET)) do
+    iT = TT;
+    v7 = w[e];
+    if ET.IsA(ET, "BasePart") and r56[ET.Name] then
+        table.insert(r56[ET.Name], ET);
+        if not r55[ET] then
+            r55[ET] = ET.Color;
+        end;
+    end; 
+end;
+local function iT(arg1_25, arg2_25, ...)
+    O = r56[arg1_25];
+    if O then
+        v3 = #O > 0;
+    end;
+    if O then
+        return O[1].Color;
+    end;
+    return arg2_25; 
+end;
+local function r57(arg1_26, arg2_26, ...)
+    e = arg2_26;
+    O = r56[arg1_26];
+    if O then
+        for p = 1, #O do
+            B = O[p];
+            if B then
+                v3 = B.Parent;
+            end;
+            if B then
+                B.Color = arg2_26;
+            end; 
+        end;
+    end;
+    return; 
+end;
+local function r58(...)
+    O = r55;
+    e = 41[3];
+    O = 41[1];
+    for e, Q in O, pairs(O) do
+        if e then
+            v4 = e.Parent;
+        end;
+        if e then
+            e.Color = Q;
+        end; 
+    end;
+    v7 = w[Q];
+    v7.Notify(v7, {
+        ["Title"] = "Map",
+        ["Content"] = "Colors Restored",
+        ["Duration"] = 2
+    });
+    return; 
+end;
+aT.CreateColorPicker(aT, {
+    ["Name"] = "Snow Color",
+    ["Default"] = iT("Snow", Color3.fromRGB(255, 255, 255)),
+    ["Callback"] = function(arg1_27, ...)
+        r57("Snow", arg1_27);
+        return; 
+    end
+});
+aT.CreateColorPicker(aT, {
+    ["Name"] = "Sand Color",
+    ["Default"] = iT("Sand", Color3.fromRGB(194, 178, 128)),
+    ["Callback"] = function(arg1_28, ...)
+        r57("Sand", arg1_28);
+        return; 
+    end
+});
+aT.CreateColorPicker(aT, {
+    ["Name"] = "Grass Color",
+    ["Default"] = iT("Grass", Color3.fromRGB(110, 148, 56)),
+    ["Callback"] = function(arg1_29, ...)
+        r57("Grass", arg1_29);
+        return; 
+    end
+});
+aT.CreateColorPicker(aT, {
+    ["Name"] = "Grass 2 Color",
+    ["Default"] = iT("LushGrass", Color3.fromRGB(82, 124, 38)),
+    ["Callback"] = function(arg1_30, ...)
+        r57("LushGrass", arg1_30);
+        return; 
+    end
+});
+aT.CreateColorPicker(aT, {
+    ["Name"] = "Rock Color",
+    ["Default"] = iT("Rock", Color3.fromRGB(120, 120, 120)),
+    ["Callback"] = function(arg1_31, ...)
+        r57("Rock", arg1_31);
+        return; 
+    end
+});
+aT.CreateColorPicker(aT, {
+    ["Name"] = "Waste Grass",
+    ["Default"] = iT("WasteGrass", Color3.fromRGB(100, 100, 70)),
+    ["Callback"] = function(arg1_32, ...)
+        r57("WasteGrass", arg1_32);
+        return; 
+    end
+});
+aT.CreateButton(aT, {
+    ["Name"] = "Reset Map Colors",
+    ["Callback"] = function(...)
+        r58();
+        return; 
+    end
+});
+rT.CreateSlider(rT, {
+    ["Name"] = "Time of Day",
+    ["Min"] = 0,
+    ["Max"] = 24,
+    ["Default"] = 12,
+    ["Callback"] = function(arg1_33, ...)
+        r28.ClockTime = arg1_33;
+        return; 
+    end
+});
+rT.CreateSlider(rT, {
+    ["Name"] = "Brightness",
+    ["Min"] = 0,
+    ["Max"] = 10,
+    ["Default"] = 2,
+    ["Callback"] = function(arg1_34, ...)
+        r28.Brightness = arg1_34;
+        return; 
+    end
+});
+rT.CreateColorPicker(rT, {
+    ["Name"] = "Ambient Color",
+    ["Default"] = r28.OutdoorAmbient,
+    ["Callback"] = function(arg1_35, ...)
+        v1 = arg1_35;
+        e = v1;
+        r28.OutdoorAmbient = e;
+        r28.Ambient = v1;
+        return; 
+    end
+});
+rT.CreateInput(rT, {
+    ["Name"] = "Skybox ID",
+    ["Placeholder"] = "ID",
+    ["Default"] = "",
+    ["Callback"] = function(arg1_36, ...)
+        r51(arg1_36);
+        return; 
+    end
+});
+VT.CreateToggle(VT, {
+    ["Name"] = "Enable Fog",
+    ["Default"] = false,
+    ["Callback"] = function(arg1_37, ...)
+        r37.FogEnabled = arg1_37;
+        r53();
+        return; 
+    end
+});
+VT.CreateColorPicker(VT, {
+    ["Name"] = "Fog Color",
+    ["Default"] = r28.FogColor,
+    ["Callback"] = function(arg1_38, ...)
+        v1 = arg1_38;
+        e = v1;
+        r37.FogColor = e;
+        e = "FogEnabled";
+        if r37[e] then
+            e = arg1_38;
+            r28.FogColor = e;
+        end;
+        return; 
+    end
+});
+VT.CreateSlider(VT, {
+    ["Name"] = "Fog Distance",
+    ["Min"] = 10,
+    ["Max"] = 5000,
+    ["Default"] = 1000,
+    ["Callback"] = function(arg1_39, ...)
+        v1 = arg1_39;
+        e = v1;
+        r37.FogEnd = e;
+        e = "FogEnabled";
+        if r37[e] then
+            e = arg1_39;
+            r28.FogEnd = e;
+        end;
+        return; 
+    end
+});
+VT.CreateSlider(VT, {
+    ["Name"] = "Fog Start",
+    ["Min"] = 0,
+    ["Max"] = 500,
+    ["Default"] = 0,
+    ["Callback"] = function(arg1_40, ...)
+        v1 = arg1_40;
+        e = v1;
+        r37.FogStart = e;
+        e = "FogEnabled";
+        if r37[e] then
+            e = arg1_40;
+            r28.FogStart = e;
+        end;
+        return; 
+    end
+});
+VT.CreateButton(VT, {
+    ["Name"] = "Reset World Defaults",
+    ["Callback"] = function(...)
+        r54();
+        return; 
+    end
+});
+TT = fT.CreateTab(fT, "Other", true);
+ET = TT.CreateBlock(TT, {
+    ["Name"] = "Camera",
+    ["Side"] = "Left"
+});
+NT = TT.CreateBlock(TT, {
+    ["Name"] = "Server & Actions",
+    ["Side"] = "Right"
+});
+ET.CreateSlider(ET, {
+    ["Name"] = "FOV Value",
+    ["Min"] = 1,
+    ["Max"] = 120,
+    ["Default"] = 70,
+    ["Callback"] = function(arg1_41, ...)
+        v1 = arg1_41;
+        e = v1;
+        r37.FovValue = e;
+        e = "FovEnabled";
+        if r37[e] then
+            e = arg1_41;
+            r31.FieldOfView = e;
+        end;
+        return; 
+    end
+});
+ET.CreateKeybind(ET, {
+    ["Name"] = "Toggle FOV Key",
+    ["Default"] = Enum.KeyCode.V,
+    ["Callback"] = function(...)
+        r37.FovEnabled = not r37.FovEnabled;
+        v7 = r37.FovEnabled;
+        if v7 then
+            r31.FieldOfView = r37.FovValue;
+            v7 = r24;
+            v7.Notify(v7, {
+                ["Title"] = "FOV",
+                ["Content"] = "Enabled",
+                ["Duration"] = 1
+            });
+        else
+            r31.FieldOfView = r37.DefaultFov;
+            v7 = r24;
+            v7.Notify(v7, {
+                ["Title"] = "FOV",
+                ["Content"] = "Disabled",
+                ["Duration"] = 1
+            });
+        end;
+        return; 
+    end
+});
+NT.CreateButton(NT, {
+    ["Name"] = "Rejoin Server",
+    ["Callback"] = function(...)
+        v7 = r24;
+        v7.Notify(v7, {
+            ["Title"] = "Rejoin",
+            ["Content"] = "Rejoining...",
+            ["Duration"] = 3
+        });
+        v1 = r25;
+        v7 = #v1.GetPlayers(v1) <= 1;
+        if v7 then
+            v7 = r30;
+            v7.Kick(v7, "Rejoining...");
+            task.wait();
+            v7 = r29;
+            v7.Teleport(v7, game.PlaceId, r30);
+        else
+            v7 = r29;
+            v7.Teleport(v7, game.PlaceId, r30);
+        end;
+        return; 
+    end
+});
+NT.CreateKeybind(NT, {
+    ["Name"] = "Delete Pallets (Bind)",
+    ["Default"] = Enum.KeyCode.Delete,
+    ["Callback"] = function(...)
+        v7 = not r42;
+        if v7 then
+            v7 = r24;
+            v7.Notify(v7, {
+                ["Title"] = "Error",
+                ["Content"] = "Remote not found!",
+                ["Duration"] = 3
+            });
+            return;
+        end;
+        v7 = pairs;
+        p = r40;
+        O = p[3];
+        p = p[1];
+        for O, v4 in p, v7(p.GetChildren(p)) do
+            Q = O;
+            v7 = v4.Name;
+            if v7.find(v7, "Pallet") then
+                v7 = r42;
+                v7.FireServer(v7, v4);
+                v1 = 0 + 1;
+            end; 
+        end;
+        e = 0 > 0;
+        if e then
+            e = r24;
+            e.Notify(e, {
+                ["Title"] = "Pallets",
+                ["Content"] = "Removed " .. 0 .. " items",
+                ["Duration"] = 2
+            });
+        else
+            e = r24;
+            e.Notify(e, {
+                ["Title"] = "Pallets",
+                ["Content"] = "No pallets found",
+                ["Duration"] = 2
+            });
+        end;
+        return; 
+    end
+});
+NT.CreateButton(NT, {
+    ["Name"] = "Clear All Toys (FPS Boost)",
+    ["Callback"] = function(...)
+        v7 = ipairs;
+        p = w[O];
+        e = p[2];
+        p = p[1];
+        for O, v4 in v7(p.GetPlayers(p)) do
+            Q = O;
+            v7 = r26;
+            if v7.FindFirstChild(v7, v4.Name .. "SpawnedInToys") then
+                v8 = v6.GetChildren;
+                T = v8[2];
+                B = v8[1];
+                for N, v8 in ipairs(v8(v6)) do
+                    E = N;
+                    v8.Destroy(v8);
+                    v1 = 0 + 1; 
+                end;
+            end; 
+        end;
+        e = 0 > 0;
+        if e then
+            e = r24;
+            e.Notify(e, {
+                ["Title"] = "Optimization",
+                ["Content"] = "Deleted " .. 0 .. " objects locally!",
+                ["Duration"] = 3
+            });
+        else
+            e = r24;
+            e.Notify(e, {
+                ["Title"] = "Optimization",
+                ["Content"] = "No objects found to delete.",
+                ["Duration"] = 2
+            });
+        end;
+        return; 
+    end
+});
+r59 = setmetatable({}, {
+    ["__mode"] = "k"
+});
+local function r61(arg1_42, ...)
+    v1 = arg1_42;
+    if v1.IsA(v1, "BasePart") then
+        if not r59[v1] then
+            r59[v1] = {
+                ["Material"] = v1.Material,
+                ["Color"] = v1.Color
+            };
+        end;
+        v1.Material = Enum.Material.Plastic;
+        v1.Color = Color3.new(v1.Color.R * .7, v1.Color.G * .7, v1.Color.B * .7);
+    else
+        if v1.IsA(v1, "Texture") or v1.IsA(v1, "Decal") then
+            if not r59[v1] then
+                r59[v1] = {
+                    ["Transparency"] = v1.Transparency
+                };
+            end;
+            v1.Transparency = 1;
+        end;
+        return;
+    end; 
+end;
+NT.CreateToggle(NT, {
+    ["Name"] = "Soap Textures (FPS Boost)",
+    ["Default"] = false,
+    ["Callback"] = function(arg1_43, ...)
+        if arg1_43 then
+            v7 = r24;
+            v7.Notify(v7, {
+                ["Title"] = "Optimization",
+                ["Content"] = "Applying Soap Textures...",
+                ["Duration"] = 2
+            });
+            task.spawn(function(...)
+                O = r26;
+                e = O[3];
+                O = O[1];
+                for e, Q in O, ipairs(O.GetDescendants(O)) do
+                    p = e;
+                    r61(Q); 
+                end;
+                v7 = r24;
+                v7.Notify(v7, {
+                    ["Title"] = "Optimization",
+                    ["Content"] = "Soap Textures Applied!",
+                    ["Duration"] = 2
+                });
+                return; 
+            end);
+            v7 = r26.DescendantAdded;
+            r60 = v7.Connect(v7, function(arg1_44, ...)
+                task.wait();
+                r61(arg1_44);
+                return; 
+            end);
+        else
+            v7 = r24;
+            v7.Notify(v7, {
+                ["Title"] = "Optimization",
+                ["Content"] = "Restoring Map...",
+                ["Duration"] = 2
+            });
+            if r60 then
+                v7 = r60;
+                v7.Disconnect(v7);
+            end;
+            task.spawn(function(...)
+                O = r59;
+                e = p[3];
+                O = p[1];
+                for e, Q in O, pairs(O) do
+                    if e then
+                        v4 = e.Parent;
+                    end;
+                    if e then
+                        if e.IsA(e, "BasePart") then
+                            e.Material = Q.Material;
+                            e.Color = Q.Color;
+                        else
+                            if e.IsA(e, "Texture") or e.IsA(e, "Decal") then
+                                e.Transparency = Q.Transparency;
+                            end;
+                        end;
+                    end; 
+                end;
+                r59 = setmetatable({}, {
+                    ["__mode"] = "k"
+                });
+                v7 = r24;
+                v7.Notify(v7, {
+                    ["Title"] = "Optimization",
+                    ["Content"] = "Map Restored!",
+                    ["Duration"] = 2
+                });
+                return; 
+            end);
+            return;
+        end; 
+    end
+});
+kT = v4.GetService(v4, "RunService").Heartbeat;
+kT.Connect(kT, function(...)
+    O = r25;
+    v1 = O[2];
+    O = O[1];
+    for e, Q in ipairs(O.GetPlayers(O)) do
+        p = e;
+        v4 = Q ~= r30 and Q.Character;
+        if v4 then
+            v4 = Q.Character;
+            v4.FindFirstChild(v4, "OmniusESP");
+            if r34.OutlineEnabled or r34.NoOutlineEnabled then
+                if not v2 then
+                    v2 = Instance.new("Highlight");
+                    v2.Name = "OmniusESP";
+                    v2.DepthMode = Enum.HighlightDepthMode.Occluded;
+                    v2.Parent = Q.Character;
+                end;
+                if r34.OutlineEnabled then
+                    v2.FillColor = r34.OutlineFillColor;
+                    v2.OutlineColor = Color3.fromRGB(255, 255, 255);
+                    v2.FillTransparency = 0.5;
+                    v2.OutlineTransparency = 0;
+                else
+                    if r34.NoOutlineEnabled then
+                        v2.FillColor = r34.NoOutlineFillColor;
+                        v2.FillTransparency = 0.5;
+                        v2.OutlineTransparency = 1;
+                    end;
+                end;
+            else
+                if v7 then
+                    v7.Destroy(v7);
+                end;
+            end;
+        end; 
+    end;
+    if not r35.Enabled then
+        return;
+    end;
+    v7 = r26;
+    v1 = v7.FindFirstChild(v7, "GrabParts");
+    if v1 then
+        v4 = v1.GetDescendants;
+        p = v4[3];
+        O = v4[2];
+        for p, v4 in pairs(v4(v1)) do
+            Q = p;
+            if v4.IsA(v4, "Beam") and v4.Name == "GrabBeam" then
+                v4.Texture = r35.TextureID;
+                v4.Color = ColorSequence.new(r35.BeamColor);
+                v4.Width0 = r35.Width;
+                v4.Width1 = r35.Width;
+                v4.TextureSpeed = r35.TextureSpeed;
+                v4.TextureMode = Enum.TextureMode.Wrap;
+                v4.TextureLength = 1;
+                v4.LightEmission = 1;
+                v4.Transparency = NumberSequence.new(0);
+            end; 
+        end;
+    end;
+    return; 
+end);
+return;
+end;
+end;
