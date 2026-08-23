@@ -39,6 +39,7 @@ local Tabs = {
     Combat = Window:AddTab({ Title = "Combat", Icon = "sword" }),
     Player = Window:AddTab({ Title = "Player", Icon = "user" }),
     Visuals = Window:AddTab({ Title = "Visuals", Icon = "eye" }),
+    Cosmetics = Window:AddTab({ Title = "Cosmetics & Shaders", Icon = "sparkles" }),
     Mass = Window:AddTab({ Title = "Mass / Troll", Icon = "zap" }),
     Protection = Window:AddTab({ Title = "Protection", Icon = "shield" }),
     Auras = Window:AddTab({ Title = "Auras", Icon = "target" }),
@@ -778,6 +779,96 @@ task.spawn(function()
         task.wait(0.02)
     end
 end)
+
+-- === COSMETICS & SHADERS TAB ===
+Tabs.Cosmetics:AddSection("Wings & Accessories")
+
+Tabs.Cosmetics:AddToggle("AngelWingsToggle", {
+    Title = "Angel Wings",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
+                if torso then
+                    local model = Instance.new("Model", char)
+                    model.Name = "AngelWings"
+                    for side = 1, 2 do
+                        local s = side == 1 and 1 or -1
+                        for row = 1, 3 do
+                            local part = Instance.new("Part", model)
+                            part.Size = Vector3.new(0.2, 1.2, 0.05)
+                            part.Color = Color3.fromRGB(255, 255, 255)
+                            part.Material = Enum.Material.SmoothPlastic
+                            part.CanCollide = false
+                            part.CFrame = torso.CFrame * CFrame.new(s * (0.5 + row * 0.2), 0.2, -0.3)
+                            local weld = Instance.new("Weld", part)
+                            weld.Part0 = torso
+                            weld.Part1 = part
+                            weld.C0 = torso.CFrame:ToObjectSpace(part.CFrame)
+                        end
+                    end
+                end
+            end)
+        else
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("AngelWings") then
+                    char.AngelWings:Destroy()
+                end
+            end)
+        end
+    end
+})
+
+Tabs.Cosmetics:AddSection("Atmosphere & Lighting Shaders")
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Dreamy (Galaxy)",
+    Callback = function()
+        pcall(function()
+            Lighting.ClockTime = 14
+            Lighting.Brightness = 2
+            Lighting.Ambient = Color3.fromRGB(120, 120, 120)
+            Lighting.OutdoorAmbient = Color3.fromRGB(200, 200, 200)
+            local cc = Instance.new("ColorCorrectionEffect", Lighting)
+            cc.Saturation = 0.5
+            cc.Contrast = 0.3
+            cc.TintColor = Color3.fromRGB(240, 220, 255)
+        end)
+        Fluent:Notify({ Title = "Shaders", Content = "Dreamy applied!", Duration = 2 })
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Desert Sunset",
+    Callback = function()
+        pcall(function()
+            Lighting.ClockTime = 7
+            Lighting.Brightness = 2.5
+            Lighting.Ambient = Color3.fromRGB(80, 40, 10)
+            Lighting.OutdoorAmbient = Color3.fromRGB(100, 50, 10)
+            local cc = Instance.new("ColorCorrectionEffect", Lighting)
+            cc.Saturation = 0.05
+            cc.TintColor = Color3.fromRGB(255, 224, 219)
+        end)
+        Fluent:Notify({ Title = "Shaders", Content = "Desert applied!", Duration = 2 })
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Bright Clean",
+    Callback = function()
+        pcall(function()
+            Lighting.ClockTime = 10
+            Lighting.Brightness = 2
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 999999
+        end)
+        Fluent:Notify({ Title = "Shaders", Content = "Bright applied!", Duration = 2 })
+    end
+})
 
 Window:SelectTab(1)
 Fluent:Notify({
