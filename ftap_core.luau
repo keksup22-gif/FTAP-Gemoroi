@@ -406,6 +406,44 @@ Tabs.Protection:AddToggle("AntiFlingToggle", {
     end
 })
 
+Tabs.Protection:AddToggle("AntiGucciToggle", {
+    Title = "Anti-Gucci (Blobman Seat Protection)",
+    Default = false,
+    Callback = function(Value)
+        Config.AntiGucciEnabled = Value
+        if Value then
+            task.spawn(function()
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    local hrp = getRoot(LocalPlayer)
+                    local hum = getHumanoid(LocalPlayer)
+                    if not char or not hrp or not hum then return end
+                    
+                    local spawnToy = ReplicatedStorage:FindFirstChild("MenuToys") and ReplicatedStorage.MenuToys:FindFirstChild("SpawnToyRemoteFunction")
+                    if spawnToy then
+                        spawnToy:InvokeServer("CreatureBlobman", hrp.CFrame * CFrame.new(0, 5, 0), Vector3.new(0, 0, 0))
+                    end
+                    task.wait(0.5)
+                    local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                    local blob = folder and folder:FindFirstChild("CreatureBlobman")
+                    local seat = blob and blob:FindFirstChild("VehicleSeat")
+                    if seat and seat:IsA("VehicleSeat") then
+                        seat:Sit(hum)
+                        Fluent:Notify({ Title = "Anti-Gucci", Content = "Protected inside Blobman seat!", Duration = 3 })
+                    end
+                end)
+            end)
+        else
+            pcall(function()
+                local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                if folder and folder:FindFirstChild("CreatureBlobman") then
+                    folder.CreatureBlobman:Destroy()
+                end
+            end)
+        end
+    end
+})
+
 Tabs.Protection:AddToggle("AutoAntiRagdollToggle", {
     Title = "Auto Anti Ragdoll",
     Default = false,
