@@ -15,18 +15,27 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-local success, Fluent = pcall(function()
-    local ok, res = pcall(function()
-        return loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-    end)
-    if ok and res then
-        return res
-    end
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/main.lua"))()
-end)
+local Fluent = nil
+local fluentSources = {
+    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/main.lua",
+    "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua",
+    "https://raw.githubusercontent.com/disco0001/FluentUI/main/main.lua"
+}
 
-if not success or not Fluent then
-    warn("[FTAP-Gemoroi] Failed to load Fluent UI library.")
+for _, url in ipairs(fluentSources) do
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet(url))()
+    end)
+    if success and result then
+        Fluent = result
+        break
+    else
+        warn("[FTAP-Gemoroi] Failed to load from " .. url .. ": " .. tostring(result))
+    end
+end
+
+if not Fluent then
+    warn("[FTAP-Gemoroi] CRITICAL: All Fluent UI sources failed to load!")
     return
 end
 
