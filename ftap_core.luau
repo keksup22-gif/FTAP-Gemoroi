@@ -790,34 +790,36 @@ Tabs.Cosmetics:AddToggle("AngelWingsToggle", {
         if Value then
             pcall(function()
                 local char = LocalPlayer.Character
-                local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
-                if not torso then return end
+                local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+                if not root then return end
+                if char:FindFirstChild("AngelWings") then char.AngelWings:Destroy() end
+
                 local model = Instance.new("Model", char)
                 model.Name = "AngelWings"
-                for side = 1, 2 do
-                    local s = side == 1 and 1 or -1
-                    for row = 1, 4 do
-                        local featherCount = 6 - row
-                        for i = 1, featherCount do
-                            local part = Instance.new("Part", model)
-                            part.Size = Vector3.new(0.15, 1.4, 0.04)
-                            part.Color = Color3.fromRGB(245, 245, 255)
-                            part.Material = Enum.Material.SmoothPlastic
-                            part.CanCollide = false
-                            local angle = (i - featherCount/2) * 0.25
-                            local attachPos = torso.CFrame * CFrame.new(
-                                s * (0.5 + row * 0.2),
-                                0.2 + row * 0.15,
-                                -0.35
-                            ) * CFrame.Angles(0, math.rad(s * 35 + angle * 20), math.rad(s * 15))
-                            part.CFrame = attachPos
-                            local weld = Instance.new("Weld", part)
-                            weld.Part0 = torso
-                            weld.Part1 = part
-                            weld.C0 = torso.CFrame:ToObjectSpace(part.CFrame)
-                        end
-                    end
-                end
+
+                local leftWing = Instance.new("Part", model)
+                leftWing.Size = Vector3.new(0.5, 3.0, 1.5)
+                leftWing.Color = Color3.fromRGB(250, 250, 255)
+                leftWing.Material = Enum.Material.Neon
+                leftWing.CanCollide = false
+                leftWing.CFrame = root.CFrame * CFrame.new(-1.5, 0.5, 0.6)
+
+                local lw = Instance.new("Weld", leftWing)
+                lw.Part0 = root
+                lw.Part1 = leftWing
+                lw.C0 = root.CFrame:ToObjectSpace(leftWing.CFrame)
+
+                local rightWing = Instance.new("Part", model)
+                rightWing.Size = Vector3.new(0.5, 3.0, 1.5)
+                rightWing.Color = Color3.fromRGB(250, 250, 255)
+                rightWing.Material = Enum.Material.Neon
+                rightWing.CanCollide = false
+                rightWing.CFrame = root.CFrame * CFrame.new(1.5, 0.5, 0.6)
+
+                local rw = Instance.new("Weld", rightWing)
+                rw.Part0 = root
+                rw.Part1 = rightWing
+                rw.C0 = root.CFrame:ToObjectSpace(rightWing.CFrame)
             end)
         else
             pcall(function()
