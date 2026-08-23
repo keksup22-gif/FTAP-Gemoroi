@@ -791,18 +791,26 @@ Tabs.Cosmetics:AddToggle("AngelWingsToggle", {
             pcall(function()
                 local char = LocalPlayer.Character
                 local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
-                if torso then
-                    local model = Instance.new("Model", char)
-                    model.Name = "AngelWings"
-                    for side = 1, 2 do
-                        local s = side == 1 and 1 or -1
-                        for row = 1, 3 do
+                if not torso then return end
+                local model = Instance.new("Model", char)
+                model.Name = "AngelWings"
+                for side = 1, 2 do
+                    local s = side == 1 and 1 or -1
+                    for row = 1, 4 do
+                        local featherCount = 6 - row
+                        for i = 1, featherCount do
                             local part = Instance.new("Part", model)
-                            part.Size = Vector3.new(0.2, 1.2, 0.05)
-                            part.Color = Color3.fromRGB(255, 255, 255)
+                            part.Size = Vector3.new(0.15, 1.4, 0.04)
+                            part.Color = Color3.fromRGB(245, 245, 255)
                             part.Material = Enum.Material.SmoothPlastic
                             part.CanCollide = false
-                            part.CFrame = torso.CFrame * CFrame.new(s * (0.5 + row * 0.2), 0.2, -0.3)
+                            local angle = (i - featherCount/2) * 0.25
+                            local attachPos = torso.CFrame * CFrame.new(
+                                s * (0.5 + row * 0.2),
+                                0.2 + row * 0.15,
+                                -0.35
+                            ) * CFrame.Angles(0, math.rad(s * 35 + angle * 20), math.rad(s * 15))
+                            part.CFrame = attachPos
                             local weld = Instance.new("Weld", part)
                             weld.Part0 = torso
                             weld.Part1 = part
@@ -824,49 +832,118 @@ Tabs.Cosmetics:AddToggle("AngelWingsToggle", {
 
 Tabs.Cosmetics:AddSection("Atmosphere & Lighting Shaders")
 
-Tabs.Cosmetics:AddButton({
-    Title = "Shader: Dreamy (Galaxy)",
-    Callback = function()
-        pcall(function()
-            Lighting.ClockTime = 14
-            Lighting.Brightness = 2
-            Lighting.Ambient = Color3.fromRGB(120, 120, 120)
-            Lighting.OutdoorAmbient = Color3.fromRGB(200, 200, 200)
+local function ClearShaders()
+    pcall(function()
+        for _, e in pairs(Lighting:GetChildren()) do
+            if e:IsA("PostEffect") or e:IsA("Sky") or e:IsA("Atmosphere") then
+                e:Destroy()
+            end
+        end
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.GlobalShadows = true
+        Lighting.FogEnd = 100000
+    end)
+end
+
+local function ApplyShader(cfg)
+    ClearShaders()
+    pcall(function()
+        if cfg.CC then
             local cc = Instance.new("ColorCorrectionEffect", Lighting)
-            cc.Saturation = 0.5
-            cc.Contrast = 0.3
-            cc.TintColor = Color3.fromRGB(240, 220, 255)
-        end)
-        Fluent:Notify({ Title = "Shaders", Content = "Dreamy applied!", Duration = 2 })
+            for k, v in pairs(cfg.CC) do cc[k] = v end
+        end
+        if cfg.Blur then
+            local bu = Instance.new("BlurEffect", Lighting)
+            bu.Size = cfg.Blur
+        end
+        if cfg.SunRays then
+            local sr = Instance.new("SunRaysEffect", Lighting)
+            sr.Intensity = cfg.SunRays
+        end
+        if cfg.L then
+            for k, v in pairs(cfg.L) do Lighting[k] = v end
+        end
+    end)
+end
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Warm Sunshine",
+    Callback = function()
+        ApplyShader({CC={Brightness=0.25,Contrast=0.1,Saturation=0.3,TintColor=Color3.fromRGB(255,245,220)},SunRays=0.35,L={Brightness=2.5,FogEnd=2000,Ambient=Color3.fromRGB(255,240,200),OutdoorAmbient=Color3.fromRGB(255,230,180),ClockTime=12}})
+        Fluent:Notify({ Title = "Shaders", Content = "Warm Sunshine applied!", Duration = 2 })
     end
 })
 
 Tabs.Cosmetics:AddButton({
-    Title = "Shader: Desert Sunset",
+    Title = "Shader: Sakura Dream",
     Callback = function()
-        pcall(function()
-            Lighting.ClockTime = 7
-            Lighting.Brightness = 2.5
-            Lighting.Ambient = Color3.fromRGB(80, 40, 10)
-            Lighting.OutdoorAmbient = Color3.fromRGB(100, 50, 10)
-            local cc = Instance.new("ColorCorrectionEffect", Lighting)
-            cc.Saturation = 0.05
-            cc.TintColor = Color3.fromRGB(255, 224, 219)
-        end)
-        Fluent:Notify({ Title = "Shaders", Content = "Desert applied!", Duration = 2 })
+        ApplyShader({CC={Brightness=0.2,Contrast=0.05,Saturation=0.2,TintColor=Color3.fromRGB(255,225,235)},SunRays=0.25,L={Brightness=2.3,FogEnd=1500,Ambient=Color3.fromRGB(255,215,230),OutdoorAmbient=Color3.fromRGB(255,200,220),ClockTime=8}})
+        Fluent:Notify({ Title = "Shaders", Content = "Sakura Dream applied!", Duration = 2 })
     end
 })
 
 Tabs.Cosmetics:AddButton({
-    Title = "Shader: Bright Clean",
+    Title = "Shader: Clear Sky",
     Callback = function()
-        pcall(function()
-            Lighting.ClockTime = 10
-            Lighting.Brightness = 2
-            Lighting.GlobalShadows = false
-            Lighting.FogEnd = 999999
-        end)
-        Fluent:Notify({ Title = "Shaders", Content = "Bright applied!", Duration = 2 })
+        ApplyShader({CC={Brightness=0.15,Contrast=0.1,Saturation=0.15,TintColor=Color3.fromRGB(220,235,255)},SunRays=0.3,L={Brightness=2.8,FogEnd=5000,Ambient=Color3.fromRGB(200,220,250),OutdoorAmbient=Color3.fromRGB(180,200,240),ClockTime=11}})
+        Fluent:Notify({ Title = "Shaders", Content = "Clear Sky applied!", Duration = 2 })
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Mint Fresh",
+    Callback = function()
+        ApplyShader({CC={Brightness=0.2,Contrast=0.08,Saturation=0.1,TintColor=Color3.fromRGB(200,240,220)},SunRays=0.2,L={Brightness=2.4,FogEnd=2000,Ambient=Color3.fromRGB(190,230,210),OutdoorAmbient=Color3.fromRGB(170,210,190),ClockTime=10}})
+        Fluent:Notify({ Title = "Shaders", Content = "Mint Fresh applied!", Duration = 2 })
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Peach Smooth",
+    Callback = function()
+        ApplyShader({CC={Brightness=0.2,Contrast=0.05,Saturation=0.25,TintColor=Color3.fromRGB(255,220,200)},SunRays=0.3,L={Brightness=2.5,FogEnd=1800,Ambient=Color3.fromRGB(255,210,190),OutdoorAmbient=Color3.fromRGB(255,195,175),ClockTime=16}})
+        Fluent:Notify({ Title = "Shaders", Content = "Peach Smooth applied!", Duration = 2 })
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Ocean Breeze",
+    Callback = function()
+        ApplyShader({CC={Brightness=0.15,Contrast=0.1,Saturation=0.1,TintColor=Color3.fromRGB(180,215,240)},Blur=0.3,L={Brightness=2.2,FogEnd=1200,Ambient=Color3.fromRGB(170,210,240),OutdoorAmbient=Color3.fromRGB(150,190,230),ClockTime=13}})
+        Fluent:Notify({ Title = "Shaders", Content = "Ocean Breeze applied!", Duration = 2 })
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Golden Hour",
+    Callback = function()
+        ApplyShader({CC={Brightness=0.2,Contrast=0.1,Saturation=0.3,TintColor=Color3.fromRGB(255,235,200)},SunRays=0.4,L={Brightness=2.6,FogEnd=2000,Ambient=Color3.fromRGB(255,225,180),OutdoorAmbient=Color3.fromRGB(255,210,160),ClockTime=17}})
+        Fluent:Notify({ Title = "Shaders", Content = "Golden Hour applied!", Duration = 2 })
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Frost Morning",
+    Callback = function()
+        ApplyShader({CC={Brightness=0.3,Contrast=0.05,Saturation=-0.2,TintColor=Color3.fromRGB(220,230,255)},Blur=0.5,L={Brightness=3,FogEnd=1000,Ambient=Color3.fromRGB(220,225,250),OutdoorAmbient=Color3.fromRGB(200,210,240),ClockTime=7}})
+        Fluent:Notify({ Title = "Shaders", Content = "Frost Morning applied!", Duration = 2 })
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Soft Sunset",
+    Callback = function()
+        ApplyShader({CC={Brightness=0.15,Contrast=0.08,Saturation=0.3,TintColor=Color3.fromRGB(255,210,190)},SunRays=0.5,L={Brightness=2,FogEnd=1500,Ambient=Color3.fromRGB(255,180,140),OutdoorAmbient=Color3.fromRGB(255,160,120),ClockTime=18.5}})
+        Fluent:Notify({ Title = "Shaders", Content = "Soft Sunset applied!", Duration = 2 })
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Reset / Default",
+    Callback = function()
+        ClearShaders()
+        Fluent:Notify({ Title = "Shaders", Content = "Reset to default!", Duration = 2 })
     end
 })
 
