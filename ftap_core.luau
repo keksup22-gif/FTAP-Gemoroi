@@ -127,6 +127,28 @@ local function isVisible(part)
     return not result or result.Instance:IsDescendantOf(part.Parent)
 end
 
+local function getClosestPlayer()
+    local closest, closestDist = nil, Config.FOVRadius
+    local mousePos = UserInputService:GetMouseLocation()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local hitPart = getHitPart(player)
+            local humanoid = getHumanoid(player)
+            if hitPart and humanoid and humanoid.Health > 0 then
+                local screenPoint, onScreen = Camera:WorldToViewportPoint(hitPart.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPoint.X, screenPoint.Y) - mousePos).Magnitude
+                    if dist < closestDist and (not Config.WallCheck or isVisible(hitPart)) then
+                        closest = hitPart
+                        closestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
 -- Safe recursive part checker (avoiding infinite loops)
 local function getSafeParts(model)
     local parts = {}
@@ -594,7 +616,7 @@ end
 
 -- === MAIN RUNTIME LOOPS ===
 RunService.RenderStepped:Connect(function()
-    -- FOV Circle update
+    -- FOV Circle update & Silent Aim / Aimbot lock
     if fovCircle then
         if Config.SilentAimEnabled and Config.ShowFOV then
             local mousePos = UserInputService:GetMouseLocation()
@@ -602,6 +624,13 @@ RunService.RenderStepped:Connect(function()
             fovCircle.Visible = true
         else
             fovCircle.Visible = false
+        end
+    end
+
+    if Config.SilentAimEnabled then
+        local target = getClosestPlayer()
+        if target then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
         end
     end
 
