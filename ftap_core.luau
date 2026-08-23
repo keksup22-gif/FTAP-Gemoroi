@@ -16,7 +16,13 @@ local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
 local success, Fluent = pcall(function()
-    return loadstring(game:HttpGet("https://github.com/dawidsulfide/fluent/releases/latest/download/main.lua"))()
+    local ok, res = pcall(function()
+        return loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+    end)
+    if ok and res then
+        return res
+    end
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/main.lua"))()
 end)
 
 if not success or not Fluent then
