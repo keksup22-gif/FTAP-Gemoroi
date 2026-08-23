@@ -592,6 +592,54 @@ task.spawn(function()
     end
 end)
 
+-- Defense & Anti-Grab background task (Omega EZ & Amethyst defense ported)
+task.spawn(function()
+    pcall(function()
+        Workspace.DescendantAdded:Connect(function(d)
+            if d.Name == "PaintPlayerPart" then
+                task.wait(0.05)
+                pcall(function() d:Destroy() end)
+            end
+        end)
+    end)
+
+    while true do
+        pcall(function()
+            local hrp = getRoot(LocalPlayer)
+            local hum = getHumanoid(LocalPlayer)
+
+            if Config.AntiGrabEnabled then
+                local isHeldVal = LocalPlayer:FindFirstChild("IsHeld")
+                if isHeldVal and isHeldVal.Value then
+                    local struggleEvent = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
+                    if struggleEvent then
+                        struggleEvent:FireServer()
+                    end
+                    if hrp then
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
+                    end
+                end
+            end
+
+            if Config.AntiFlingEnabled and hrp then
+                if hrp.AssemblyLinearVelocity.Magnitude > 300 then
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                end
+            end
+
+            if Config.AntiRagdollAuto and hum then
+                if hum:GetState() == Enum.HumanoidStateType.Ragdoll or hum.Sit then
+                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                    hum.Sit = false
+                end
+            end
+        end)
+        task.wait(0.1)
+    end
+end)
+
 Window:SelectTab(1)
 Fluent:Notify({
     Title = "FTAP-Gemoroi",
