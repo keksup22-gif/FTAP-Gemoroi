@@ -82,7 +82,8 @@ local Config = {
     KillTarget = nil,
     LoopKillEnabled = false,
     LoopKillDelay = 0.5,
-    LoopKillTarget = nil
+    LoopKillTarget = nil,
+    FlingPower = 1
 }
 
 -- Safe FOV Circle
@@ -148,6 +149,45 @@ local function getClosestPlayer()
         end
     end
     return closest
+end
+
+local flingForces = {
+    function(root) root.AssemblyLinearVelocity = Vector3.new(0, 80 * Config.FlingPower, 0) end,
+    function(root) root.AssemblyLinearVelocity = Camera.CFrame.LookVector * (120 * Config.FlingPower) + Vector3.new(0, 40, 0) end,
+    function(root) root.AssemblyAngularVelocity = Vector3.new(0, 80 * Config.FlingPower, 0); root.AssemblyLinearVelocity = Vector3.new(0, 150 * Config.FlingPower, 0) end,
+    function(root) root.CFrame = root.CFrame + Vector3.new(0, 20 * Config.FlingPower, 0); root.AssemblyLinearVelocity = Vector3.new(0, 200 * Config.FlingPower, 0) end,
+    function(root) root.AssemblyLinearVelocity = Vector3.new(math.random(-1,1), 1, math.random(-1,1)).Unit * (250 * Config.FlingPower) end,
+    function(root) root.CFrame = CFrame.new(root.Position + Vector3.new(0, 500, 0)) end,
+}
+
+local function flingClosestTarget()
+    local closest, dist = nil, 50
+    local myRoot = getRoot(LocalPlayer)
+    if not myRoot then return end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local root = getRoot(player)
+            if root then
+                local d = (root.Position - myRoot.Position).Magnitude
+                if d < dist then
+                    closest = player
+                    dist = d
+                end
+            end
+        end
+    end
+    if closest then
+        local root = getRoot(closest)
+        if root then
+            local power = math.clamp(math.floor(Config.FlingPower), 1, 6)
+            pcall(function()
+                flingForces[power](root)
+            end)
+            Fluent:Notify({ Title = "Fling", Content = "Flinged " .. closest.Name .. " (Power " .. power .. ")", Duration = 2 })
+        end
+    else
+        Fluent:Notify({ Title = "Fling", Content = "No player nearby to fling!", Duration = 2 })
+    end
 end
 
 -- Safe recursive part checker (avoiding infinite loops)
@@ -443,6 +483,26 @@ Tabs.Mass:AddToggle("LoopKillToggle", {
     Default = false,
     Callback = function(Value)
         Config.LoopKillEnabled = Value
+    end
+})
+
+Tabs.Mass:AddSection("Fling Utilities (Zentrix)")
+
+Tabs.Mass:AddSlider("FlingPowerSlider", {
+    Title = "Fling Power Level (1-6)",
+    Default = 1,
+    Min = 1,
+    Max = 6,
+    Rounding = 0,
+    Callback = function(Value)
+        Config.FlingPower = Value
+    end
+})
+
+Tabs.Mass:AddButton({
+    Title = "Fling Closest Player (Key F)",
+    Callback = function()
+        flingClosestTarget()
     end
 })
 
@@ -763,9 +823,17 @@ task.spawn(function()
             end
 
             if Config.AntiFlingEnabled and hrp then
-                if hrp.AssemblyLinearVelocity.Magnitude > 300 then
+                if hrp.AssemblyLinearVelocity.Magnitude > 120 then
                     hrp.AssemblyLinearVelocity = Vector3.zero
                     hrp.AssemblyAngularVelocity = Vector3.zero
+                end
+                if hum then
+                    if hum.PlatformStand or hum.Sit then
+                        hum.PlatformStand = false
+                        hum.Sit = false
+                        hum.AutoRotate = true
+                        hum:ChangeState(Enum.HumanoidStateType.Running)
+                    end
                 end
             end
 
@@ -948,6 +1016,14 @@ Tabs.Cosmetics:AddButton({
         Fluent:Notify({ Title = "Shaders", Content = "Reset to default!", Duration = 2 })
     end
 })
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed then
+        if input.KeyCode == Enum.KeyCode.F then
+            flingClosestTarget()
+        end
+    end
+end)
 
 Window:SelectTab(1)
 Fluent:Notify({
