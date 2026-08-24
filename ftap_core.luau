@@ -343,8 +343,113 @@ local AmethystFeatures = {
         enabled = false,
         connection = nil,
         parts = {}
+    },
+    JumpKickAura = {
+        enabled = false,
+        loopThread = nil,
+        processedPlayers = {}
+    },
+    KickAuraFixed = {
+        enabled = false,
+        loopThread = nil,
+        fixedPlayers = {}
     }
 }
+
+local KickNotify = AmethystFeatures.KickNotify
+local TeleportCfg = AmethystFeatures.Teleport
+local SpeedCfg = AmethystFeatures.Speed
+local AntiGrabCfg = AmethystFeatures.AntiGrab
+local SafePosCfg = AmethystFeatures.SafePos
+local AutoSitCfg = AmethystFeatures.AutoSitBlob
+local AntiKickResetCfg = AmethystFeatures.AntiKickReset
+local AntiKickStickCfg = AmethystFeatures.AntiKickStick
+local LoopKickCfg = AmethystFeatures.LoopKick
+local PermanentPalletCfg = AmethystFeatures.PermanentPallet
+local RagdollAuraCfg = AmethystFeatures.RagdollAura
+local RagdollLoopKickCfg = AmethystFeatures.RagdollLoopKick
+local SelfGrabCfg = AmethystFeatures.SelfGrab
+local BlobKillCfg = AmethystFeatures.BlobKill
+local BlobKickDualCfg = AmethystFeatures.BlobKickDual
+local ServerLagCfg = AmethystFeatures.ServerLag
+local AntiInputLagCfg = AmethystFeatures.AntiInputLag
+local AntiRagdollCfg = AmethystFeatures.AntiRagdoll
+local KillAuraCfg = AmethystFeatures.KillAura
+local AntiBlobCfg = AmethystFeatures.AntiBlob
+local AntiBurnCfg = AmethystFeatures.AntiBurn
+local AntiVoidCfg = AmethystFeatures.AntiVoid
+local AntiPaintCfg = AmethystFeatures.AntiPaint
+local AdvancedDuallockCfg = AmethystFeatures.AdvancedDuallock
+local LoopSnowballCfg = AmethystFeatures.LoopSnowball
+local DestroyKickAuraCfg = AmethystFeatures.DestroyKickAura
+local DeleteLegsCfg = AmethystFeatures.DeleteLegs
+local AutoGucciCfg = AmethystFeatures.AutoGucci
+local AntiAntiInputCfg = AmethystFeatures.AntiAntiInput
+local AntiBarrierCfg = AmethystFeatures.AntiBarrier
+local AntiInvisibleCfg = AmethystFeatures.AntiInvisible
+local NoclipCfg = AmethystFeatures.Noclip
+local JumpKickAuraCfg = AmethystFeatures.JumpKickAura
+local KickAuraFixedCfg = AmethystFeatures.KickAuraFixed
+
+local findFirstChild = function(parent, name)
+    if not parent then
+        return nil
+    end
+    return parent:FindFirstChild(name)
+end
+
+local function PlaySound(soundId, delayTime)
+    pcall(function()
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxassetid://" .. soundId
+        sound.Volume = 0.5
+        sound.Parent = game:GetService("SoundService")
+        sound:Play()
+        task.delay(delayTime, function()
+            if sound and sound.IsPlaying then
+                sound:Stop()
+                sound:Destroy()
+            end
+        end)
+    end)
+end
+
+local function PlayEnableSound()
+    PlaySound("8745692251", 3)
+end
+
+local function PlayKickSound()
+    PlaySound("5463227301", 4.7)
+end
+
+local function GetCharHumanoid()
+    local character = LocalPlayer and LocalPlayer.Character
+    if not character then
+        return nil
+    end
+    return character:FindFirstChildOfClass("Humanoid")
+end
+
+local function ApplySpeed(dt)
+    if not SpeedCfg.enabled then
+        return
+    end
+    local character = LocalPlayer.Character
+    if not character then
+        return
+    end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not root or not humanoid then
+        return
+    end
+    humanoid.WalkSpeed = SpeedCfg.value
+    local move = humanoid.MoveDirection
+    if move.Magnitude > 0 then
+        local delta = move.Unit * SpeedCfg.value * dt * 0.1
+        root.CFrame = root.CFrame + Vector3.new(delta.X, 0, delta.Z)
+    end
+end
 
 local success, Fluent = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
