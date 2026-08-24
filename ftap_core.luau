@@ -83,7 +83,8 @@ local Config = {
     LoopKillEnabled = false,
     LoopKillDelay = 0.5,
     LoopKillTarget = nil,
-    FlingPower = 1
+    FlingPower = 1,
+    AnchorGrabEnabled = false
 }
 
 -- Safe FOV Circle
@@ -521,6 +522,15 @@ Tabs.Protection:AddToggle("AntiGrabToggle", {
     Default = false,
     Callback = function(Value)
         Config.AntiGrabEnabled = Value
+    end
+})
+
+Tabs.Protection:AddToggle("AnchorGrabToggle", {
+    Title = "Anchor Grab (Freeze on Drop)",
+    Default = false,
+    Callback = function(Value)
+        Config.AnchorGrabEnabled = Value
+        Fluent:Notify({ Title = "Anchor Grab", Content = Value and "Enabled (Dropped items freeze in mid-air)" or "Disabled", Duration = 3 })
     end
 })
 
@@ -1029,6 +1039,37 @@ UserInputService.InputBegan:Connect(function(input, processed)
         if input.KeyCode == Enum.KeyCode.F then
             flingClosestTarget()
         end
+    end
+end)
+
+-- Anchor Grab background task (Freeze on Drop)
+local anchoredObjects = {}
+task.spawn(function()
+    while true do
+        pcall(function()
+            if Config.AnchorGrabEnabled then
+                for _, toy in ipairs(Workspace:GetDescendants()) do
+                    if toy:IsA("Model") and toy:FindFirstChild("HoldPart") then
+                        local holdPart = toy.HoldPart
+                        local owner = holdPart:FindFirstChild("PartOwner")
+                        if owner and owner.Value == "" and not anchoredObjects[toy] then
+                            local root = getRoot(LocalPlayer)
+                            if root and (holdPart.Position - root.Position).Magnitude < 15 then
+                                anchoredObjects[toy] = true
+                                holdPart.Anchored = true
+                                holdPart.AssemblyLinearVelocity = Vector3.zero
+                                holdPart.AssemblyAngularVelocity = Vector3.zero
+                                local bp = Instance.new("BodyPosition", holdPart)
+                                bp.Position = holdPart.Position
+                                bp.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+                                bp.P = 10000
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        task.wait(0.2)
     end
 end)
 
