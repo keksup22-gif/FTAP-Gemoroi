@@ -179,6 +179,13 @@ local function flingClosestTarget()
     if closest then
         local root = getRoot(closest)
         if root then
+            pcall(function()
+                local setNetOwner = ReplicatedStorage:FindFirstChild("GrabEvents") and ReplicatedStorage.GrabEvents:FindFirstChild("SetNetworkOwner")
+                if setNetOwner then
+                    setNetOwner:FireServer(root, root.CFrame)
+                end
+            end)
+            task.wait(0.05)
             local power = math.clamp(math.floor(Config.FlingPower), 1, 6)
             pcall(function()
                 flingForces[power](root)
