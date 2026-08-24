@@ -161,6 +161,188 @@ local AmethystFeatures = {
         savedPos = nil,
         dragging = false,
         grabStart = 0
+    },
+    SelfGrab = {
+        enabled = false,
+        loopThread = nil,
+        MyBlob = nil,
+        OriginalMassless = nil,
+        OriginalPosition = nil,
+        WasGrabbedByEnemy = false,
+        ProcessingGrab = false,
+        ProcessingRelease = false,
+        GrabCooldown = 0,
+        RegrabActive = false,
+        SpawningBlob = false
+    },
+    BlobKill = {
+        enabled = false,
+        selectedPlayers = {},
+        loopThread = nil,
+        barrierThread = nil,
+        currentBlob = nil
+    },
+    BlobKickDual = {
+        enabled = false,
+        loopThread = nil,
+        bp = nil,
+        lastTargetChar = nil
+    },
+    Fly = {
+        Enabled = false,
+        Speed = 100,
+        BV = nil,
+        BG = nil,
+        Connections = {}
+    },
+    ServerLag = {
+        enabled = false,
+        loopThread = nil
+    },
+    AntiInputLag = {
+        enabled = false,
+        loopThread = nil,
+        currentItem = nil,
+        selectedItem = "FoodHamburger",
+        items = {
+            "FoodHamburger",
+            "InstrumentDrumBongos",
+            "InstrumentBrassTrumpet",
+            "InstrumentBrassBugle",
+            "InstrumentVoiceMicrophone",
+            "InstrumentWoodwindOcarina",
+            "InstrumentGuitarUkulele",
+            "InstrumentGuitarLyre",
+            "InstrumentGuitarBanjo",
+            "InstrumentGuitarAcoustic",
+            "CupMugBrown",
+            "CupMugWhite",
+            "FoodBanana",
+            "FoodBread",
+            "FoodBroccoli",
+            "FoodCakePink",
+            "FoodCoconut",
+            "FoodDippyEgg",
+            "FoodDonut",
+            "FoodFrenchFries",
+            "FoodHotdog",
+            "FoodMayonnaise",
+            "FoodMeatStick",
+            "FoodMushroomPoison",
+            "FoodPizzaCheese",
+            "FoodPizzaPepperoni",
+            "FoodSodaCan",
+            "PoopPile",
+            "PoopPileSparkle"
+        }
+    },
+    AntiRagdoll = {
+        enabled = false,
+        connections = {},
+        ragdolledSit = false
+    },
+    KillAura = {
+        enabled = false,
+        loopThread = nil,
+        currentBlob = nil,
+        spawningBlob = false,
+        killCooldown = {},
+        targetPlayers = {},
+        lastKillTime = 0
+    },
+    AntiBlob = {
+        enabled = false,
+        loopThread = nil,
+        processedPlayers = {}
+    },
+    WaterWalk = {
+        enabled = false,
+        waterParts = {},
+        originalStates = {}
+    },
+    AntiBurn = {
+        enabled = false,
+        connection1 = nil,
+        connection2 = nil,
+        currentBarrier = nil
+    },
+    AntiVoid = {
+        enabled = false,
+        loopThread = nil,
+        originalDestroyHeight = -100
+    },
+    AntiPaint = {
+        enabled = false,
+        connection = nil
+    },
+    AdvancedDuallock = {
+        enabled = false,
+        loopThread = nil,
+        currentBlob = nil,
+        targetPlayer = nil
+    },
+    LoopSnowball = {
+        enabled = false,
+        loopThread = nil,
+        currentSnowball = nil,
+        soundPart = nil,
+        selectedPlayer = nil
+    },
+    DestroyKickAura = {
+        enabled = false,
+        loopThread = nil,
+        currentBlob = nil,
+        processedPlayers = {},
+        spawnInterval = 0,
+        isSpawning = false,
+        lastSpawnTime = 0
+    },
+    DeleteLegs = {
+        enabled = false,
+        monitoringThread = nil,
+        hipHeightAdjusted = false
+    },
+    AntiExplode = {
+        enabled = false,
+        connection = nil,
+        bombEvent = nil
+    },
+    AutoGucci = {
+        enabled = false,
+        monitoringThread = nil,
+        connection = nil,
+        safePosition = nil,
+        restoreFrames = 0
+    },
+    AntiBananaEat = {
+        enabled = false,
+        loopThread = nil,
+        scanConnection = nil,
+        processedBananas = {},
+        processedFolders = {}
+    },
+    AntiAntiInput = {
+        enabled = false,
+        loopThread = nil,
+        scanConnection = nil,
+        processedItems = {},
+        processedFolders = {}
+    },
+    AntiBarrier = {
+        enabled = false,
+        originalStates = {}
+    },
+    AntiInvisible = {
+        enabled = false,
+        loopThread = nil
+    },
+    SantaSleighGucci = {
+        enabled = false
+    },
+    Noclip = {
+        enabled = false,
+        connection = nil,
+        parts = {}
     }
 }
 
