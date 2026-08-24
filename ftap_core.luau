@@ -1508,6 +1508,128 @@ task.spawn(function()
     end
 end)
 
+-- Amethyst Premium background defense & notification tasks
+task.spawn(function()
+    print("[AMETHYST] Ожидание загрузки игры...")
+    if not game:IsLoaded() then
+        game.Loaded:Wait()
+    end
+    if not game.Players.LocalPlayer then
+        task.wait(.1)
+    end
+    local lp = game.Players.LocalPlayer
+    if lp then
+        if not lp.Character then
+            lp.CharacterAdded:Wait()
+        end
+        task.wait(2)
+        print("[AMETHYST] ===== АКТИВАЦИЯ ВСЕХ ЗАЩИТНЫХ ФУНКЦИЙ =====")
+
+        pcall(function()
+            local ui = Instance.new("ScreenGui")
+            ui.Name = "KickNotifyUI"
+            ui.Parent = S.CoreGui
+
+            local notifications = {}
+            local notificationTimes = {}
+            local retentionTime = 30
+
+            local function canNotify(key)
+                if not notificationTimes[key] then return true end
+                if tick() - notificationTimes[key] > retentionTime then
+                    notificationTimes[key] = nil
+                    return true
+                end
+                return false
+            end
+
+            local function cleanupNotifications()
+                local dead = {}
+                for i, v in ipairs(notifications) do
+                    if not v or not v.Parent then table.insert(dead, i) end
+                end
+                for i = #dead, 1, -1 do table.remove(notifications, dead[i]) end
+            end
+
+            local function showKickNotify(ownerName, displayName)
+                if not canNotify(ownerName) then return end
+                notificationTimes[ownerName] = tick()
+                local frame = Instance.new("Frame")
+                frame.Name = "KickNotification_" .. ownerName .. "_" .. tick()
+                frame.Size = UDim2.new(0, 300, 0, 80)
+                frame.Position = UDim2.new(1, -320, 0, 80)
+                frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                frame.BackgroundTransparency = .1
+                frame.BorderSizePixel = 0
+                frame.Parent = ui
+                Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+                local stroke = Instance.new("UIStroke", frame)
+                stroke.Color = Color3.fromRGB(180, 180, 180)
+                stroke.Thickness = 2
+                stroke.Transparency = .3
+
+                local title = Instance.new("TextLabel")
+                title.Size = UDim2.new(1, -20, 0, 20)
+                title.Position = UDim2.new(0, 10, 0, 8)
+                title.BackgroundTransparency = 1
+                title.Text = "KICK DETECTED"
+                title.TextColor3 = Color3.fromRGB(255, 255, 255)
+                title.Font = Enum.Font.GothamBold
+                title.TextSize = 16
+                title.TextXAlignment = Enum.TextXAlignment.Left
+                title.Parent = frame
+
+                local victim = Instance.new("TextLabel")
+                victim.Size = UDim2.new(1, -20, 0, 24)
+                victim.Position = UDim2.new(0, 10, 0, 30)
+                victim.BackgroundTransparency = 1
+                victim.Text = displayName .. " (" .. ownerName .. ")"
+                victim.TextColor3 = Color3.fromRGB(255, 255, 255)
+                victim.Font = Enum.Font.GothamSemibold
+                victim.TextSize = 14
+                victim.TextXAlignment = Enum.TextXAlignment.Left
+                victim.Parent = frame
+
+                table.insert(notifications, frame)
+                PlayKickSound()
+
+                local tween = game:GetService("TweenService")
+                task.delay(4.7, function()
+                    if frame and frame.Parent then
+                        tween:Create(frame, TweenInfo.new(0.5), { BackgroundTransparency = 1 }):Play()
+                        task.wait(0.5)
+                        frame:Destroy()
+                    end
+                end)
+            end
+
+            S.Workspace.ChildAdded:Connect(function(child)
+                if child.Name == "BlackHoleKick" or child.Name == "BlackHole" then
+                    child.Name = "BlackHole_Detected_" .. tick()
+                    local snapshot = {}
+                    for _, p in pairs(S.Players:GetPlayers()) do
+                        if p ~= LocalPlayer then snapshot[p.Name] = p.DisplayName end
+                    end
+                    task.wait(3.25)
+                    local present = {}
+                    for _, p in pairs(S.Players:GetPlayers()) do present[p.Name] = true end
+                    local left = {}
+                    for name, display in pairs(snapshot) do
+                        if not present[name] then table.insert(left, {name = name, display = display}) end
+                    end
+                    if #left > 0 then
+                        for _, info in ipairs(left) do
+                            cleanupNotifications()
+                            showKickNotify(info.name, info.display)
+                            task.wait(.1)
+                        end
+                    end
+                end
+            end)
+        end)
+    end
+end)
+
 Window:SelectTab(1)
 Fluent:Notify({
     Title = "FTAP-Gemoroi",
