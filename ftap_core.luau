@@ -16,6 +16,154 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
+local S = {
+    Players = Players,
+    RunService = RunService,
+    ReplicatedStorage = ReplicatedStorage,
+    UserInputService = UserInputService,
+    Workspace = Workspace,
+    CoreGui = CoreGui,
+    TweenService = TweenService,
+    TextService = game:GetService("TextService")
+}
+
+local RAGDOLL_LIMBS = {"Left Leg", "Right Leg", "Left Arm", "Right Arm"}
+local AmethystFeatures = {
+    Selected = {
+        kickPlayer = nil,
+        players = {},
+        multiSelect = false,
+        currentPlayer = nil,
+        currentButton = nil
+    },
+    Teleport = {
+        loop = {
+            enabled = false,
+            target = CFrame.new(3, -7, -2),
+            loopThread = nil
+        },
+        houses = {
+            {"Pink House", CFrame.new(-491, -7, -166)},
+            {"Green House", CFrame.new(-535, -7, 93)},
+            {"Purple House", CFrame.new(250, -6, 463)},
+            {"China House", CFrame.new(554, 123, -72)},
+            {"Blue House", CFrame.new(510, 83, -339)},
+            {"Spawn", CFrame.new(3, -7, -2)}
+        }
+    },
+    Speed = {
+        value = 16,
+        min = 16,
+        max = 10000,
+        enabled = false,
+        originalWalkSpeed = nil,
+        connection = nil
+    },
+    ThirdPerson = {
+        enabled = false
+    },
+    PCLD = {
+        Enabled = false,
+        Boxes = {},
+        NameTags = {},
+        Connections = {}
+    },
+    PacketLag = {
+        enabled = false,
+        loopThread = nil,
+        packetSize = 100,
+        minSize = 100,
+        maxSize = 1000000
+    },
+    KickNotify = {
+        enabled = false,
+        connection = nil,
+        notifications = {},
+        notificationQueue = {},
+        processedKicks = {}
+    },
+    Gucci = {
+        active = false,
+        blobman = nil,
+        connection = nil,
+        remotes = {}
+    },
+    GucciTractor = {
+        enabled = false,
+        busy = false,
+        currentTractor = nil,
+        seatMonitorConn = nil,
+        loopThread = nil
+    },
+    AntiLag = {
+        enabled = false
+    },
+    RemoveAntiKick = {
+        enabled = false,
+        targetPlayer = nil,
+        loopThread = nil
+    },
+    AntiGrab = {
+        enabled = false,
+        antiGrabEnabled = false
+    },
+    SafePos = {
+        enabled = false,
+        target = nil,
+        loopThread = nil
+    },
+    AutoSitBlob = {
+        enabled = false,
+        loopThread = nil,
+        currentBlob = nil
+    },
+    AntiKickReset = {
+        enabled = false,
+        connection = nil
+    },
+    AntiStick = {
+        enabled = false,
+        loopThread = nil
+    },
+    AntiKickStick = {
+        enabled = false,
+        loopThread = nil,
+        selectedItem = "NinjaShuriken",
+        items = {
+            "NinjaShuriken",
+            "NinjaKunai",
+            "ToolPencil",
+            "ToolPickaxe",
+            "ToolDiggingForkRusty",
+            "ToolCleaver",
+            "NinjaKatana"
+        }
+    },
+    LoopKick = {
+        enabled = false,
+        loopThread = nil
+    },
+    PermanentPallet = {
+        enabled = false,
+        loopThread = nil,
+        currentPallet = nil,
+        isReady = false
+    },
+    RagdollAura = {
+        enabled = false,
+        loopThread = nil,
+        ragdolledPlayers = {},
+        isTeleportingPallet = false
+    },
+    RagdollLoopKick = {
+        enabled = false,
+        loopThread = nil,
+        savedPos = nil,
+        dragging = false,
+        grabStart = 0
+    }
+}
+
 local success, Fluent = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
 end)
