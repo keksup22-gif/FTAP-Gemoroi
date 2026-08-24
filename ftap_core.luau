@@ -724,6 +724,7 @@ local Tabs = {
     Cosmetics = Window:AddTab({ Title = "Cosmetics & Shaders", Icon = "sparkles" }),
     Mass = Window:AddTab({ Title = "Mass / Troll", Icon = "zap" }),
     Protection = Window:AddTab({ Title = "Protection", Icon = "shield" }),
+    Defense = Window:AddTab({ Title = "Defense", Icon = "shield" }),
     Auras = Window:AddTab({ Title = "Auras", Icon = "target" }),
     Teleports = Window:AddTab({ Title = "Teleports", Icon = "map-pin" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
@@ -1876,6 +1877,264 @@ task.spawn(function()
         end)
     end
 end)
+
+-- === PLAYER TAB (Amethyst Integration) ===
+Tabs.Player:AddSection("Player")
+
+Tabs.Player:AddToggle("LoopTPToggle", {
+    Title = "Loop Teleport",
+    Default = false,
+    Callback = function(state)
+        if state then
+            TeleportCfg.loop.enabled = true
+            TeleportCfg.loop.loopThread = task.spawn(function()
+                while TeleportCfg.loop.enabled do
+                    if LocalPlayer.Character then
+                        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if root and TeleportCfg.loop.target then
+                            root.CFrame = TeleportCfg.loop.target
+                        end
+                        task.wait()
+                    end
+                end
+            end)
+            Fluent:Notify({ Title = "Loop TP", Content = "Enabled - Looping to selected location", Duration = 3 })
+            PlayEnableSound()
+        else
+            TeleportCfg.loop.enabled = false
+            if TeleportCfg.loop.loopThread then
+                task.cancel(TeleportCfg.loop.loopThread)
+                TeleportCfg.loop.loopThread = nil
+            end
+            Fluent:Notify({ Title = "Loop TP", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+local houseNames = {}
+for _, house in ipairs(TeleportCfg.houses) do
+    table.insert(houseNames, house[1])
+end
+
+Tabs.Player:AddDropdown("TeleportLocationDropdown", {
+    Title = "Teleport Location",
+    Values = houseNames,
+    Default = "Spawn",
+    Callback = function(selected)
+        for _, house in ipairs(TeleportCfg.houses) do
+            if house[1] == selected then
+                TeleportCfg.loop.target = house[2]
+                break
+            end
+        end
+    end
+})
+
+Tabs.Player:AddButton({
+    Title = "Teleport Once",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if char then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root and TeleportCfg.loop.target then
+                root.CFrame = TeleportCfg.loop.target
+                Fluent:Notify({ Title = "Teleport", Content = "Teleported to selected location", Duration = 2 })
+                PlayEnableSound()
+            end
+        end
+    end
+})
+
+Tabs.Player:AddSection("Speed player")
+
+Tabs.Player:AddSlider("SpeedControlSlider", {
+    Title = "Speed Control",
+    Default = 16,
+    Min = 16,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(value)
+        SpeedCfg.value = value
+        if SpeedCfg.enabled then
+            local humanoid = GetCharHumanoid()
+            if humanoid then
+                humanoid.WalkSpeed = value
+            end
+        end
+    end
+})
+
+Tabs.Player:AddToggle("EnableSpeedToggle", {
+    Title = "Enable Speed",
+    Default = false,
+    Callback = function(state)
+        if state then
+            EnableSpeed()
+            Fluent:Notify({ Title = "Speed", Content = "Enabled - WalkSpeed: " .. SpeedCfg.value, Duration = 2 })
+            PlayEnableSound()
+        else
+            DisableSpeed()
+            Fluent:Notify({ Title = "Speed", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+-- === DEFENSE TAB (Amethyst Integration) ===
+Tabs.Defense:AddSection("Anti-Function")
+
+Tabs.Defense:AddToggle("AntiGrabAmethystToggle", {
+    Title = "Anti Grab",
+    Default = false,
+    Callback = function(state)
+        if state then
+            AntiGrabCfg.enabled = true
+            AntiGrabCfg.antiGrabEnabled = true
+            local antiGrab = { remotes = {}, parts = {}, conns = {} }
+            local function getRemote(name)
+                if antiGrab.remotes[name] then return antiGrab.remotes[name] end
+                for _, desc in ipairs(S.ReplicatedStorage:GetDescendants()) do
+                    if desc.Name == name and desc:IsA("RemoteEvent") then
+                        antiGrab.remotes[name] = desc
+                        return desc
+                    end
+                end
+            end
+            local function OnHeartbeat()
+                if not antiGrab.parts.IsHeld or not antiGrab.parts.IsHeld.Value then return end
+                if not antiGrab.parts.Root or not antiGrab.parts.Humanoid then return end
+                antiGrab.parts.Root.Anchored = true
+                S.ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(antiGrab.parts.Root, antiGrab.parts.Root.CFrame)
+                antiGrab.parts.Root.Massless = true
+                antiGrab.parts.Root.CanCollide = false
+                antiGrab.parts.Root.CanQuery = false
+                antiGrab.parts.Root.AssemblyLinearVelocity = Vector3.zero
+                antiGrab.parts.Root.AssemblyAngularVelocity = Vector3.zero
+                local struggle = getRemote("Struggle")
+                local ragdoll = getRemote("RagdollRemote")
+                if struggle then struggle:FireServer() end
+                if ragdoll then ragdoll:FireServer(antiGrab.parts.Root, 0) end
+                if antiGrab.parts.originalGrabPosition then
+                    antiGrab.parts.Root.CFrame = antiGrab.parts.originalGrabPosition
+                end
+                antiGrab.parts.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                antiGrab.parts.Humanoid.Sit = false
+                antiGrab.parts.Humanoid.PlatformStand = false
+            end
+            local function OnHeldChanged()
+                if not antiGrab.parts.IsHeld then return end
+                if antiGrab.parts.IsHeld.Value then
+                    antiGrab.parts.grabStartTime = os.clock()
+                    if antiGrab.parts.Root then
+                        antiGrab.parts.originalGrabPosition = antiGrab.parts.Root.CFrame
+                        antiGrab.parts.Root.Anchored = true
+                    end
+                    if not antiGrab.conns.heartbeat then
+                        antiGrab.conns.heartbeat = S.RunService.Heartbeat:Connect(OnHeartbeat)
+                    end
+                else
+                    if antiGrab.conns.heartbeat then
+                        antiGrab.conns.heartbeat:Disconnect()
+                        antiGrab.conns.heartbeat = nil
+                    end
+                    if antiGrab.parts.Root then
+                        antiGrab.parts.Root.Anchored = false
+                        antiGrab.parts.Root.Massless = false
+                        antiGrab.parts.Root.CanCollide = true
+                        antiGrab.parts.Root.CanQuery = true
+                    end
+                end
+            end
+            local function OnCharacterAdded(character)
+                if not character then return end
+                antiGrab.parts.Character = character
+                antiGrab.parts.Root = character:WaitForChild("HumanoidRootPart")
+                antiGrab.parts.Humanoid = character:WaitForChild("Humanoid")
+            end
+            antiGrab.parts.IsHeld = LocalPlayer:WaitForChild("IsHeld")
+            if LocalPlayer.Character then OnCharacterAdded(LocalPlayer.Character) end
+            antiGrab.conns.charAdded = LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
+            antiGrab.conns.heldChanged = antiGrab.parts.IsHeld:GetPropertyChangedSignal("Value"):Connect(OnHeldChanged)
+            OnHeldChanged()
+            Fluent:Notify({ Title = "Anti Grab", Content = "Enabled - Grab protection active", Duration = 2 })
+            PlayEnableSound()
+        else
+            AntiGrabCfg.enabled = false
+            AntiGrabCfg.antiGrabEnabled = false
+            Fluent:Notify({ Title = "Anti Grab", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+Tabs.Defense:AddDropdown("AntiKickStickItemDropdown", {
+    Title = "Anti Kick (Stick) Item",
+    Values = AntiKickStickCfg.items,
+    Default = "NinjaShuriken",
+    Callback = function(selected)
+        AntiKickStickCfg.selectedItem = selected
+        Fluent:Notify({ Title = "Anti Kick", Content = "Selected: " .. selected, Duration = 2 })
+    end
+})
+
+Tabs.Defense:AddToggle("AntiKickStickToggle", {
+    Title = "Anti Kick (Stick)",
+    Default = false,
+    Callback = function(state)
+        if state then
+            AntiKickStickCfg.enabled = true
+            Fluent:Notify({ Title = "Anti Kick", Content = "Enabled with " .. AntiKickStickCfg.selectedItem, Duration = 2 })
+            PlayEnableSound()
+            AntiKickStickCfg.loopThread = task.spawn(StartAntiKickStickLoop)
+        else
+            AntiKickStickCfg.enabled = false
+            if AntiKickStickCfg.loopThread then
+                task.cancel(AntiKickStickCfg.loopThread)
+                AntiKickStickCfg.loopThread = nil
+            end
+            Fluent:Notify({ Title = "Anti Kick", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+Tabs.Defense:AddSection("Other Defense")
+
+Tabs.Defense:AddToggle("SafePosToggle", {
+    Title = "Safe Pos LP",
+    Default = false,
+    Callback = function(state)
+        if state then
+            SafePosCfg.enabled = true
+            local char = LocalPlayer.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then SafePosCfg.target = root.CFrame end
+            end
+            if not SafePosCfg.target then
+                Fluent:Notify({ Title = "Safe Pos", Content = "Error: Could not save position!", Duration = 2 })
+                return
+            end
+            SafePosCfg.loopThread = task.spawn(function()
+                while SafePosCfg.enabled do
+                    local char = LocalPlayer.Character
+                    if char then
+                        local root = char:FindFirstChild("HumanoidRootPart")
+                        if root then root.CFrame = SafePosCfg.target end
+                    end
+                    task.wait()
+                end
+            end)
+            Fluent:Notify({ Title = "Safe Pos", Content = "Enabled - Position saved", Duration = 2 })
+            PlayEnableSound()
+        else
+            SafePosCfg.enabled = false
+            if SafePosCfg.loopThread then
+                task.cancel(SafePosCfg.loopThread)
+                SafePosCfg.loopThread = nil
+            end
+            Fluent:Notify({ Title = "Safe Pos", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
 
 Window:SelectTab(1)
 Fluent:Notify({
