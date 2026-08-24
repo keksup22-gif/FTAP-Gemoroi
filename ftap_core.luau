@@ -494,6 +494,210 @@ local function DisableSpeed()
     end
 end
 
+local function ApplyHighlight(model)
+    if not model or not model.Parent then
+        return
+    end
+    local existing = model:FindFirstChild("Amethyst_FullHighlight")
+    if existing then
+        existing:Destroy()
+    end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "Amethyst_FullHighlight"
+    highlight.FillColor = Color3.fromRGB(170, 100, 255)
+    highlight.OutlineColor = Color3.fromRGB(140, 90, 220)
+    highlight.OutlineTransparency = .1
+    highlight.FillTransparency = .2
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Adornee = model
+    highlight.Parent = model
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Transparency = .95
+            if part:FindFirstChildOfClass("Texture") then
+                part.Material = Enum.Material.ForceField
+            end
+        end
+    end
+    return highlight
+end
+
+local function GetStickRemotes()
+    local spawnToy = S.ReplicatedStorage.MenuToys.SpawnToyRemoteFunction
+    local destroyToy = S.ReplicatedStorage.MenuToys.DestroyToy
+    local setOwner = S.ReplicatedStorage.GrabEvents:WaitForChild("SetNetworkOwner")
+    local stickyEvent = S.ReplicatedStorage.PlayerEvents:WaitForChild("StickyPartEvent")
+    return spawnToy, destroyToy, setOwner, stickyEvent
+end
+
+local function PlayerInPlot(playerName)
+    local folder = S.Workspace.PlotItems.PlayersInPlots
+    if not folder:FindFirstChild(playerName) then
+        return false
+    end
+    for _, plot in pairs(S.Workspace.Plots:GetChildren()) do
+        local sign = plot:FindFirstChild("PlotSign")
+        if sign then
+            local owners = sign:FindFirstChild("ThisPlotsOwners")
+            if owners then
+                for _, owner in pairs(sign:GetChildren()) do
+                    if owner.Name == "Value" and owner.Value == playerName then
+                        return true, S.Workspace.PlotItems:FindFirstChild(plot.Name)
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function GetRoot()
+    local char = LocalPlayer.Character
+    if char then
+        return char:FindFirstChild("HumanoidRootPart")
+    end
+    local newChar = LocalPlayer.CharacterAdded:Wait()
+    return newChar:WaitForChild("HumanoidRootPart")
+end
+
+local function SpawnSelectedItem()
+    local item = AntiKickStickCfg.selectedItem
+    while not LocalPlayer.CanSpawnToy.Value do
+        if not AntiKickStickCfg.enabled or tick() - tick() > 5 then
+            return nil
+        end
+        task.wait()
+    end
+    local root = GetRoot()
+    if root then
+        local cframe = root.CFrame * CFrame.new(0, 12, 20)
+        task.spawn(function()
+            local spawnToy = S.ReplicatedStorage.MenuToys.SpawnToyRemoteFunction
+            spawnToy:InvokeServer(item, cframe, Vector3.new(0, 0, 0))
+        end)
+    end
+    local inPlot, plotFolder = PlayerInPlot(LocalPlayer.Name)
+    local folder = S.Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+    if inPlot then
+        return plotFolder:WaitForChild(item, 2)
+    end
+    return folder:WaitForChild(item, 2) or (S.Workspace.PlotItems.PlayersInPlots:FindFirstChild(LocalPlayer.Name) and folder and folder:WaitForChild(item, 2)) or nil
+end
+
+local function DestroyAllItems(player)
+    local folder = S.Workspace:FindFirstChild(player.Name .. "SpawnedInToys")
+    if not folder then
+        return
+    end
+    local destroyToy = S.ReplicatedStorage.MenuToys.DestroyToy
+    for _, toy in pairs(folder:GetChildren()) do
+        if toy.Name == AntiKickStickCfg.selectedItem then
+            destroyToy:FireServer(toy)
+        end
+    end
+end
+
+local function GiveNetworkOwner(model, ownerName)
+    if not model or not model:FindFirstChild("StickyPart") then
+        return
+    end
+    if not GetRoot() then
+        return
+    end
+    local setOwner = S.ReplicatedStorage.GrabEvents:WaitForChild("SetNetworkOwner")
+    if model:FindFirstChild("SoundPart") then
+        local soundPart = model.SoundPart
+        if not soundPart:FindFirstChild("PartOwner") or soundPart.PartOwner.Value ~= ownerName then
+            setOwner:FireServer(soundPart, soundPart.CFrame)
+        end
+    end
+end
+
+local function MakeAntiKick(model, player)
+    local lp = player.Character
+    if not lp or not lp:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    if not model or not model:FindFirstChild("StickyPart") then
+        return
+    end
+    local root = lp.HumanoidRootPart
+    local firePart = root:FindFirstChild("FirePlayerPart")
+    if not firePart then
+        firePart = Instance.new("Part")
+        firePart.Name = "FirePlayerPart"
+        firePart.Size = Vector3.new(1, 1, 1)
+        firePart.Transparency = 1
+        firePart.CanCollide = false
+        firePart.CanQuery = false
+        firePart.Anchored = true
+        firePart.Parent = root
+        local weld = Instance.new("Weld")
+        weld.Part0 = root
+        weld.Part1 = firePart
+        weld.C0 = CFrame.new(0, 0, 0)
+        weld.Parent = firePart
+    end
+    local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+    local setOwner = grabEvents:WaitForChild("SetNetworkOwner")
+    if model:FindFirstChild("SoundPart") then
+        local soundPart = model.SoundPart
+        if not soundPart:FindFirstChild("PartOwner") or soundPart.PartOwner.Value ~= player.Name then
+            pcall(function()
+                setOwner:FireServer(soundPart, soundPart.CFrame)
+            end)
+        end
+    end
+    local playerEvents = S.ReplicatedStorage:WaitForChild("PlayerEvents")
+    local stickyEvent = playerEvents:WaitForChild("StickyPartEvent")
+    pcall(function()
+        stickyEvent:FireServer(model.StickyPart, firePart, CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(90), math.rad(90)))
+    end)
+    local sticky = model:FindFirstChild("StickyPart")
+    if sticky then
+        sticky.Transparency = 1
+        sticky.CanCollide = false
+        sticky.CanQuery = false
+    end
+    local soundPart = model:FindFirstChild("SoundPart")
+    if soundPart then
+        soundPart.Transparency = 1
+        soundPart.CanCollide = false
+        soundPart.CanQuery = false
+    end
+    ApplyHighlight(model)
+    if not model:FindFirstChild("Amethyst_Atmosphere") then
+        local atmosphere = Instance.new("Atmosphere", model)
+        atmosphere.Name = "Amethyst_Atmosphere"
+        atmosphere.Color = Color3.fromRGB(170, 100, 255)
+        atmosphere.Decay = Color3.fromRGB(50, 30, 80)
+        atmosphere.Glare = .2
+        atmosphere.Haze = .1
+        atmosphere.Density = .3
+    end
+    if not model:FindFirstChild("Amethyst_PointLight") then
+        local light = Instance.new("PointLight", model)
+        light.Name = "Amethyst_PointLight"
+        light.Color = Color3.fromRGB(170, 100, 255)
+        light.Range = 15
+        light.Brightness = 0.5
+        light.Shadows = true
+    end
+    if model.PrimaryPart then
+        model:SetPrimaryPartCFrame(root.CFrame)
+    end
+    model.Name = "AntiKick"
+    task.delay(.1, function()
+        if model and model.Parent then
+            for _, part in ipairs(model:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "StickyPart" and part.Name ~= "SoundPart" then
+                    part.Transparency = 0.5
+                end
+            end
+        end
+    end)
+end
+
 local success, Fluent = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
 end)
