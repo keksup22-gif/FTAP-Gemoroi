@@ -451,6 +451,49 @@ local function ApplySpeed(dt)
     end
 end
 
+local function EnableSpeed()
+    if SpeedCfg.enabled then
+        return
+    end
+    local humanoid = GetCharHumanoid()
+    if humanoid then
+        SpeedCfg.originalWalkSpeed = humanoid.WalkSpeed
+    end
+    SpeedCfg.enabled = true
+    if SpeedCfg.connection then
+        SpeedCfg.connection:Disconnect()
+        SpeedCfg.connection = nil
+    end
+    SpeedCfg.connection = S.RunService.Stepped:Connect(function(_, dt)
+        ApplySpeed(dt)
+    end)
+    if SpeedCfg.charConnection then
+        SpeedCfg.charConnection:Disconnect()
+    end
+    SpeedCfg.charConnection = LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if SpeedCfg.enabled then
+            EnableSpeed()
+        end
+    end)
+end
+
+local function DisableSpeed()
+    SpeedCfg.enabled = false
+    if SpeedCfg.connection then
+        SpeedCfg.connection:Disconnect()
+        SpeedCfg.connection = nil
+    end
+    if SpeedCfg.charConnection then
+        SpeedCfg.charConnection:Disconnect()
+        SpeedCfg.charConnection = nil
+    end
+    local humanoid = GetCharHumanoid()
+    if humanoid then
+        humanoid.WalkSpeed = SpeedCfg.originalWalkSpeed
+    end
+end
+
 local success, Fluent = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
 end)
