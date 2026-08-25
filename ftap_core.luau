@@ -4206,7 +4206,7 @@ local packetSizeSlider = ServerTab:AddSlider("PacketSizeSlider", {
 task.spawn(function()
     task.wait(0.5)
     local sliderUI = packetSizeSlider and typeof(packetSizeSlider.GetUI) == "function" and packetSizeSlider:GetUI() or nil
-    if sliderUI then
+    if sliderUI and typeof(sliderUI.GetChildren) == "function" then
         for _, item in pairs(sliderUI:GetChildren()) do
             if item:IsA("TextLabel") then
                 if string.find(item.Text, "Size:") or item.Name == "ValueLabel" or item.Name == "Value" then
