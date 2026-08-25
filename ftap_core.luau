@@ -2136,6 +2136,131 @@ Tabs.Defense:AddToggle("SafePosToggle", {
     end
 })
 
+Tabs.Defense:AddToggle("NoclipObjPlayersToggle", {
+    Title = "Noclip Obj players",
+    Default = false,
+    Callback = function(state)
+        if state then
+            NoclipCfg.enabled = true
+            NoclipCfg.parts = {}
+            NoclipCfg.connections = {}
+
+            local function IsInputLagItem(name)
+                for _, item in ipairs(AntiInputLagCfg.items) do
+                    if item == name then
+                        return true
+                    end
+                end
+                return false
+            end
+
+            local function SetNoclip(model)
+                if not model or not model:IsA("Model") then
+                    return
+                end
+                if IsInputLagItem(model.Name) then
+                    return
+                end
+                for _, part in ipairs(model:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        part.CanCollide = false
+                    end
+                end
+            end
+
+            local function OnCharacter(character)
+                if not character then
+                    return
+                end
+                for _, part in ipairs(character:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+
+            for _, player in ipairs(S.Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    NoclipCfg.parts[player] = {}
+                    if player.Character then
+                        OnCharacter(player.Character)
+                    end
+                    player.CharacterAdded:Connect(function(character)
+                        if NoclipCfg.enabled then
+                            OnCharacter(character)
+                        end
+                    end)
+                end
+            end
+
+            for _, player in ipairs(S.Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    local folder = S.Workspace:FindFirstChild(player.Name .. "SpawnedInToys")
+                    if folder then
+                        for _, toy in ipairs(folder:GetChildren()) do
+                            SetNoclip(toy)
+                        end
+                    end
+                end
+            end
+
+            NoclipCfg.connections.descendantAdded = S.Workspace.DescendantAdded:Connect(function(desc)
+                if not NoclipCfg.enabled then
+                    return
+                end
+                if desc:IsA("Model") and not IsInputLagItem(desc.Name) then
+                    local parent = desc.Parent
+                    local isOwnFolder = false
+                    while parent do
+                        if parent.Name == LocalPlayer.Name .. "SpawnedInToys" then
+                            isOwnFolder = true
+                            break
+                        end
+                        parent = parent.Parent
+                    end
+                    if not isOwnFolder then
+                        task.wait(.1)
+                        SetNoclip(desc)
+                    end
+                end
+            end)
+
+            NoclipCfg.connections.playerAdded = S.Players.PlayerAdded:Connect(function(player)
+                if not NoclipCfg.enabled or player == LocalPlayer then
+                    return
+                end
+                NoclipCfg.parts[player] = {}
+                player.CharacterAdded:Connect(function(character)
+                    if NoclipCfg.enabled then
+                        for _, part in ipairs(character:GetChildren()) do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = false
+                            end
+                        end
+                    end
+                end)
+            end)
+
+            Fluent:Notify({ Title = "Noclip", Content = "Enabled - Noclip through players/items", Duration = 2 })
+            PlayEnableSound()
+        else
+            NoclipCfg.enabled = false
+            for _, conn in pairs(NoclipCfg.connections) do
+                if conn then
+                    if typeof(conn) == "RBXScriptConnection" then
+                        conn:Disconnect()
+                    else
+                        task.cancel(conn)
+                    end
+                end
+            end
+            NoclipCfg.connections = {}
+            NoclipCfg.parts = {}
+            Fluent:Notify({ Title = "Noclip", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
 Window:SelectTab(1)
 Fluent:Notify({
     Title = "FTAP-Gemoroi",
