@@ -424,6 +424,11 @@ function Fluent:CreateWindow(options)
                     DropBtn.Text = tostring(val)
                 end
             }
+
+            function TabObj:SetValues(newVals)
+                DropdownObj:SetValues(newVals)
+            end
+
             return DropdownObj
         end
         end
