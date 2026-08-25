@@ -2352,6 +2352,726 @@ Tabs.Defense:AddButton({
     end
 })
 
+
+pcall(function()
+    print("[AMETHYST] Активация Permanent Pallet...")
+    PermanentPalletCfg.enabled = true
+    local lp = LocalPlayer
+    local spawnToyRemote = S.ReplicatedStorage.MenuToys.SpawnToyRemoteFunction
+    local destroyToyRemote = S.ReplicatedStorage.MenuToys.DestroyToy
+    local setOwnerRemote = S.ReplicatedStorage.GrabEvents.SetNetworkOwner
+
+
+    local function FindOwnPallet()
+        local folder = S.Workspace:FindFirstChild(lp.Name .. "SpawnedInToys")
+        if not folder then
+            return nil
+        end
+        for _, toy in ipairs(folder:GetChildren()) do
+            if toy.Name == "PalletLightBrown" then
+                local soundPart = toy:FindFirstChild("SoundPart")
+                if soundPart then
+                    local owner = soundPart:FindFirstChild("PartOwner")
+                    if owner and owner.Value == lp.Name then
+                        return toy
+                    else
+                        setOwnerRemote:FireServer(setOwnerRemote, setOwnerRemote.CFrame)
+                        task.wait(.1)
+                        owner = soundPart:FindFirstChild("PartOwner")
+                        if owner and owner.Value == lp.Name then
+                            return toy
+                        end
+                    end
+                end
+            end
+        end
+        return nil
+    end
+
+
+    local function SpawnPallet()
+        local folder = S.Workspace:FindFirstChild(lp.Name .. "SpawnedInToys")
+        if folder then
+            for _, toy in ipairs(folder:GetChildren()) do
+                if toy.Name == "PalletLightBrown" then
+                    local soundPart = toy:FindFirstChild("SoundPart")
+                    if not soundPart or not soundPart:FindFirstChild("PartOwner") or soundPart.PartOwner.Value ~= lp.Name then
+                        destroyToyRemote:FireServer(toy)
+                        task.wait(.1)
+                    end
+                end
+            end
+        end
+        local canSpawn = lp:FindFirstChild("CanSpawnToy")
+        if canSpawn then
+            local start = tick()
+            while canSpawn.Value do
+                if tick() - start < 5 then
+                    task.wait(.1)
+                    if not PermanentPalletCfg.enabled then
+                        return nil
+                    end
+                end
+                local char = lp.Character
+                if char then
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    if not root then
+                        return nil
+                    end
+                end
+                return nil
+            end
+            local char = lp.Character
+            if not char then
+                return nil
+            end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then
+                return nil
+            end
+            spawnToyRemote:InvokeServer("PalletLightBrown", root.CFrame * CFrame.new(0, 30, 20), Vector3.new(0, -90, 0))
+            for _ = 1, 20 do
+                if not PermanentPalletCfg.enabled then
+                    return nil
+                end
+                local folder = S.Workspace:FindFirstChild(lp.Name .. "SpawnedInToys")
+                local pallet = folder and folder:FindFirstChild("PalletLightBrown")
+                if pallet then
+                    local soundPart = pallet:FindFirstChild("SoundPart")
+                    if soundPart then
+                        setOwnerRemote:FireServer(soundPart, soundPart.CFrame)
+                        task.wait(.1)
+                        local owner = soundPart:FindFirstChild("PartOwner")
+                        if owner and owner.Value == lp.Name then
+                            return pallet
+                        else
+                            setOwnerRemote:FireServer(setOwnerRemote, setOwnerRemote.CFrame)
+                            task.wait(.1)
+                            owner = soundPart:FindFirstChild("PartOwner")
+                            if owner and owner.Value == lp.Name then
+                                return pallet
+                            else
+                                task.wait(.1)
+                            end
+                        end
+                    end
+                end
+                task.wait(.1)
+            end
+            return nil
+        end
+    end
+
+    local function HidePallet(pallet)
+        if not pallet then
+            return false
+        end
+        local soundPart = pallet:FindFirstChild("SoundPart")
+        if not soundPart then
+            return false
+        end
+        for _, part in ipairs(pallet:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 1
+                part.CanCollide = false
+                part.CanQuery = false
+                part.Massless = true
+            end
+        end
+        soundPart.CFrame = CFrame.new(0, 1000000000, 0)
+        return true
+    end
+
+
+    PermanentPalletCfg.loopThread = task.spawn(function()
+        while PermanentPalletCfg.enabled do
+            local pallet = FindOwnPallet()
+            if not pallet then
+                pallet = SpawnPallet()
+            end
+            if pallet then
+                PermanentPalletCfg.currentPallet = pallet
+                PermanentPalletCfg.isReady = true
+                HidePallet(pallet)
+                local soundPart = pallet:FindFirstChild("SoundPart")
+                if soundPart then
+                    local owner = soundPart:FindFirstChild("PartOwner")
+                    if not owner or owner.Value ~= lp.Name then
+                        setOwnerRemote:FireServer(setOwnerRemote, setOwnerRemote.CFrame)
+                    end
+                    soundPart.CFrame = CFrame.new(0, 1000000000, 0)
+                end
+            else
+                PermanentPalletCfg.isReady = false
+                PermanentPalletCfg.currentPallet = nil
+            end
+            task.wait(0.5)
+        end
+        PermanentPalletCfg.currentPallet = nil
+        PermanentPalletCfg.isReady = false
+    end)
+    print("[AMETHYST] ✅ Permanent Pallet активирован автоматически")
+end)
+
+
+local TargetTab = Window:CreateTab("Target")
+local playersInPlotsFolder = S.Workspace:WaitForChild("PlotItems"):WaitForChild("PlayersInPlots")
+
+
+local function IsPlayerInPlot(player)
+    if not player then
+        return false
+    end
+    return playersInPlotsFolder:FindFirstChild(player.Name) ~= nil
+end
+
+
+local targetData = {
+    loopKick = {},
+    ragdollLoopKick = {},
+    loopBring = {}
+}
+
+
+local function ClearTargetGroup(groupName)
+    if targetData[groupName] then
+        for _, obj in pairs(targetData[groupName]) do
+            if obj and typeof(obj) == "Instance" then
+                pcall(function()
+                    obj:Destroy()
+                end)
+            end
+        end
+        targetData[groupName] = {}
+    end
+end
+
+
+local function TrackInstance(groupName, obj)
+    if not targetData[groupName] then
+        targetData[groupName] = {}
+    end
+    table.insert(targetData[groupName], obj)
+    return obj
+end
+
+
+task.wait(0.5)
+TargetTab:CreateSection("Select Player")
+
+
+local function PlayerLabel(player)
+    local display = player.DisplayName
+    local name = player.Name
+    if display and display ~= "" and display ~= name then
+        return display .. " (" .. name .. ")" .. (IsPlayerInPlot(player) and " [PLOT]" or "")
+    else
+        return name .. (IsPlayerInPlot(player) and " [PLOT]" or "")
+    end
+end
+
+
+local function GetPlayerList()
+    local items = {}
+    local mapping = {}
+    for _, player in ipairs(S.Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local label = PlayerLabel(player)
+            table.insert(items, label)
+            mapping[label] = player
+        end
+    end
+    return items, mapping
+end
+
+
+local targetPlayerName = ""
+local targetPlayer = nil
+
+
+local targetDropdown
+local function RefreshPlayerDropdown()
+    local items, mapping = GetPlayerList()
+    if targetDropdown then
+        targetDropdown:Refresh(items, true)
+        if AmethystFeatures.Selected.currentPlayer and AmethystFeatures.Selected.currentPlayer.Parent then
+            targetDropdown:Set(PlayerLabel(AmethystFeatures.Selected.currentPlayer))
+        end
+    end
+end
+
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        RefreshPlayerDropdown()
+    end
+end)
+
+
+targetDropdown = TargetTab:CreateDropdown({
+    Title = "Select Target Player",
+    Values = {},
+    Default = "",
+    Callback = function(selected)
+        if selected == "" then
+            AmethystFeatures.Selected.kickPlayer = nil
+            AmethystFeatures.Selected.currentPlayer = nil
+            return
+        end
+        local items, mapping = GetPlayerList()
+        local player = mapping[selected]
+        if player then
+            AmethystFeatures.Selected.kickPlayer = player
+            AmethystFeatures.Selected.currentPlayer = player
+            Fluent:Notify({ Title = "Target Selected", Content = "Target: " .. PlayerLabel(player), Duration = 2 })
+            PlayEnableSound()
+        end
+    end
+})
+RefreshPlayerDropdown()
+
+
+S.Players.PlayerAdded:Connect(function()
+    task.wait(0.5)
+    RefreshPlayerDropdown()
+end)
+S.Players.PlayerRemoving:Connect(function(player)
+    RefreshPlayerDropdown()
+    if AmethystFeatures.Selected.currentPlayer == player then
+        AmethystFeatures.Selected.kickPlayer = nil
+        AmethystFeatures.Selected.currentPlayer = nil
+        targetDropdown:Set("")
+        Fluent:Notify({ Title = "Target", Content = "Selected player left the game", Duration = 2 })
+    end
+end)
+
+
+playersInPlotsFolder.ChildAdded:Connect(RefreshPlayerDropdown)
+playersInPlotsFolder.ChildRemoved:Connect(RefreshPlayerDropdown)
+
+
+local function IsTargetAlive(player)
+    return IsPlayerInPlot(player)
+end
+
+
+TargetTab:CreateSection("Grabs func")
+
+
+TargetTab:CreateToggle({
+    Title = "Fast kick",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if not AmethystFeatures.Selected.kickPlayer then
+                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                return
+            end
+            if not PermanentPalletCfg.enabled or not PermanentPalletCfg.currentPallet then
+                Fluent:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
+                return
+            end
+            ClearTargetGroup("ragdollLoopKick")
+            local target = AmethystFeatures.Selected.kickPlayer
+            local pallet = PermanentPalletCfg.currentPallet
+            RagdollLoopKickCfg.enabled = true
+            RagdollLoopKickCfg.savedPos = nil
+            RagdollLoopKickCfg.dragging = false
+            RagdollLoopKickCfg.grabStart = 0
+            RagdollLoopKickCfg.loopThread = task.spawn(function()
+                if not (pallet and pallet:FindFirstChild("SoundPart")) then
+                    RagdollLoopKickCfg.enabled = false
+                    Fluent:Notify({ Title = "Error", Content = "SoundPart not found!", Duration = 3 })
+                    return
+                end
+                local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+                local setOwner = grabEvents:WaitForChild("SetNetworkOwner")
+                local createGrabLine = grabEvents:WaitForChild("CreateGrabLine")
+                local destroyGrabLine = grabEvents:WaitForChild("DestroyGrabLine")
+                local attachHold, attachTarget, alignPos, alignOri = nil, nil, nil, nil
+                local isHeld = false
+                local heldSince = 0
+                local soundPart = pallet.SoundPart
+                while RagdollLoopKickCfg.enabled do
+                    local lpChar = LocalPlayer.Character
+                    local myRoot = lpChar and lpChar:FindFirstChild("HumanoidRootPart")
+                    if not myRoot then
+                        task.wait()
+                    else
+                        local targetChar = target.Character
+                        local targetHum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
+                        local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+                        if not targetRoot or not targetHum or not IsTargetAlive(target) then
+                            ClearTargetGroup("ragdollLoopKick")
+                            isHeld = false
+                            task.wait()
+                        else
+                            if IsTargetAlive(target) then
+                                task.wait(.1)
+                            else
+                                myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, -6, -10)
+                                myRoot.Velocity = Vector3.zero
+                                if not targetRoot:FindFirstChild("PartOwner") then
+                                    setOwner:FireServer(targetRoot, targetRoot.CFrame)
+                                end
+                                task.wait()
+                                createGrabLine:FireServer(targetRoot)
+                                destroyGrabLine:FireServer(targetRoot, Vector3.zero, targetRoot.Position, false)
+                                targetHum.PlatformStand = true
+                                targetHum.Sit = true
+                                if not isHeld then
+                                    heldSince = tick()
+                                end
+                                if tick() - heldSince > .4 then
+                                    if targetHum.PlatformStand then
+                                        isHeld = true
+                                        myRoot.CFrame = myRoot.CFrame
+                                        myRoot.Velocity = Vector3.zero
+                                        attachHold = TrackInstance("ragdollLoopKick", Instance.new("Attachment", myRoot))
+                                        attachHold.Name = "RagdollLoopKickAttHold"
+                                        attachTarget = TrackInstance("ragdollLoopKick", Instance.new("Attachment", targetRoot))
+                                        attachTarget.Name = "RagdollLoopKickAttTarget"
+                                        alignPos = TrackInstance("ragdollLoopKick", Instance.new("AlignPosition"))
+                                        alignPos.Attachment0 = attachTarget
+                                        alignPos.Attachment1 = attachHold
+                                        alignPos.MaxForce = math.huge
+                                        alignPos.Responsiveness = math.huge
+                                        alignPos.Name = "RagdollLoopKickAlignPos"
+                                        alignPos.Parent = targetRoot
+                                        alignOri = TrackInstance("ragdollLoopKick", Instance.new("AlignOrientation"))
+                                        alignOri.Attachment0 = attachTarget
+                                        alignOri.Attachment1 = attachHold
+                                        alignOri.MaxTorque = math.huge
+                                        alignOri.Responsiveness = math.huge
+                                        alignOri.Name = "RagdollLoopKickAlignOri"
+                                        alignOri.Parent = targetRoot
+                                        targetHum:ChangeState(Enum.HumanoidStateType.Physics)
+                                    else
+                                        heldSince = tick()
+                                    end
+                                end
+                                task.wait()
+                            end
+                            if targetChar and targetRoot then
+                                setOwner:FireServer(targetRoot, targetRoot.CFrame)
+                                if not targetRoot:FindFirstChild("PartOwner") then
+                                    setOwner:FireServer(targetRoot, targetRoot.CFrame)
+                                end
+                                if attachHold then
+                                    attachHold.Position = Vector3.new()
+                                    attachTarget.CFrame = CFrame.new(0, 14.5, 0) * CFrame.Angles(math.rad((0 + 0 * .016) % 360), 0, 0)
+                                end
+                                if tick() - (isHeld and heldSince or 0) >= 0 then
+                                    soundPart.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 0)
+                                    if not soundPart:FindFirstChild("PartOwner") then
+                                        setOwner:FireServer(soundPart, soundPart.CFrame)
+                                    end
+                                    task.wait()
+                                    soundPart.CFrame = CFrame.new(0, 1000000000, 0)
+                                end
+                            end
+                        end
+                    end
+                    task.wait()
+                end
+                ClearTargetGroup("ragdollLoopKick")
+                isHeld = false
+            end)
+            Fluent:Notify({ Title = "Ragdoll Loop Kick", Content = "Enabled - Target: " .. target.Name, Duration = 3 })
+            PlayEnableSound()
+        else
+            RagdollLoopKickCfg.enabled = false
+            if RagdollLoopKickCfg.loopThread then
+                task.cancel(RagdollLoopKickCfg.loopThread)
+                RagdollLoopKickCfg.loopThread = nil
+            end
+            ClearTargetGroup("ragdollLoopKick")
+            Fluent:Notify({ Title = "Ragdoll Loop Kick", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+TargetTab:CreateToggle({
+    Title = "control kick",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if not AmethystFeatures.Selected.kickPlayer then
+                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                return
+            end
+            if not PermanentPalletCfg.enabled or not PermanentPalletCfg.currentPallet then
+                Fluent:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
+                return
+            end
+            local target = AmethystFeatures.Selected.kickPlayer
+            local pallet = PermanentPalletCfg.currentPallet
+            ClearTargetGroup("ragdollLoopKick")
+            RagdollLoopKickCfg.enabled = true
+            RagdollLoopKickCfg.dragging = false
+            RagdollLoopKickCfg.savedPos = nil
+            RagdollLoopKickCfg.grabStart = 0
+            RagdollLoopKickCfg.loopThread = task.spawn(function()
+                if not (pallet and pallet:FindFirstChild("SoundPart")) then
+                    RagdollLoopKickCfg.enabled = false
+                    Fluent:Notify({ Title = "Error", Content = "SoundPart not found!", Duration = 3 })
+                    return
+                end
+                local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+                local setOwner = grabEvents:WaitForChild("SetNetworkOwner")
+                grabEvents:WaitForChild("CreateGrabLine")
+                grabEvents:WaitForChild("DestroyGrabLine")
+                local angleCache = {}
+                local function getAngle(deg)
+                    if not angleCache[deg] then
+                        angleCache[deg] = CFrame.Angles(math.rad(deg), 0, 0)
+                    end
+                    return angleCache[deg]
+                end
+                while RagdollLoopKickCfg.enabled do
+                    local lpChar = LocalPlayer.Character
+                    local myRoot = lpChar and lpChar:FindFirstChild("HumanoidRootPart")
+                    if not myRoot then
+                        task.wait()
+                    else
+                        local targetChar = target.Character
+                        local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+                        local targetHum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
+                        if not targetChar or not targetRoot or not targetHum or targetHum.Health <= 0 then
+                            task.wait()
+                        else
+                            local soundPart = pallet:FindFirstChild("SoundPart")
+                            if soundPart then
+                                soundPart.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 0)
+                                if not soundPart:FindFirstChild("PartOwner") then
+                                    setOwner:FireServer(soundPart, soundPart.CFrame)
+                                end
+                                task.wait()
+                                soundPart.CFrame = CFrame.new(0, 1000000000, 0)
+                            end
+                        end
+                    end
+                    task.wait()
+                end
+                ClearTargetGroup("ragdollLoopKick")
+                return
+            end)
+            Fluent:Notify({ Title = "Ragdoll Loop Kick", Content = "Enabled - Target: " .. target.Name, Duration = 3 })
+            PlayEnableSound()
+        else
+            RagdollLoopKickCfg.enabled = false
+            if RagdollLoopKickCfg.loopThread then
+                task.cancel(RagdollLoopKickCfg.loopThread)
+                RagdollLoopKickCfg.loopThread = nil
+            end
+            ClearTargetGroup("ragdollLoopKick")
+            Fluent:Notify({ Title = "Ragdoll Loop Kick", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+TargetTab:CreateToggle({
+    Title = "loop bring",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if not AmethystFeatures.Selected.kickPlayer then
+                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                return
+            end
+            if not PermanentPalletCfg.enabled or not PermanentPalletCfg.currentPallet then
+                Fluent:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
+                return
+            end
+            local target = AmethystFeatures.Selected.kickPlayer
+            local pallet = PermanentPalletCfg.currentPallet
+            ClearTargetGroup("loopBring")
+            LoopKickCfg.enabled = true
+            LoopKickCfg.loopThread = task.spawn(function()
+                local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+                local setOwner = grabEvents:WaitForChild("SetNetworkOwner")
+                local soundPart = pallet:FindFirstChild("SoundPart")
+                local attachHold, attachTarget, alignPos, alignOri = nil, nil, nil, nil
+                while LoopKickCfg.enabled do
+                    local lpChar = LocalPlayer.Character
+                    local myRoot = lpChar and lpChar:FindFirstChild("HumanoidRootPart")
+                    if not myRoot then
+                        task.wait()
+                    else
+                        local targetChar = target.Character
+                        local targetHum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
+                        local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+                        if not targetChar or not targetHum or targetHum.Health <= 0 or not targetRoot then
+                            ClearTargetGroup("loopBring")
+                            task.wait()
+                        else
+                            if IsTargetAlive(target) then
+                                task.wait(.4)
+                            else
+                                myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, -6, -10)
+                                myRoot.Velocity = Vector3.zero
+                                if not targetRoot:FindFirstChild("PartOwner") then
+                                    setOwner:FireServer(targetRoot, targetRoot.CFrame)
+                                end
+                                targetRoot.Velocity = Vector3.zero
+                                targetRoot.AssemblyLinearVelocity = Vector3.zero
+                                targetRoot.AssemblyAngularVelocity = Vector3.zero
+                                targetRoot.RotVelocity = Vector3.zero
+                                local holdSince = tick()
+                                if tick() - holdSince > .35 then
+                                    if targetRoot.Velocity.Magnitude < 5 then
+                                        attachHold = TrackInstance("loopBring", Instance.new("Attachment", myRoot))
+                                        attachHold.Name = "LoopBringAttHold"
+                                        attachTarget = TrackInstance("loopBring", Instance.new("Attachment", targetRoot))
+                                        attachTarget.Name = "LoopBringAttTarget"
+                                        alignPos = TrackInstance("loopBring", Instance.new("AlignPosition"))
+                                        alignPos.Attachment0 = attachTarget
+                                        alignPos.Attachment1 = attachHold
+                                        alignPos.MaxForce = math.huge
+                                        alignPos.Responsiveness = 1000
+                                        alignPos.Name = "LoopBringAlignPos"
+                                        alignPos.Parent = targetRoot
+                                        alignOri = TrackInstance("loopBring", Instance.new("AlignOrientation"))
+                                        alignOri.Attachment0 = attachTarget
+                                        alignOri.Attachment1 = attachHold
+                                        alignOri.MaxTorque = math.huge
+                                        alignOri.Responsiveness = 1000
+                                        alignOri.Name = "LoopBringAlignOri"
+                                        alignOri.Parent = targetRoot
+                                        if soundPart then
+                                            soundPart.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 0)
+                                            if not soundPart:FindFirstChild("PartOwner") then
+                                                setOwner:FireServer(soundPart, soundPart.CFrame)
+                                            end
+                                            task.wait()
+                                            soundPart.CFrame = CFrame.new(0, 1000000000, 0)
+                                        end
+                                        for _, part in pairs(targetRoot:GetChildren()) do
+                                            if part:IsA("BasePart") then
+                                                part.CustomPhysicalProperties = PhysicalProperties.new(.2, 0, 10)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            if attachHold and targetRoot then
+                                setOwner:FireServer(targetRoot, targetRoot.CFrame)
+                                if not targetRoot:FindFirstChild("PartOwner") then
+                                    setOwner:FireServer(targetRoot, targetRoot.CFrame)
+                                end
+                                if soundPart then
+                                    soundPart.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 0)
+                                    if not soundPart:FindFirstChild("PartOwner") then
+                                        setOwner:FireServer(soundPart, soundPart.CFrame)
+                                    end
+                                    task.wait()
+                                    soundPart.CFrame = CFrame.new(0, 1000000000, 0)
+                                end
+                            end
+                        end
+                    end
+                    task.wait()
+                end
+                ClearTargetGroup("loopBring")
+            end)
+            Fluent:Notify({ Title = "Loop Kick (Hold + Pallet)", Content = "Holding: " .. target.Name, Duration = 3 })
+            PlayEnableSound()
+        else
+            LoopKickCfg.enabled = false
+            if LoopKickCfg.loopThread then
+                task.cancel(LoopKickCfg.loopThread)
+                LoopKickCfg.loopThread = nil
+            end
+            ClearTargetGroup("loopBring")
+            Fluent:Notify({ Title = "Loop Kick (Hold + Pallet)", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+TargetTab:CreateSection("removed")
+
+
+TargetTab:CreateToggle({
+    Title = "Remove Anti Kick",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if not AmethystFeatures.Selected.kickPlayer then
+                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                return
+            end
+            RemoveAntiKickCfg.enabled = true
+            RemoveAntiKickCfg.targetPlayer = AmethystFeatures.Selected.kickPlayer
+            Fluent:Notify({ Title = "Remove Anti Kick", Content = "Enabled - Target: " .. RemoveAntiKickCfg.targetPlayer.Name, Duration = 3 })
+            PlayEnableSound()
+            RemoveAntiKickCfg.loopThread = task.spawn(function()
+                local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+                local setOwner = grabEvents:WaitForChild("SetNetworkOwner")
+                local target = RemoveAntiKickCfg.targetPlayer
+                local processed = {}
+
+
+                local function Claim(soundPart)
+                    if not soundPart then
+                        return false
+                    end
+                    setOwner:FireServer(soundPart, soundPart.CFrame)
+                    task.wait()
+                    local owner = soundPart:FindFirstChild("PartOwner")
+                    if owner and owner.Value == LocalPlayer.Name then
+                        soundPart.CFrame = CFrame.new(0, 1000, 0)
+                        return true
+                    end
+                    return false
+                end
+
+
+                while RemoveAntiKickCfg.enabled and target and target.Parent do
+                    local folder = S.Workspace:FindFirstChild(target.Name .. "SpawnedInToys")
+                    if folder then
+                        for _, toy in ipairs(folder:GetChildren()) do
+                            for _, itemName in ipairs({ "NinjaKunai", "NinjaShuriken", "AntiKick" }) do
+                                if toy.Name == itemName then
+                                    local key = toy.Name .. "_" .. tostring(toy:GetDebugId())
+                                    if not processed[key] then
+                                        if Claim(toy) then
+                                            processed[key] = true
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        for key in pairs(processed) do
+                            if string.match(key, "_(%d+)$") then
+                                local name = string.match(key, "^(.-)_")
+                                local item = folder:FindFirstChild(name)
+                                if not item or not item:IsDescendantOf(folder) then
+                                    processed[key] = nil
+                                end
+                            end
+                        end
+                    end
+                    task.wait()
+                end
+                RemoveAntiKickCfg.enabled = false
+                RemoveAntiKickCfg.targetPlayer = nil
+            end)
+        else
+            RemoveAntiKickCfg.enabled = false
+            RemoveAntiKickCfg.targetPlayer = nil
+            if RemoveAntiKickCfg.loopThread then
+                task.cancel(RemoveAntiKickCfg.loopThread)
+                RemoveAntiKickCfg.loopThread = nil
+            end
+            Fluent:Notify({ Title = "Remove Anti Kick", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
 Window:SelectTab(1)
 Fluent:Notify({
     Title = "FTAP-Gemoroi",
