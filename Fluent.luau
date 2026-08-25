@@ -251,11 +251,22 @@ function Fluent:CreateWindow(options)
             TCorner.CornerRadius = UDim.new(1, 0)
             TCorner.Parent = ToggleBtn
 
-            ToggleBtn.MouseButton1Click:Connect(function()
-                toggled = not toggled
+            local function updateToggle(val)
+                toggled = val
                 ToggleBtn.BackgroundColor3 = toggled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(45, 45, 45)
                 pcall(function() callback(toggled) end)
+            end
+
+            ToggleBtn.MouseButton1Click:Connect(function()
+                updateToggle(not toggled)
             end)
+
+            local ToggleObj = {
+                SetValue = function(self, val)
+                    updateToggle(val)
+                end
+            }
+            return ToggleObj
         end
 
         function TabObj:AddSlider(flagName, sliderOptions)
