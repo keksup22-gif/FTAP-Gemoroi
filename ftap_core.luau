@@ -2565,7 +2565,7 @@ end
 
 
 task.wait(0.5)
-TargetTab:CreateSection("Select Player")
+TargetTab:AddSection("Select Player")
 
 
 local function PlayerLabel(player)
@@ -2617,7 +2617,7 @@ task.spawn(function()
 end)
 
 
-targetDropdown = TargetTab:CreateDropdown({
+targetDropdown = TargetTab:AddDropdown("TargetPlayerDropdown", {
     Title = "Select Target Player",
     Values = {},
     Default = "",
@@ -2664,10 +2664,9 @@ local function IsTargetAlive(player)
 end
 
 
-TargetTab:CreateSection("Grabs func")
+TargetTab:AddSection("Grabs func")
 
-
-TargetTab:CreateToggle({
+TargetTab:AddToggle("FastKickToggle", {
     Title = "Fast kick",
     Default = false,
     Callback = function(state)
@@ -2801,7 +2800,7 @@ TargetTab:CreateToggle({
 })
 
 
-TargetTab:CreateToggle({
+TargetTab:AddToggle("ControlKickToggle", {
     Title = "control kick",
     Default = false,
     Callback = function(state)
@@ -2881,7 +2880,7 @@ TargetTab:CreateToggle({
 })
 
 
-TargetTab:CreateToggle({
+TargetTab:AddToggle("LoopBringToggle", {
     Title = "loop bring",
     Default = false,
     Callback = function(state)
