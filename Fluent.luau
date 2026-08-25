@@ -396,17 +396,36 @@ function Fluent:CreateWindow(options)
 
             local idx = 1
             DropBtn.MouseButton1Click:Connect(function()
-                idx = idx % #values + 1
-                local selected = values[idx]
-                DropBtn.Text = tostring(selected)
-                pcall(function() callback(selected) end)
+                if #values > 0 then
+                    idx = idx % #values + 1
+                    local selected = values[idx]
+                    DropBtn.Text = tostring(selected)
+                    pcall(function() callback(selected) end)
+                end
             end)
 
-            function TabObj:SetValues(newVals)
-                values = newVals or {"None"}
-                idx = 1
-                DropBtn.Text = tostring(values[1])
-            end
+            local DropdownObj = {
+                SetValues = function(self, newVals)
+                    values = newVals or {"None"}
+                    idx = 1
+                    DropBtn.Text = tostring(values[1])
+                end,
+                Refresh = function(self, newVals, retain)
+                    values = newVals or {}
+                    if not retain and #values > 0 then
+                        idx = 1
+                        DropBtn.Text = tostring(values[1])
+                    end
+                end,
+                Set = function(self, val)
+                    DropBtn.Text = tostring(val)
+                end,
+                SetValue = function(self, val)
+                    DropBtn.Text = tostring(val)
+                end
+            }
+            return DropdownObj
+        end
         end
 
         function TabObj:AddButton(btnOptions)
