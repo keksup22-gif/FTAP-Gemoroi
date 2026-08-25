@@ -2612,7 +2612,9 @@ local function RefreshPlayerDropdown()
     if targetDropdown then
         targetDropdown:Refresh(items, true)
         if AmethystFeatures.Selected.currentPlayer and AmethystFeatures.Selected.currentPlayer.Parent then
-            targetDropdown:Set(PlayerLabel(AmethystFeatures.Selected.currentPlayer))
+            if targetDropdown and typeof(targetDropdown.SetValue) == "function" then
+                targetDropdown:SetValue(PlayerLabel(AmethystFeatures.Selected.currentPlayer))
+            end
         end
     end
 end
@@ -2658,7 +2660,9 @@ S.Players.PlayerRemoving:Connect(function(player)
     if AmethystFeatures.Selected.currentPlayer == player then
         AmethystFeatures.Selected.kickPlayer = nil
         AmethystFeatures.Selected.currentPlayer = nil
-        targetDropdown:Set("")
+    if targetDropdown and typeof(targetDropdown.SetValue) == "function" then
+        targetDropdown:SetValue("")
+    end
         Fluent:Notify({ Title = "Target", Content = "Selected player left the game", Duration = 2 })
     end
 end)
