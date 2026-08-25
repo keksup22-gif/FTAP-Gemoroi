@@ -27,7 +27,15 @@ local S = {
     TextService = game:GetService("TextService")
 }
 
-local RAGDOLL_LIMBS = {"Left Leg", "Right Leg", "Left Arm", "Right Arm"}
+local function Notify(title, content, duration)
+    pcall(function()
+        Fluent:Notify({
+            Title = title,
+            Content = content,
+            Duration = duration or 3
+        })
+    end)
+end
 local AmethystFeatures = {
     Selected = {
         kickPlayer = nil,
