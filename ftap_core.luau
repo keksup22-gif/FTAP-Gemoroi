@@ -3078,3 +3078,517 @@ Fluent:Notify({
     Content = "Fully Operational Core loaded successfully!",
     Duration = 5
 })
+
+TargetTab:AddSection("Blob Functions")
+
+TargetTab:AddToggle("AutoSitBlobTargetToggle", {
+    Title = "Auto Sit Blob",
+    Default = false,
+    Callback = function(state)
+        if state then
+            AutoSitCfg.enabled = true
+            AutoSitCfg.loopThread = task.spawn(function()
+                local lp = LocalPlayer
+                local spawnToy = S.ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
+                S.ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("DestroyToy")
+                local function FindBlob()
+                    local folder = S.Workspace:FindFirstChild(lp.Name .. "SpawnedInToys")
+                    if folder then
+                        for _, toy in pairs(folder:GetChildren()) do
+                            if toy.Name == "CreatureBlobman" then
+                                return toy
+                            end
+                        end
+                    end
+                    return nil
+                end
+                local function SpawnBlob()
+                    local canSpawn = lp:FindFirstChild("CanSpawnToy")
+                    if canSpawn then
+                        local start = tick()
+                        while canSpawn.Value do
+                            if tick() - start < 3 then
+                                task.wait()
+                            end
+                            if not lp:FindFirstChild("CanSpawnToy").Value then
+                                return nil
+                            end
+                        end
+                        local char = lp.Character
+                        if not char then
+                            return nil
+                        end
+                        local root = char:FindFirstChild("HumanoidRootPart")
+                        if not root then
+                            return nil
+                        end
+                        spawnToy:InvokeServer("CreatureBlobman", root.CFrame * CFrame.new(0, 0, 5), Vector3.new(0, 0, 0))
+                        task.wait(0.3)
+                        for _ = 1, 10 do
+                            local blob = FindBlob()
+                            if blob then
+                                return blob
+                            end
+                            task.wait()
+                        end
+                        return nil
+                    end
+                end
+                local function SitOnBlob(blob)
+                    if not blob then
+                        return false
+                    end
+                    local char = lp.Character
+                    if not char then
+                        return false
+                    end
+                    local humanoid = char:FindFirstChild("Humanoid")
+                    if not humanoid then
+                        return false
+                    end
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    if not root then
+                        return false
+                    end
+                    local seat = blob:FindFirstChild("VehicleSeat")
+                    if not seat then
+                        return false
+                    end
+                    if humanoid.SeatPart == seat then
+                        return true
+                    end
+                    root.CFrame = seat.CFrame * CFrame.new(0, 2, 0)
+                    task.wait()
+                    seat:Sit(humanoid)
+                    task.wait()
+                    return humanoid.SeatPart == seat
+                end
+                while AutoSitCfg.enabled do
+                    if not lp.Character then
+                        task.wait()
+                    end
+                    local blob = AutoSitCfg.currentBlob
+                    if not blob or not blob.Parent then
+                        blob = FindBlob()
+                        if not blob then
+                            blob = SpawnBlob()
+                        end
+                        if blob then
+                            AutoSitCfg.currentBlob = blob
+                            SitOnBlob(blob)
+                        end
+                    end
+                    task.wait()
+                end
+                AutoSitCfg.currentBlob = nil
+            end)
+            Fluent:Notify({ Title = "Auto Sit Blob", Content = "Enabled - Auto sitting on blob", Duration = 2 })
+            PlayEnableSound()
+        else
+            AutoSitCfg.enabled = false
+            if AutoSitCfg.loopThread then
+                task.cancel(AutoSitCfg.loopThread)
+                AutoSitCfg.loopThread = nil
+            end
+            AutoSitCfg.currentBlob = nil
+            Fluent:Notify({ Title = "Auto Sit Blob", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+TargetTab:AddToggle("BlobKillToggle", {
+    Title = "Blob Kill",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if not AmethystFeatures.Selected.kickPlayer then
+                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                return
+            end
+            BlobKillCfg.enabled = true
+            BlobKillCfg.selectedPlayers = { AmethystFeatures.Selected.kickPlayer }
+            BlobKillCfg.currentBlob = nil
+            BlobKillCfg.loopThread = task.spawn(function()
+                local lp = LocalPlayer
+                while BlobKillCfg.enabled do
+                    local char = lp.Character
+                    if not char then
+                        task.wait(0.5)
+                    else
+                        local humanoid = char:FindFirstChild("Humanoid")
+                        if not humanoid or humanoid.Health <= 0 or not humanoid.SeatPart then
+                            task.wait(0.5)
+                        else
+                            local blob = humanoid.SeatPart:FindFirstAncestor("CreatureBlobman")
+                            local target = BlobKillCfg.selectedPlayers[1]
+                            if blob and target and target.Character then
+                                local seatScript = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+                                if seatScript then
+                                    local grab = seatScript:FindFirstChild("CreatureGrab")
+                                    local release = seatScript:FindFirstChild("CreatureRelease") or seatScript:FindFirstChild("CreatureDrop")
+                                    local leftDet = blob:FindFirstChild("LeftDetector")
+                                    local leftWeld = leftDet and leftDet:FindFirstChild("LeftWeld")
+                                    local rightDet = blob:FindFirstChild("RightDetector")
+                                    local rightWeld = rightDet and rightDet:FindFirstChild("RightWeld")
+                                    if grab and release then
+                                        local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                                        if targetRoot then
+                                            grab:FireServer(rightDet, targetRoot, rightWeld)
+                                            task.wait(.1)
+                                            if target.Character and target.Character:FindFirstChild("Humanoid") and target.Character.Humanoid.Health > 0 then
+                                                target.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
+                                            end
+                                            release:FireServer(rightWeld)
+                                        end
+                                    end
+                                end
+                            end
+                            task.wait(1)
+                        end
+                    end
+                end
+                BlobKillCfg.currentBlob = nil
+            end)
+            Fluent:Notify({ Title = "Blob Kill", Content = "Enabled - Target: " .. AmethystFeatures.Selected.kickPlayer.Name, Duration = 3 })
+            PlayEnableSound()
+        else
+            BlobKillCfg.enabled = false
+            if BlobKillCfg.loopThread then
+                task.cancel(BlobKillCfg.loopThread)
+                BlobKillCfg.loopThread = nil
+            end
+            BlobKillCfg.currentBlob = nil
+            BlobKillCfg.selectedPlayers = {}
+            Fluent:Notify({ Title = "Blob Kill", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+TargetTab:AddToggle("BlobSimpleTeleportSpamToggle", {
+    Title = "Blob - Simple Teleport Spam",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if not AmethystFeatures.Selected.kickPlayer then
+                Fluent:Notify({ Title = "Error", Content = "Select target!", Duration = 2 })
+                return
+            end
+            local target = AmethystFeatures.Selected.kickPlayer
+            TargetTab.SimpleSpamData = {
+                active = true
+            }
+            TargetTab.SimpleSpamData.thread = task.spawn(function()
+                while TargetTab.SimpleSpamData and TargetTab.SimpleSpamData.active do
+                    if not LocalPlayer.Character then
+                        task.wait(.1)
+                    else
+                        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        local targetChar = target and target.Character
+                        local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+                        if root and targetRoot then
+                            root.CFrame = targetRoot.CFrame
+                            task.wait(.05)
+                        end
+                    end
+                end
+            end)
+            Fluent:Notify({ Title = "Simple Teleport Spam", Content = "Enabled", Duration = 2 })
+        else
+            if TargetTab.SimpleSpamData then
+                TargetTab.SimpleSpamData.active = false
+                if TargetTab.SimpleSpamData.thread then
+                    task.cancel(TargetTab.SimpleSpamData.thread)
+                end
+                TargetTab.SimpleSpamData = nil
+            end
+            Fluent:Notify({ Title = "Simple Teleport Spam", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+local AurasTab = Window:AddTab({ Title = "Auras", Icon = "" })
+AurasTab:AddSection("Ragdoll auras")
+
+
+AurasTab:AddToggle("RagdollAuraToggle", {
+    Title = "Ragdoll Aura",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if not PermanentPalletCfg.enabled then
+                Fluent:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
+                return
+            end
+            local pallet = PermanentPalletCfg.currentPallet
+            if not pallet or not pallet.Parent then
+                Fluent:Notify({ Title = "Error", Content = "Permanent Pallet not found!", Duration = 3 })
+                return
+            end
+            local soundPart = pallet:FindFirstChild("SoundPart")
+            if not soundPart then
+                Fluent:Notify({ Title = "Error", Content = "Pallet has no SoundPart!", Duration = 3 })
+                return
+            end
+            local owner = soundPart:FindFirstChild("PartOwner")
+            if not owner or owner.Value ~= LocalPlayer.Name then
+                Fluent:Notify({ Title = "Error", Content = "No ownership on pallet!", Duration = 3 })
+                return
+            end
+            RagdollAuraCfg.enabled = true
+            RagdollAuraCfg.ragdolledPlayers = {}
+            RagdollAuraCfg.isTeleportingPallet = false
+            RagdollAuraCfg.loopThread = task.spawn(function()
+                local lp = LocalPlayer
+                local char = lp.Character
+                if not char then
+                    return
+                end
+                local myRoot = char:FindFirstChild("HumanoidRootPart")
+                if not myRoot then
+                    return
+                end
+                local setOwner = S.ReplicatedStorage.GrabEvents.SetNetworkOwner
+                local ragdollRemote = S.ReplicatedStorage.CharacterEvents.RagdollRemote
+
+
+                local function EnsureOwnership(soundPart)
+                    if not soundPart then
+                        return false
+                    end
+                    if not soundPart.Parent then
+                        return false
+                    end
+                    local owner = soundPart:FindFirstChild("PartOwner")
+                    if not owner or owner.Value ~= lp.Name then
+                        setOwner:FireServer(soundPart, soundPart.CFrame)
+                    end
+                    return true
+                end
+
+
+                local function RagdollTarget(player)
+                    if not player or player == lp then
+                        return false
+                    end
+                    local pChar = player.Character
+                    if not pChar then
+                        return false
+                    end
+                    local root = pChar:FindFirstChild("HumanoidRootPart")
+                    local humanoid = pChar:FindFirstChild("Humanoid")
+                    if not root then
+                        return false
+                    end
+                    if (root.Position - myRoot.Position).Magnitude > 30 then
+                        RagdollAuraCfg.ragdolledPlayers[player] = nil
+                        return false
+                    end
+                    if soundPart and soundPart.CFrame then
+                        setOwner:FireServer(root, root.CFrame)
+                        soundPart.CFrame = root.CFrame * CFrame.new(0, 0, 0.5)
+                        setOwner:FireServer(soundPart, soundPart.CFrame)
+                        task.wait()
+                        soundPart.CFrame = CFrame.new(0, 10000, 0)
+                        task.wait()
+                        setOwner:FireServer(soundPart, soundPart.CFrame)
+                    end
+                    RagdollAuraCfg.ragdolledPlayers[player] = os.clock()
+                    return true
+                end
+
+
+                while RagdollAuraCfg.enabled do
+                    local pChar = lp.Character
+                    if pChar then
+                        myRoot = pChar:FindFirstChild("HumanoidRootPart")
+                        if myRoot then
+                            if not PermanentPalletCfg.enabled or not PermanentPalletCfg.currentPallet then
+                                print("[Ragdoll Aura] Permanent Pallet отключилась")
+                            else
+                                if not EnsureOwnership(soundPart) then
+                                    print("[Ragdoll Aura] Не удалось установить ownership на паллет")
+                                else
+                                    for player, lastTime in pairs(RagdollAuraCfg.ragdolledPlayers) do
+                                        if os.clock() - lastTime > 1 then
+                                            RagdollAuraCfg.ragdolledPlayers[player] = nil
+                                        end
+                                    end
+                                    local near = {}
+                                    for _, player in pairs(S.Players:GetPlayers()) do
+                                        if player ~= lp and player.Character then
+                                            local root = player.Character:FindFirstChild("HumanoidRootPart")
+                                            if root and (root.Position - myRoot.Position).Magnitude <= 30 then
+                                                table.insert(near, player)
+                                            end
+                                        end
+                                    end
+                                    for i, player in ipairs(near) do
+                                        if RagdollAuraCfg.enabled then
+                                            RagdollTarget(player)
+                                            if i % 3 == 0 then
+                                                task.wait()
+                                            end
+                                        end
+                                    end
+                                    task.wait()
+                                end
+                            end
+                        end
+                    end
+                    task.wait()
+                end
+                RagdollAuraCfg.ragdolledPlayers = {}
+            end)
+            task.spawn(function()
+                while RagdollAuraCfg.enabled do
+                    if RagdollAuraCfg.enabled and not PermanentPalletCfg.enabled then
+                        print("[Ragdoll Aura] Permanent Pallet отключилась, отключаем...")
+                        if RagdollAuraCfg.loopThread then
+                            task.cancel(RagdollAuraCfg.loopThread)
+                            RagdollAuraCfg.loopThread = nil
+                        end
+                        RagdollAuraCfg.enabled = false
+                        RagdollAuraCfg.ragdolledPlayers = {}
+                        RagdollAuraCfg.isTeleportingPallet = false
+                        break
+                    else
+                        task.wait(1)
+                    end
+                end
+            end)
+            Fluent:Notify({ Title = "Ragdoll Aura", Content = "Enabled", Duration = 3 })
+            PlayEnableSound()
+        else
+            RagdollAuraCfg.enabled = false
+            if RagdollAuraCfg.loopThread then
+                task.cancel(RagdollAuraCfg.loopThread)
+                RagdollAuraCfg.loopThread = nil
+            end
+            RagdollAuraCfg.ragdolledPlayers = {}
+            RagdollAuraCfg.isTeleportingPallet = false
+            Fluent:Notify({ Title = "Ragdoll Aura", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+AurasTab:AddSection("Blob Auras")
+
+
+AurasTab:AddToggle("AutoSitBlobAuraToggle", {
+    Title = "Auto Sit Blob",
+    Default = false,
+    Callback = function(state)
+        if state then
+            AutoSitCfg.enabled = true
+            AutoSitCfg.loopThread = task.spawn(function()
+                local lp = LocalPlayer
+                local spawnToy = S.ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
+                S.ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("DestroyToy")
+                local function FindBlob()
+                    local folder = S.Workspace:FindFirstChild(lp.Name .. "SpawnedInToys")
+                    if folder then
+                        for _, toy in pairs(folder:GetChildren()) do
+                            if toy.Name == "CreatureBlobman" then
+                                return toy
+                            end
+                        end
+                    end
+                    return nil
+                end
+                local function SpawnBlob()
+                    local canSpawn = lp:FindFirstChild("CanSpawnToy")
+                    if canSpawn then
+                        local start = tick()
+                        while canSpawn.Value do
+                            if tick() - start < 3 then
+                                task.wait()
+                            end
+                            if not lp:FindFirstChild("CanSpawnToy").Value then
+                                return nil
+                            end
+                        end
+                        local char = lp.Character
+                        if not char then
+                            return nil
+                        end
+                        local root = char:FindFirstChild("HumanoidRootPart")
+                        if not root then
+                            return nil
+                        end
+                        spawnToy:InvokeServer("CreatureBlobman", root.CFrame * CFrame.new(0, 0, 5), Vector3.new(0, 0, 0))
+                        task.wait(0.3)
+                        for _ = 1, 10 do
+                            local blob = FindBlob()
+                            if blob then
+                                return blob
+                            end
+                            task.wait()
+                        end
+                        return nil
+                    end
+                end
+                local function SitOnBlob(blob)
+                    if not blob then
+                        return false
+                    end
+                    local char = lp.Character
+                    if not char then
+                        return false
+                    end
+                    local humanoid = char:FindFirstChild("Humanoid")
+                    if not humanoid then
+                        return false
+                    end
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    if not root then
+                        return false
+                    end
+                    local seat = blob:FindFirstChild("VehicleSeat")
+                    if not seat then
+                        return false
+                    end
+                    if humanoid.SeatPart == seat then
+                        return true
+                    end
+                    root.CFrame = seat.CFrame * CFrame.new(0, 2, 0)
+                    task.wait()
+                    seat:Sit(humanoid)
+                    task.wait()
+                    return humanoid.SeatPart == seat
+                end
+                while AutoSitCfg.enabled do
+                    if not lp.Character then
+                        task.wait()
+                    end
+                    local blob = AutoSitCfg.currentBlob
+                    if not blob or not blob.Parent then
+                        blob = FindBlob()
+                        if not blob then
+                            blob = SpawnBlob()
+                        end
+                        if blob then
+                            AutoSitCfg.currentBlob = blob
+                            SitOnBlob(blob)
+                        end
+                    end
+                    task.wait()
+                end
+                AutoSitCfg.currentBlob = nil
+            end)
+            Fluent:Notify({ Title = "Auto Sit Blob", Content = "Enabled - Auto sitting on blob", Duration = 2 })
+            PlayEnableSound()
+        else
+            AutoSitCfg.enabled = false
+            if AutoSitCfg.loopThread then
+                task.cancel(AutoSitCfg.loopThread)
+                AutoSitCfg.loopThread = nil
+            end
+            AutoSitCfg.currentBlob = nil
+            Fluent:Notify({ Title = "Auto Sit Blob", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
