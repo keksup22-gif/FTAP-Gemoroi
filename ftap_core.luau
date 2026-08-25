@@ -2241,6 +2241,32 @@ Tabs.Defense:AddToggle("NoclipObjPlayersToggle", {
                 end)
             end)
 
+            NoclipCfg.connections.periodicCheck = task.spawn(function()
+                while NoclipCfg.enabled do
+                    for _, player in ipairs(S.Players:GetPlayers()) do
+                        if player ~= LocalPlayer and player.Character then
+                            for _, part in ipairs(player.Character:GetChildren()) do
+                                if part:IsA("BasePart") and part.CanCollide then
+                                    part.CanCollide = false
+                                end
+                            end
+                            local folder = S.Workspace:FindFirstChild(player.Name .. "SpawnedInToys")
+                            if folder then
+                                for _, toy in ipairs(folder:GetChildren()) do
+                                    if toy:IsA("Model") and not IsInputLagItem(toy.Name) then
+                                        for _, part in ipairs(toy:GetDescendants()) do
+                                            if part:IsA("BasePart") and part.CanCollide then
+                                                part.CanCollide = false
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    task.wait(2)
+                end
+            end)
             Fluent:Notify({ Title = "Noclip", Content = "Enabled - Noclip through players/items", Duration = 2 })
             PlayEnableSound()
         else
@@ -2257,6 +2283,71 @@ Tabs.Defense:AddToggle("NoclipObjPlayersToggle", {
             NoclipCfg.connections = {}
             NoclipCfg.parts = {}
             Fluent:Notify({ Title = "Noclip", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+Tabs.Defense:AddButton({
+    Title = "Delete Legs",
+    Callback = function()
+        local lp = LocalPlayer
+        local char = lp.Character
+        if not char then
+            return
+        end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local ragdollRemote = S.ReplicatedStorage.CharacterEvents.RagdollRemote
+        if not char or not ragdollRemote then
+            return
+        end
+        if not (char:FindFirstChild("Left Leg")) then
+            Fluent:Notify({ Title = "Delete Legs", Content = "Error: Missing body parts", Duration = 3 })
+            return
+        end
+        local torso = char:FindFirstChild("Torso")
+        S.Workspace.FallenPartsDestroyHeight = -100
+        Fluent:Notify({ Title = "Delete Legs", Content = "Deleting legs...", Duration = 3 })
+        PlayEnableSound()
+        ragdollRemote:FireServer(root, 2)
+        task.wait(0.5)
+        char["Right Leg"].CFrame = CFrame.new(0, -10000, 0)
+        char["Left Leg"].CFrame = CFrame.new(0, -10000, 0)
+        task.wait(.3)
+        if torso then
+            torso.CFrame = CFrame.new(0, -9970, 0)
+        end
+        task.wait(0.5)
+        if torso then
+            local grab = torso.CFrame
+            torso.CFrame = grab
+        end
+        task.wait(0.5)
+        S.Workspace.FallenPartsDestroyHeight = S.Workspace.FallenPartsDestroyHeight
+        if not char:FindFirstChild("Left Leg") and not char:FindFirstChild("Right Leg") then
+            Fluent:Notify({ Title = "Delete Legs", Content = "Legs successfully deleted!", Duration = 5 })
+            PlayEnableSound()
+            task.spawn(function()
+                while char.Parent do
+                    if not char:FindFirstChild("Left Leg") and not char:FindFirstChild("Right Leg") then
+                        local humanoid = char:FindFirstChild("Humanoid")
+                        if humanoid then
+                            local controls = lp.PlayerGui:FindFirstChild("ControlsGui")
+                            local pcFrame = controls and controls:FindFirstChild("PCFrame")
+                            local stand = pcFrame and pcFrame:FindFirstChild("Stand")
+                            if stand then
+                                if stand.Visible == false then
+                                    humanoid.HipHeight = 2
+                                else
+                                    humanoid.HipHeight = 0
+                                end
+                            end
+                        end
+                        task.wait()
+                    end
+                end
+            end)
+        else
+            Fluent:Notify({ Title = "Delete Legs", Content = "Warning: Legs not fully deleted", Duration = 3 })
         end
     end
 })
