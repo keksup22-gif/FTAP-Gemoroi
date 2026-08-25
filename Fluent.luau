@@ -297,7 +297,7 @@ function Fluent:CreateWindow(options)
             SCorner.Parent = SliderBar
 
             local Fill = Instance.new("Frame")
-            Fill.Size = UDim2.new((default - min)/(max - min), 0, 1, 0)
+            Fill.Size = UDim2.new(math.clamp((default - min)/(max - min), 0, 1), 0, 1, 0)
             Fill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
             Fill.BorderSizePixel = 0
             Fill.Parent = SliderBar
@@ -329,6 +329,19 @@ function Fluent:CreateWindow(options)
                     pcall(function() callback(currentVal) end)
                 end
             end)
+
+            local SliderObj = {
+                GetUI = function(self)
+                    return Elem
+                end,
+                SetValue = function(self, val)
+                    local clamped = math.clamp((val - min) / (max - min), 0, 1)
+                    Fill.Size = UDim2.new(clamped, 0, 1, 0)
+                    Label.Text = (sliderOptions.Title or flagName) .. ": " .. tostring(val)
+                    pcall(function() callback(val) end)
+                end
+            }
+            return SliderObj
         end
 
         function TabObj:AddDropdown(flagName, dropOptions)
