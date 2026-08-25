@@ -2999,10 +2999,10 @@ TargetTab:AddToggle("LoopBringToggle", {
 })
 
 
-TargetTab:CreateSection("removed")
+TargetTab:AddSection("removed")
 
 
-TargetTab:CreateToggle({
+TargetTab:AddToggle("RemoveAntiKickToggle", {
     Title = "Remove Anti Kick",
     Default = false,
     Callback = function(state)
