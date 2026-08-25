@@ -2532,11 +2532,14 @@ end)
 
 
 local TargetTab = Window:AddTab({ Title = "Target", Icon = "users" })
-local playersInPlotsFolder = S.Workspace:WaitForChild("PlotItems"):WaitForChild("PlayersInPlots")
+local playersInPlotsFolder = nil
+pcall(function()
+    playersInPlotsFolder = S.Workspace:WaitForChild("PlotItems", 2) and S.Workspace.PlotItems:WaitForChild("PlayersInPlots", 2)
+end)
 
 
 local function IsPlayerInPlot(player)
-    if not player then
+    if not player or not playersInPlotsFolder then
         return false
     end
     return playersInPlotsFolder:FindFirstChild(player.Name) ~= nil
@@ -2672,8 +2675,10 @@ S.Players.PlayerRemoving:Connect(function(player)
 end)
 
 
-playersInPlotsFolder.ChildAdded:Connect(RefreshPlayerDropdown)
-playersInPlotsFolder.ChildRemoved:Connect(RefreshPlayerDropdown)
+if playersInPlotsFolder then
+    playersInPlotsFolder.ChildAdded:Connect(RefreshPlayerDropdown)
+    playersInPlotsFolder.ChildRemoved:Connect(RefreshPlayerDropdown)
+end
 
 
 local function IsTargetAlive(player)
