@@ -2610,7 +2610,11 @@ local targetDropdown
 local function RefreshPlayerDropdown()
     local items, mapping = GetPlayerList()
     if targetDropdown then
-        targetDropdown:Refresh(items, true)
+        if typeof(targetDropdown.Refresh) == "function" then
+            targetDropdown:Refresh(items, true)
+        elseif typeof(targetDropdown.SetValues) == "function" then
+            targetDropdown:SetValues(items)
+        end
         if AmethystFeatures.Selected.currentPlayer and AmethystFeatures.Selected.currentPlayer.Parent then
             if targetDropdown and typeof(targetDropdown.SetValue) == "function" then
                 targetDropdown:SetValue(PlayerLabel(AmethystFeatures.Selected.currentPlayer))
