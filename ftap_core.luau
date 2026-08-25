@@ -3993,3 +3993,285 @@ AurasTab:AddToggle("DestroyKickAuraToggle", {
         end
     end
 })
+
+
+AurasTab:AddSection("Kick Auras")
+
+
+AurasTab:AddToggle("KickAuraFixedToggle", {
+    Title = "Kick Aura (Fixed)",
+    Default = false,
+    Callback = function(state)
+        if state then
+            KickAuraFixedCfg.enabled = true
+            KickAuraFixedCfg.fixedPlayers = {}
+            KickAuraFixedCfg.loopThread = task.spawn(function()
+                local grabEvents = S.ReplicatedStorage.GrabEvents
+                local setOwner = grabEvents.SetNetworkOwner
+                local destroyGrabLine = grabEvents.DestroyGrabLine
+                local ragdollRemote = S.ReplicatedStorage.CharacterEvents.RagdollRemote
+                local offsets = {
+                    Vector3.new(-4, 15, -4),
+                    Vector3.new(4, 15, -4),
+                    Vector3.new(-4, 15, 4),
+                    Vector3.new(4, 15, 4)
+                }
+                while KickAuraFixedCfg.enabled do
+                    if not LocalPlayer.Character then
+                        break
+                    end
+                    task.wait()
+                end
+            end)
+            Fluent:Notify({ Title = "Kick Aura (Fixed)", Content = "Enabled", Duration = 3 })
+            PlayEnableSound()
+        else
+            KickAuraFixedCfg.enabled = false
+            if KickAuraFixedCfg.loopThread then
+                task.cancel(KickAuraFixedCfg.loopThread)
+                KickAuraFixedCfg.loopThread = nil
+            end
+            for _, data in pairs(KickAuraFixedCfg.fixedPlayers) do
+                if data.alignPos and data.alignPos.Parent then
+                    data.alignPos:Destroy()
+                end
+                if data.alignOri and data.alignOri.Parent then
+                    data.alignOri:Destroy()
+                end
+            end
+            KickAuraFixedCfg.fixedPlayers = {}
+            Fluent:Notify({ Title = "Kick Aura (Fixed)", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+AurasTab:AddToggle("JumpKickAuraToggle", {
+    Title = "Jump Kick Aura",
+    Default = false,
+    Callback = function(state)
+        if state then
+            JumpKickAuraCfg.enabled = true
+            JumpKickAuraCfg.processedPlayers = {}
+            JumpKickAuraCfg.loopThread = task.spawn(function()
+                local grabEvents = S.ReplicatedStorage.GrabEvents
+                local setOwner = grabEvents.SetNetworkOwner
+                local destroyGrabLine = grabEvents.DestroyGrabLine
+                while JumpKickAuraCfg.enabled do
+                    if not LocalPlayer.Character then
+                        break
+                    end
+                    task.wait()
+                end
+            end)
+            Fluent:Notify({ Title = "Jump Kick Aura", Content = "Enabled", Duration = 3 })
+            PlayEnableSound()
+        else
+            JumpKickAuraCfg.enabled = false
+            if JumpKickAuraCfg.loopThread then
+                task.cancel(JumpKickAuraCfg.loopThread)
+                JumpKickAuraCfg.loopThread = nil
+            end
+            JumpKickAuraCfg.processedPlayers = {}
+            Fluent:Notify({ Title = "Jump Kick Aura", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+local ServerTab = Window:AddTab({ Title = "Server", Icon = "" })
+ServerTab:AddSection("Server Lag")
+
+
+local lagRiskLabel = nil
+local packetSizeLabel = nil
+
+
+local function UpdateLagLabels()
+    if packetSizeLabel then
+        packetSizeLabel.Text = "Size: " .. Features.PacketLag.packetSize
+        if Features.PacketLag.packetSize > 600000 then
+            packetSizeLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+            if lagRiskLabel then
+                lagRiskLabel.Text = "⚠️ HIGH LAG WARNING! ⚠️"
+                lagRiskLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+            end
+        elseif Features.PacketLag.packetSize > 200000 then
+            packetSizeLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+            if lagRiskLabel then
+                lagRiskLabel.Text = "⚠️ Medium lag risk ⚠️"
+                lagRiskLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+            end
+        else
+            packetSizeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            if lagRiskLabel then
+                lagRiskLabel.Text = "Low lag risk"
+                lagRiskLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
+        end
+    end
+end
+
+
+local function StopPacketLag()
+    if Features.PacketLag.loopThread then
+        task.cancel(Features.PacketLag.loopThread)
+        Features.PacketLag.loopThread = nil
+    end
+    Features.PacketLag.enabled = false
+    if lagRiskLabel then
+        lagRiskLabel.Text = "Stopped"
+        lagRiskLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
+    end
+    Fluent:Notify({ Title = "Packet Lag", Content = "Disabled", Duration = 2 })
+    task.delay(2, function()
+        if lagRiskLabel then
+            UpdateLagLabels()
+        end
+    end)
+end
+
+
+local function StartPacketLag()
+    Features.PacketLag.enabled = true
+    if lagRiskLabel then
+        lagRiskLabel.Text = "STARTING..."
+        lagRiskLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
+    end
+    Features.PacketLag.loopThread = task.spawn(function()
+        local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+        local extendRemote = grabEvents:WaitForChild("ExtendGrabLine")
+        if not extendRemote then
+            warn("[Packet Lag] ExtendGrabLine RemoteEvent not found!")
+            StopPacketLag()
+            return
+        end
+        if lagRiskLabel then
+            lagRiskLabel.Text = "LAGGING SERVER..."
+            lagRiskLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
+        end
+        Fluent:Notify({ Title = "Packet Lag", Content = "Enabled - Packet Size: " .. Features.PacketLag.packetSize, Duration = 3 })
+        PlayEnableSound()
+        while Features.PacketLag.enabled do
+            extendRemote:FireServer(string.rep("❤️❤️❤️❤️❤️😘😘😘😘😍😍😍😍❤️❤️❤️❤️❤️😘😘😘😘😍😍😍😍❤️❤️❤️❤️❤️😘😘😘😘😍😍😍😍❤️❤️❤️", math.floor(Features.PacketLag.packetSize / 10)))
+            print("[Packet Lag] Sent packet size: " .. Features.PacketLag.packetSize)
+            task.wait(3e-05)
+        end
+    end)
+end
+
+
+local packetSizeSlider = ServerTab:AddSlider("PacketSizeSlider", {
+    Title = "Packet Size",
+    Min = 100,
+    Max = 1000000,
+    Default = 50000,
+    Rounding = 0,
+    Callback = function(value)
+        Features.PacketLag.packetSize = value
+        UpdateLagLabels()
+    end
+})
+
+
+task.spawn(function()
+    task.wait(0.5)
+    local sliderUI = packetSizeSlider:GetUI()
+    if sliderUI then
+        for _, item in pairs(sliderUI:GetChildren()) do
+            if item:IsA("TextLabel") then
+                if string.find(item.Text, "Size:") or item.Name == "ValueLabel" or item.Name == "Value" then
+                    packetSizeLabel = item
+                end
+            end
+        end
+        if not packetSizeLabel then
+            packetSizeLabel = Instance.new("TextLabel")
+            packetSizeLabel.Size = UDim2.new(1, -20, 0, 20)
+            packetSizeLabel.Position = UDim2.new(0, 10, 0, 70)
+            packetSizeLabel.BackgroundTransparency = 1
+            packetSizeLabel.Text = "Size: " .. Features.PacketLag.packetSize
+            packetSizeLabel.Font = Enum.Font.Gotham
+            packetSizeLabel.TextSize = 12
+            packetSizeLabel.TextXAlignment = Enum.TextXAlignment.Center
+            packetSizeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            packetSizeLabel.Parent = sliderUI
+        end
+        lagRiskLabel = Instance.new("TextLabel")
+        lagRiskLabel.Size = UDim2.new(1, -20, 0, 20)
+        lagRiskLabel.Position = UDim2.new(0, 10, 0, 90)
+        lagRiskLabel.BackgroundTransparency = 1
+        lagRiskLabel.Text = "Low lag risk"
+        lagRiskLabel.Font = Enum.Font.GothamBold
+        lagRiskLabel.TextSize = 11
+        lagRiskLabel.TextXAlignment = Enum.TextXAlignment.Center
+        lagRiskLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        lagRiskLabel.Parent = sliderUI
+        UpdateLagLabels()
+    end
+})
+
+
+ServerTab:AddToggle("PacketLagToggle", {
+    Title = "Packet Lag",
+    Default = false,
+    Callback = function(state)
+        if state then
+            StartPacketLag()
+        else
+            StopPacketLag()
+        end
+    end
+})
+
+
+ServerTab:AddSection("Line Lag")
+
+
+ServerTab:AddToggle("LineLagServerLagToggle", {
+    Title = "Line Lag (Server Lag)",
+    Default = false,
+    Callback = function(state)
+        if state then
+            ServerLagCfg.enabled = true
+            task.spawn(function()
+                if ServerLagCfg.enabled then
+                    local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+                    local createGrabLine = grabEvents:WaitForChild("CreateGrabLine")
+                    if not createGrabLine then
+                        warn("[Server Lag] CreateGrabLine RemoteEvent not found!")
+                        ServerLagCfg.enabled = false
+                        Fluent:Notify({ Title = "Server Lag", Content = "Error: CreateGrabLine not found!", Duration = 3 })
+                        return
+                    end
+                    print("[Server Lag] Started!")
+                    ServerLagCfg.loopThread = task.spawn(function()
+                        while ServerLagCfg.enabled do
+                            local spawnLoc = S.Workspace:FindFirstChild("SpawnLocation")
+                            if spawnLoc then
+                                for y = 0, 50 do
+                                    if not ServerLagCfg.enabled then
+                                        break
+                                    end
+                                    createGrabLine:FireServer(CFrame.new(0, y, 0))
+                                    task.wait(.005)
+                                end
+                            end
+                            task.wait(.1)
+                        end
+                    end)
+                    Fluent:Notify({ Title = "Server Lag", Content = "Enabled - Lagging server with lines", Duration = 3 })
+                    PlayEnableSound()
+                end
+            end)
+        else
+            ServerLagCfg.enabled = false
+            if ServerLagCfg.loopThread then
+                task.cancel(ServerLagCfg.loopThread)
+                ServerLagCfg.loopThread = nil
+            end
+            Fluent:Notify({ Title = "Server Lag", Content = "Disabled", Duration = 2 })
+            print("[Server Lag] Stopped")
+        end
+    end
+})
