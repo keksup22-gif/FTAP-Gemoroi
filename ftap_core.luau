@@ -37,6 +37,15 @@ local function Notify(title, content, duration)
     end)
 end
 local AmethystFeatures = {
+    Features = {
+        PacketLag = AmethystFeatures and AmethystFeatures.PacketLag or {
+            enabled = false,
+            loopThread = nil,
+            packetSize = 100,
+            minSize = 100,
+            maxSize = 1000000
+        }
+    },
     Selected = {
         kickPlayer = nil,
         players = {},
