@@ -3592,3 +3592,174 @@ AurasTab:AddToggle("AutoSitBlobAuraToggle", {
         end
     end
 })
+
+
+AurasTab:AddToggle("KillAuraBlobToggle", {
+    Title = "Kill Aura (Blob)",
+    Default = false,
+    Callback = function(state)
+        if state then
+            KillAuraCfg.enabled = true
+            KillAuraCfg.killCooldown = {}
+            KillAuraCfg.targetPlayers = {}
+            KillAuraCfg.lastKillTime = 0
+            KillAuraCfg.loopThread = task.spawn(function()
+                local lp = LocalPlayer
+                local ws = S.Workspace
+                local function FindBlob()
+                    local folder = ws:FindFirstChild(lp.Name .. "SpawnedInToys")
+                    if folder then
+                        for _, toy in pairs(folder:GetChildren()) do
+                            if toy.Name == "CreatureBlobman" then
+                                return toy
+                            end
+                        end
+                    end
+                    return nil
+                end
+                local function GetBlobRemotes(blob)
+                    if not blob then
+                        return nil
+                    end
+                    local seatScript = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+                    if not seatScript then
+                        return nil
+                    end
+                    local leftDet = blob:FindFirstChild("LeftDetector")
+                    local leftWeld = leftDet and leftDet:FindFirstChild("LeftWeld")
+                    local rightDet = blob:FindFirstChild("RightDetector")
+                    local rightWeld = rightDet and rightDet:FindFirstChild("RightWeld")
+                    return {
+                        grab = seatScript:FindFirstChild("CreatureGrab"),
+                        release = seatScript:FindFirstChild("CreatureRelease") or seatScript:FindFirstChild("CreatureDrop"),
+                        leftDet = leftDet,
+                        leftWeld = leftWeld,
+                        rightDet = rightDet,
+                        rightWeld = rightWeld
+                    }
+                end
+                local function TryKill(player, blob, useLeft)
+                    if not player or player == lp then
+                        return false
+                    end
+                    local pChar = player.Character
+                    if not pChar then
+                        return false
+                    end
+                    local root = pChar:FindFirstChild("HumanoidRootPart")
+                    local humanoid = pChar:FindFirstChild("Humanoid")
+                    if not root or not humanoid or humanoid.Health <= 0 then
+                        return false
+                    end
+                    local myChar = lp.Character
+                    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                    if not myRoot then
+                        return false
+                    end
+                    if (myRoot.Position - root.Position).Magnitude > 30 then
+                        return false
+                    end
+                    local now = tick()
+                    if KillAuraCfg.killCooldown[player] and now - KillAuraCfg.killCooldown[player] < 1 then
+                        return false
+                    end
+                    local remotes = GetBlobRemotes(blob)
+                    if not remotes or not remotes.grab or not remotes.release then
+                        return false
+                    end
+                    local det = useLeft and remotes.leftDet or remotes.rightDet
+                    local weld = useLeft and remotes.leftWeld or remotes.rightWeld
+                    if not det or not weld then
+                        return false
+                    end
+                    pcall(function()
+                        remotes.grab:FireServer(det, root, weld)
+                        task.wait(.0001)
+                        remotes.release:FireServer(weld)
+                    end)
+                    task.wait(.0002)
+                    pcall(function()
+                        if humanoid and humanoid.Health > 0 then
+                            humanoid:ChangeState(Enum.HumanoidStateType.Dead)
+                        end
+                    end)
+                    KillAuraCfg.killCooldown[player] = now
+                    KillAuraCfg.lastKillTime = now
+                    return true
+                end
+                while KillAuraCfg.enabled do
+                    local char = lp.Character
+                    if not char then
+                        task.wait()
+                    else
+                        local humanoid = char:FindFirstChild("Humanoid")
+                        if not humanoid or humanoid.Health <= 0 then
+                            task.wait(0)
+                        else
+                            local seatPart = humanoid.SeatPart
+                            if not seatPart or not seatPart:IsDescendantOf(ws) then
+                                task.wait(0.5)
+                            else
+                                local blob = seatPart:FindFirstAncestor("CreatureBlobman")
+                                if not blob or not blob.Parent then
+                                    task.wait(0.5)
+                                else
+                                    KillAuraCfg.currentBlob = blob
+                                    local near = {}
+                                    for _, player in ipairs(S.Players:GetPlayers()) do
+                                        if player ~= lp and player.Character then
+                                            local root = player.Character:FindFirstChild("HumanoidRootPart")
+                                            local human = player.Character:FindFirstChild("Humanoid")
+                                            if root and human and human.Health > 0 then
+                                                local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
+                                                if myRoot and (myRoot.Position - root.Position).Magnitude <= 30 then
+                                                    table.insert(near, player)
+                                                end
+                                            end
+                                        end
+                                    end
+                                    for i, player in ipairs(near) do
+                                        if KillAuraCfg.enabled then
+                                            if TryKill(player, blob, true) then
+                                                if (i + 1) % 3 == 0 then
+                                                    task.wait()
+                                                end
+                                            end
+                                        end
+                                    end
+                                    KillAuraCfg.targetPlayers = near
+                                    for player, cooldown in pairs(KillAuraCfg.killCooldown) do
+                                        if tick() - cooldown > 1e-05 then
+                                            KillAuraCfg.killCooldown[player] = nil
+                                        end
+                                    end
+                                    task.wait(.1)
+                                end
+                            end
+                        end
+                    end
+                end
+                KillAuraCfg.currentBlob = nil
+                KillAuraCfg.spawningBlob = false
+                KillAuraCfg.killCooldown = {}
+                KillAuraCfg.targetPlayers = {}
+                KillAuraCfg.lastKillTime = 0
+                print("[Kill Aura] Цикл остановлен")
+            end)
+            Fluent:Notify({ Title = "Kill Aura", Content = "Enabled", Duration = 3 })
+            PlayEnableSound()
+        else
+            KillAuraCfg.enabled = false
+            if KillAuraCfg.loopThread then
+                task.cancel(KillAuraCfg.loopThread)
+                KillAuraCfg.loopThread = nil
+            end
+            KillAuraCfg.currentBlob = nil
+            KillAuraCfg.spawningBlob = false
+            KillAuraCfg.killCooldown = {}
+            KillAuraCfg.targetPlayers = {}
+            KillAuraCfg.lastKillTime = 0
+            Fluent:Notify({ Title = "Kill Aura", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
