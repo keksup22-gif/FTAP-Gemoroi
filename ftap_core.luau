@@ -3690,9 +3690,13 @@ AurasTab:AddToggle("KillAuraBlobToggle", {
                         return false
                     end
                     pcall(function()
-                        remotes.grab:FireServer(det, root, weld)
+                        if remotes.grab and remotes.grab.FireServer then
+                            remotes.grab:FireServer(det, root, weld)
+                        end
                         task.wait(.0001)
-                        remotes.release:FireServer(weld)
+                        if remotes.release and remotes.release.FireServer then
+                            remotes.release:FireServer(weld)
+                        end
                     end)
                     task.wait(.0002)
                     pcall(function()
