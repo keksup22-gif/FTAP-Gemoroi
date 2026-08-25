@@ -2522,7 +2522,7 @@ pcall(function()
 end)
 
 
-local TargetTab = Window:CreateTab("Target")
+local TargetTab = Window:AddTab({ Title = "Target", Icon = "users" })
 local playersInPlotsFolder = S.Workspace:WaitForChild("PlotItems"):WaitForChild("PlayersInPlots")
 
 
