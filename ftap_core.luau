@@ -3763,3 +3763,233 @@ AurasTab:AddToggle("KillAuraBlobToggle", {
         end
     end
 })
+
+
+AurasTab:AddToggle("DualLockAuraToggle", {
+    Title = "Dual Lock Aura",
+    Default = false,
+    Callback = function(state)
+        if state then
+            AdvancedDuallockCfg.enabled = true
+            AdvancedDuallockCfg.processedPlayers = {}
+            AdvancedDuallockCfg.originalBarrierState = {}
+            local function DisableBarriers()
+                local plots = S.Workspace:FindFirstChild("Plots")
+                if plots then
+                    for _, plot in ipairs(plots:GetChildren()) do
+                        local barrier = plot:FindFirstChild("Barrier")
+                        if barrier then
+                            for _, part in ipairs(barrier:GetChildren()) do
+                                if part:IsA("BasePart") and part.Name == "PlotBarrier" then
+                                    AdvancedDuallockCfg.originalBarrierState[part] = part.CanCollide
+                                    part.CanCollide = false
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            AdvancedDuallockCfg.loopThread = task.spawn(function()
+                while AdvancedDuallockCfg.enabled do
+                    DisableBarriers()
+                    task.wait()
+                end
+            end)
+            Fluent:Notify({ Title = "Dual Lock Aura", Content = "Enabled", Duration = 3 })
+            PlayEnableSound()
+        else
+            AdvancedDuallockCfg.enabled = false
+            if AdvancedDuallockCfg.loopThread then
+                task.cancel(AdvancedDuallockCfg.loopThread)
+                AdvancedDuallockCfg.loopThread = nil
+            end
+            for part, state in pairs(AdvancedDuallockCfg.originalBarrierState) do
+                if part and part:IsA("BasePart") then
+                    part.CanCollide = state
+                end
+            end
+            AdvancedDuallockCfg.originalBarrierState = {}
+            AdvancedDuallockCfg.currentBlob = nil
+            AdvancedDuallockCfg.processedPlayers = {}
+            Fluent:Notify({ Title = "Dual Lock Aura", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+
+AurasTab:AddToggle("DestroyKickAuraToggle", {
+    Title = "Destroy Kick Aura",
+    Default = false,
+    Callback = function(state)
+        if state then
+            DestroyKickAuraCfg.enabled = true
+            DestroyKickAuraCfg.processedPlayers = {}
+            DestroyKickAuraCfg.isSpawning = false
+            DestroyKickAuraCfg.lastSpawnTime = 0
+            DestroyKickAuraCfg.spawnInterval = 0
+            local function BlobOfSeat(humanoid)
+                local seat = humanoid.SeatPart
+                if seat then
+                    return seat:FindFirstAncestor("CreatureBlobman")
+                end
+                return nil
+            end
+            local function IsAlive(player)
+                if not player or not player.Character then
+                    return false
+                end
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if not humanoid then
+                    return false
+                end
+                return humanoid.Health > 0
+            end
+            local function CleanupProcessed()
+                for player in pairs(DestroyKickAuraCfg.processedPlayers) do
+                    if not player:IsDescendantOf(S.Players) or not player.Character or not IsAlive(player) then
+                        DestroyKickAuraCfg.processedPlayers[player] = nil
+                    end
+                end
+            end
+            local function GetNearbyPlayers(range)
+                local char = LocalPlayer.Character
+                if not char then
+                    return {}
+                end
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if not root then
+                    return {}
+                end
+                local pos = root.Position
+                CleanupProcessed()
+                local near = {}
+                for _, player in ipairs(S.Players:GetPlayers()) do
+                    if player ~= LocalPlayer and IsAlive(player) then
+                        local pChar = player.Character
+                        if pChar then
+                            local pRoot = pChar:FindFirstChild("HumanoidRootPart")
+                            if pRoot and (pRoot.Position - pos).Magnitude <= range then
+                                table.insert(near, player)
+                            end
+                        end
+                    end
+                end
+                return near
+            end
+            local function KickPlayer(player)
+                local lpChar = LocalPlayer.Character
+                if not lpChar then
+                    return
+                end
+                local head = lpChar:WaitForChild("Head", 2)
+                local lpRoot = lpChar:WaitForChild("HumanoidRootPart", 2)
+                if not head or not lpRoot then
+                    return
+                end
+                local pChar = player.Character
+                if not pChar then
+                    return
+                end
+                local pRoot = pChar:WaitForChild("HumanoidRootPart", 2)
+                if not pRoot then
+                    return
+                end
+                local grabEvents = S.ReplicatedStorage:FindFirstChild("GrabEvents")
+                local createGrabLine = grabEvents and grabEvents:FindFirstChild("CreateGrabLine")
+                if createGrabLine then
+                    createGrabLine:FireServer(pRoot, pRoot.CFrame)
+                    task.wait(.1)
+                    S.ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(pRoot, pRoot.CFrame)
+                    task.wait(.1)
+                    pRoot.CFrame = head.CFrame * CFrame.new(0, 12, 0)
+                    task.wait(.1)
+                    S.ReplicatedStorage.GrabEvents.DestroyGrabLine:FireServer(pRoot)
+                    task.wait()
+                    S.ReplicatedStorage.GrabEvents.EndGrabEarly:FireServer(pRoot)
+                    task.wait()
+                end
+                local lpHumanoid = lpChar:FindFirstChild("Humanoid")
+                if lpHumanoid then
+                    local blob = BlobOfSeat(lpHumanoid)
+                    if blob then
+                        local seatScript = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+                        local rightDet = blob:FindFirstChild("RightDetector")
+                        local leftDet = blob:FindFirstChild("LeftDetector")
+                        if seatScript then
+                            local rightWeld = rightDet and rightDet:FindFirstChild("RightWeld")
+                            local leftWeld = leftDet and leftDet:FindFirstChild("LeftWeld")
+                            local grabRemote = seatScript:FindFirstChild("CreatureGrab")
+                            if grabRemote then
+                                if rightWeld then
+                                    grabRemote:FireServer(rightDet, pChar:WaitForChild("HumanoidRootPart", 2), rightWeld)
+                                    task.wait(.1)
+                                end
+                                if leftWeld then
+                                    grabRemote:FireServer(leftDet, pChar:WaitForChild("HumanoidRootPart", 2), leftWeld)
+                                    task.wait(.1)
+                                end
+                            end
+                        end
+                    end
+                end
+                DestroyKickAuraCfg.processedPlayers[player] = true
+            end
+            DestroyKickAuraCfg.loopThread = task.spawn(function()
+                while DestroyKickAuraCfg.enabled do
+                    local char = LocalPlayer.Character
+                    if not char then
+                        task.wait(.1)
+                    else
+                        local humanoid = char:FindFirstChild("Humanoid")
+                        if not humanoid or humanoid.Health <= 0 then
+                            task.wait(.1)
+                        else
+                            local seatPart = humanoid.SeatPart
+                            if not seatPart or not seatPart:IsDescendantOf(S.Workspace) then
+                                task.wait(0.5)
+                            else
+                                local blob = seatPart:FindFirstAncestor("CreatureBlobman")
+                                if not blob or not blob.Parent then
+                                    task.wait(0.5)
+                                else
+                                    DestroyKickAuraCfg.currentBlob = blob
+                                    local near = GetNearbyPlayers(30)
+                                    for _, player in ipairs(near) do
+                                        if DestroyKickAuraCfg.enabled then
+                                            KickPlayer(player)
+                                            if #GetNearbyPlayers(30) > 1 then
+                                                task.wait(.1)
+                                            end
+                                        end
+                                    end
+                                    CleanupProcessed()
+                                    if #near == 0 then
+                                        task.wait(.1)
+                                    else
+                                        task.wait()
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                DestroyKickAuraCfg.currentBlob = nil
+                DestroyKickAuraCfg.processedPlayers = {}
+                DestroyKickAuraCfg.isSpawning = false
+                print("[Destroy Kick Aura] Цикл остановлен")
+            end)
+            Fluent:Notify({ Title = "Destroy Kick Aura", Content = "Enabled", Duration = 3 })
+            PlayEnableSound()
+        else
+            DestroyKickAuraCfg.enabled = false
+            if DestroyKickAuraCfg.loopThread then
+                task.cancel(DestroyKickAuraCfg.loopThread)
+                DestroyKickAuraCfg.loopThread = nil
+            end
+            DestroyKickAuraCfg.currentBlob = nil
+            DestroyKickAuraCfg.processedPlayers = {}
+            DestroyKickAuraCfg.isSpawning = false
+            Fluent:Notify({ Title = "Destroy Kick Aura", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
