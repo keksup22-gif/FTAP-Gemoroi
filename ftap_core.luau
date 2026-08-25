@@ -3316,7 +3316,8 @@ TargetTab:AddToggle("BlobSimpleTeleportSpamToggle", {
 })
 
 
-local AurasTab = Window:AddTab({ Title = "Auras", Icon = "" })
+-- local AurasTab = Window:AddTab({ Title = "Auras", Icon = "" })
+local AurasTab = Tabs.Auras
 AurasTab:AddSection("Ragdoll auras")
 
 
