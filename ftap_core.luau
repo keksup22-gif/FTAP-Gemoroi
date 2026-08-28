@@ -3128,10 +3128,8 @@ TargetTab:AddToggle("AutoSitBlobTargetToggle", {
                     local canSpawn = lp:FindFirstChild("CanSpawnToy")
                     if canSpawn then
                         local start = tick()
-                        while canSpawn.Value do
-                            if tick() - start < 3 then
-                                task.wait()
-                            end
+                        while canSpawn.Value and tick() - start < 3 do
+                            task.wait()
                             if not lp:FindFirstChild("CanSpawnToy").Value then
                                 return nil
                             end
@@ -3526,10 +3524,8 @@ AurasTab:AddToggle("AutoSitBlobAuraToggle", {
                     local canSpawn = lp:FindFirstChild("CanSpawnToy")
                     if canSpawn then
                         local start = tick()
-                        while canSpawn.Value do
-                            if tick() - start < 3 then
-                                task.wait()
-                            end
+                        while canSpawn.Value and tick() - start < 3 do
+                            task.wait()
                             if not lp:FindFirstChild("CanSpawnToy").Value then
                                 return nil
                             end
