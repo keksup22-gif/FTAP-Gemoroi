@@ -1,4 +1,4 @@
---[[\
+﻿--[[\
     Project: FTAP-Gemoroi\
     Core Script (ftap_core.luau) - Fully functional with operational ESP, Auras, Physics, and Fluent UI bindings\
 ]]
@@ -1775,7 +1775,7 @@ end)
 
 -- Amethyst Premium background defense & notification tasks
 task.spawn(function()
-    print("[AMETHYST] Ожидание загрузки игры...")
+    print("[AMETHYST] ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ Ð·Ð°Ð³Ñ€ÑƒÐ·ÐºÐ¸ Ð¸Ð³Ñ€Ñ‹...")
     if not game:IsLoaded() then
         game.Loaded:Wait()
     end
@@ -1788,7 +1788,7 @@ task.spawn(function()
             lp.CharacterAdded:Wait()
         end
         task.wait(2)
-        print("[AMETHYST] ===== АКТИВАЦИЯ ВСЕХ ЗАЩИТНЫХ ФУНКЦИЙ =====")
+        print("[AMETHYST] ===== ÐÐšÐ¢Ð˜Ð’ÐÐ¦Ð˜Ð¯ Ð’Ð¡Ð•Ð¥ Ð—ÐÐ©Ð˜Ð¢ÐÐ«Ð¥ Ð¤Ð£ÐÐšÐ¦Ð˜Ð™ =====")
 
         pcall(function()
             local ui = Instance.new("ScreenGui")
@@ -2371,7 +2371,7 @@ Tabs.Defense:AddButton({
 
 
 pcall(function()
-    print("[AMETHYST] Активация Permanent Pallet...")
+    print("[AMETHYST] ÐÐºÑ‚Ð¸Ð²Ð°Ñ†Ð¸Ñ Permanent Pallet...")
     PermanentPalletCfg.enabled = true
     local lp = LocalPlayer
     local spawnToyRemote = S.ReplicatedStorage.MenuToys.SpawnToyRemoteFunction
@@ -2527,7 +2527,7 @@ pcall(function()
         PermanentPalletCfg.currentPallet = nil
         PermanentPalletCfg.isReady = false
     end)
-    print("[AMETHYST] ✅ Permanent Pallet активирован автоматически")
+    print("[AMETHYST] âœ… Permanent Pallet Ð°ÐºÑ‚Ð¸Ð²Ð¸Ñ€Ð¾Ð²Ð°Ð½ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸")
 end)
 
 
@@ -3436,10 +3436,10 @@ AurasTab:AddToggle("RagdollAuraToggle", {
                         myRoot = pChar:FindFirstChild("HumanoidRootPart")
                         if myRoot then
                             if not PermanentPalletCfg.enabled or not PermanentPalletCfg.currentPallet then
-                                print("[Ragdoll Aura] Permanent Pallet отключилась")
+                                print("[Ragdoll Aura] Permanent Pallet Ð¾Ñ‚ÐºÐ»ÑŽÑ‡Ð¸Ð»Ð°ÑÑŒ")
                             else
                                 if not EnsureOwnership(soundPart) then
-                                    print("[Ragdoll Aura] Не удалось установить ownership на паллет")
+                                    print("[Ragdoll Aura] ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÑÑ‚Ð°Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ ownership Ð½Ð° Ð¿Ð°Ð»Ð»ÐµÑ‚")
                                 else
                                     for player, lastTime in pairs(RagdollAuraCfg.ragdolledPlayers) do
                                         if os.clock() - lastTime > 1 then
@@ -3475,7 +3475,7 @@ AurasTab:AddToggle("RagdollAuraToggle", {
             task.spawn(function()
                 while RagdollAuraCfg.enabled do
                     if RagdollAuraCfg.enabled and not PermanentPalletCfg.enabled then
-                        print("[Ragdoll Aura] Permanent Pallet отключилась, отключаем...")
+                        print("[Ragdoll Aura] Permanent Pallet Ð¾Ñ‚ÐºÐ»ÑŽÑ‡Ð¸Ð»Ð°ÑÑŒ, Ð¾Ñ‚ÐºÐ»ÑŽÑ‡Ð°ÐµÐ¼...")
                         if RagdollAuraCfg.loopThread then
                             task.cancel(RagdollAuraCfg.loopThread)
                             RagdollAuraCfg.loopThread = nil
@@ -3778,7 +3778,7 @@ AurasTab:AddToggle("KillAuraBlobToggle", {
                 KillAuraCfg.killCooldown = {}
                 KillAuraCfg.targetPlayers = {}
                 KillAuraCfg.lastKillTime = 0
-                print("[Kill Aura] Цикл остановлен")
+                print("[Kill Aura] Ð¦Ð¸ÐºÐ» Ð¾ÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½")
             end)
             Fluent:Notify({ Title = "Kill Aura", Content = "Enabled", Duration = 3 })
             PlayEnableSound()
@@ -4010,7 +4010,7 @@ AurasTab:AddToggle("DestroyKickAuraToggle", {
                 DestroyKickAuraCfg.currentBlob = nil
                 DestroyKickAuraCfg.processedPlayers = {}
                 DestroyKickAuraCfg.isSpawning = false
-                print("[Destroy Kick Aura] Цикл остановлен")
+                print("[Destroy Kick Aura] Ð¦Ð¸ÐºÐ» Ð¾ÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½")
             end)
             Fluent:Notify({ Title = "Destroy Kick Aura", Content = "Enabled", Duration = 3 })
             PlayEnableSound()
@@ -4127,13 +4127,13 @@ local function UpdateLagLabels()
         if Features.PacketLag.packetSize > 600000 then
             packetSizeLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
             if lagRiskLabel then
-                lagRiskLabel.Text = "⚠️ HIGH LAG WARNING! ⚠️"
+                lagRiskLabel.Text = "âš ï¸ HIGH LAG WARNING! âš ï¸"
                 lagRiskLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
             end
         elseif Features.PacketLag.packetSize > 200000 then
             packetSizeLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
             if lagRiskLabel then
-                lagRiskLabel.Text = "⚠️ Medium lag risk ⚠️"
+                lagRiskLabel.Text = "âš ï¸ Medium lag risk âš ï¸"
                 lagRiskLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
             end
         else
@@ -4187,7 +4187,7 @@ local function StartPacketLag()
         Fluent:Notify({ Title = "Packet Lag", Content = "Enabled - Packet Size: " .. Features.PacketLag.packetSize, Duration = 3 })
         PlayEnableSound()
         while Features.PacketLag.enabled do
-            extendRemote:FireServer(string.rep("❤️❤️❤️❤️❤️😘😘😘😘😍😍😍😍❤️❤️❤️❤️❤️😘😘😘😘😍😍😍😍❤️❤️❤️❤️❤️😘😘😘😘😍😍😍😍❤️❤️❤️", math.floor(Features.PacketLag.packetSize / 10)))
+            extendRemote:FireServer(string.rep("â¤ï¸â¤ï¸â¤ï¸â¤ï¸â¤ï¸ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜ðŸ˜ðŸ˜ðŸ˜â¤ï¸â¤ï¸â¤ï¸â¤ï¸â¤ï¸ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜ðŸ˜ðŸ˜ðŸ˜â¤ï¸â¤ï¸â¤ï¸â¤ï¸â¤ï¸ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜ðŸ˜ðŸ˜ðŸ˜â¤ï¸â¤ï¸â¤ï¸", math.floor(Features.PacketLag.packetSize / 10)))
             print("[Packet Lag] Sent packet size: " .. Features.PacketLag.packetSize)
             task.wait(3e-05)
         end
@@ -4207,31 +4207,9 @@ local packetSizeSlider = ServerTab:AddSlider("PacketSizeSlider", {
     end
 })
 
-
 task.spawn(function()
     task.wait(0.5)
-    local sliderUI = packetSizeSlider and typeof(packetSizeSlider.GetUI) == "function" and packetSizeSlider:GetUI() or nil
-    if sliderUI and typeof(sliderUI.GetChildren) == "function" then
-        pcall(function()
-        for _, item in pairs(sliderUI:GetChildren()) do
-            if item:IsA("TextLabel") then
-                if string.find(item.Text, "Size:") or item.Name == "ValueLabel" or item.Name == "Value" then
-                    packetSizeLabel = item
-                end
-            end
-        end
-        if not packetSizeLabel then
-            packetSizeLabel = Instance.new("TextLabel")
-            packetSizeLabel.Size = UDim2.new(1, -20, 0, 20)
-            packetSizeLabel.Position = UDim2.new(0, 10, 0, 70)
-            packetSizeLabel.BackgroundTransparency = 1
-            packetSizeLabel.Text = "Size: " .. Features.PacketLag.packetSize
-            packetSizeLabel.Font = Enum.Font.Gotham
-            packetSizeLabel.TextSize = 12
-            packetSizeLabel.TextXAlignment = Enum.TextXAlignment.Center
-            packetSizeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-            packetSizeLabel.Parent = sliderUI
-        end
+    pcall(function()
         lagRiskLabel = Instance.new("TextLabel")
         lagRiskLabel.Size = UDim2.new(1, -20, 0, 20)
         lagRiskLabel.Position = UDim2.new(0, 10, 0, 90)
@@ -4241,10 +4219,8 @@ task.spawn(function()
         lagRiskLabel.TextSize = 11
         lagRiskLabel.TextXAlignment = Enum.TextXAlignment.Center
         lagRiskLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        lagRiskLabel.Parent = sliderUI
-        UpdateLagLabels()
-    end
-})
+    end)
+end)
 
 
 ServerTab:AddToggle("PacketLagToggle", {
