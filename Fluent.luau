@@ -431,7 +431,6 @@ function Fluent:CreateWindow(options)
 
             return DropdownObj
         end
-        end
 
         function TabObj:AddButton(btnOptions)
             local Elem = Instance.new("TextButton")

@@ -1,4 +1,4 @@
-﻿--[[\
+--[[\
     Project: FTAP-Gemoroi\
     Core Script (ftap_core.luau) - Fully functional with operational ESP, Auras, Physics, and Fluent UI bindings\
 ]]
