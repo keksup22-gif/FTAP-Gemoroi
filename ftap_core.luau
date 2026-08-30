@@ -147,6 +147,13 @@ local AmethystFeatures = {
             "NinjaKatana"
         }
     },
+    -- XOCU Integration
+    XOCU = {
+        KickMode = "Kick",
+        AntiLag = false,
+        LoopThread = nil
+    },
+
     LoopKick = {
         enabled = false,
         loopThread = nil
@@ -2830,6 +2837,58 @@ end)
 
 if playersInPlotsFolder then
     playersInPlotsFolder.ChildAdded:Connect(RefreshPlayerDropdown)
+
+-- XOCU Integration Logic
+local function getXOCURoot(player)
+    return player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function applyXOCUForce(target, velocity, name)
+    if not target or not target.Character then return end
+    local root = getXOCURoot(target)
+    if not root then return end
+    pcall(function()
+        local GrabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+        local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
+        local DestroyGrabLine = GrabEvents:FindFirstChild("DestroyGrabLine")
+        
+        SetNetworkOwner:FireServer(root, root.CFrame)
+        if DestroyGrabLine then DestroyGrabLine:FireServer(root) end
+        
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = name or "XOCUForce"
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Velocity = velocity
+        bv.P = 12500
+        bv.Parent = root
+        game:GetService("Debris"):AddItem(bv, 0.1)
+    end)
+end
+
+local XOCUKickMethods = {
+    ["Fling"] = function(target) applyXOCUForce(target, Vector3.new(0, 90000, 0), "XOCUFling") end,
+    ["Kill"] = function(target) applyXOCUForce(target, Vector3.new(0, 99999999999999, 0), "XOCUKill") end,
+    ["Heaven"] = function(target) 
+        local root = getXOCURoot(target)
+        if root then root.CFrame = CFrame.new(0, 200, 0) end
+        applyXOCUForce(target, Vector3.new(0, 200, 0), "XOCUHeaven")
+    end,
+    ["Kick"] = function(target)
+        local root = getXOCURoot(target)
+        if root then root.CFrame = CFrame.new(0, 999999999999, 0) end
+        applyXOCUForce(target, Vector3.new(0, 99999999999999, 0), "XOCUKick")
+    end,
+    ["Ragdoll"] = function(target) applyXOCUForce(target, Vector3.new(0, -20, 0), "XOCURagdoll") end,
+    ["Hell"] = function(target)
+        pcall(function()
+            for _, part in ipairs(target.Character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+        end)
+        applyXOCUForce(target, Vector3.new(0, -100000000, 0), "XOCUHell")
+    end
+}
+
     playersInPlotsFolder.ChildRemoved:Connect(RefreshPlayerDropdown)
 end
 
@@ -2837,6 +2896,53 @@ end
 local function IsTargetAlive(player)
     return IsPlayerInPlot(player)
 end
+
+
+TargetTab:AddDropdown("KickModeDropdown", {
+    Title = "Kick Mode",
+    Values = {"Fling", "Kill", "Heaven", "Kick", "Ragdoll", "Hell"},
+    Default = "Kick",
+    Callback = function(value)
+        AmethystFeatures.XOCU.KickMode = value
+    end
+})
+
+TargetTab:AddButton({
+    Title = "Execute Kick",
+    Callback = function()
+        local target = AmethystFeatures.Selected.kickPlayer
+        if target then
+            XOCUKickMethods[AmethystFeatures.XOCU.KickMode](target)
+            Notify("Kick", "Applied " .. AmethystFeatures.XOCU.KickMode .. " to " .. target.Name)
+        else
+            Notify("Error", "No target selected!")
+        end
+    end
+})
+
+TargetTab:AddToggle("AntiLagToggle", {
+    Title = "XOCU Anti Lag",
+    Default = false,
+    Callback = function(state)
+        AmethystFeatures.XOCU.AntiLag = state
+        if state then
+            AmethystFeatures.XOCU.LoopThread = task.spawn(function()
+                while AmethystFeatures.XOCU.AntiLag do
+                    for _, v in ipairs(Workspace:GetChildren()) do
+                        if v.Name == "GrabParts" and not v:FindFirstChildOfClass("Humanoid") then
+                            v:Destroy()
+                        end
+                    end
+                    task.wait(1)
+                end
+            end)
+        else
+            if AmethystFeatures.XOCU.LoopThread then
+                task.cancel(AmethystFeatures.XOCU.LoopThread)
+            end
+        end
+    end
+})
 
 
 TargetTab:AddSection("Grabs func")
@@ -4296,6 +4402,14 @@ local function UpdateLagLabels()
 end
 
 
+local function SpawnLagToy()
+    local spawnToy = S.ReplicatedStorage:FindFirstChild("MenuToys") and S.ReplicatedStorage.MenuToys:FindFirstChild("SpawnToyRemoteFunction")
+    if spawnToy then
+        local pos = LocalPlayer.Character and LocalPlayer.Character.HumanoidRootPart.CFrame or CFrame.new(0, 100, 0)
+        spawnToy:InvokeServer("CreatureBlobman", pos * CFrame.new(math.random(-50,50), 50, math.random(-50,50)), Vector3.new(0, 0, 0))
+    end
+end
+
 local function StopPacketLag()
     if Features.PacketLag.loopThread then
         task.cancel(Features.PacketLag.loopThread)
@@ -4333,12 +4447,11 @@ local function StartPacketLag()
             lagRiskLabel.Text = "LAGGING SERVER..."
             lagRiskLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
         end
-        Fluent:Notify({ Title = "Packet Lag", Content = "Enabled - Packet Size: " .. Features.PacketLag.packetSize, Duration = 3 })
+        Fluent:Notify({ Title = "Packet Lag", Content = "Enabled - Spawning lag objects", Duration = 3 })
         PlayEnableSound()
         while Features.PacketLag.enabled do
-            extendRemote:FireServer(string.rep("â¤ï¸â¤ï¸â¤ï¸â¤ï¸â¤ï¸ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜ðŸ˜ðŸ˜ðŸ˜â¤ï¸â¤ï¸â¤ï¸â¤ï¸â¤ï¸ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜ðŸ˜ðŸ˜ðŸ˜â¤ï¸â¤ï¸â¤ï¸â¤ï¸â¤ï¸ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜˜ðŸ˜ðŸ˜ðŸ˜ðŸ˜â¤ï¸â¤ï¸â¤ï¸", math.floor(Features.PacketLag.packetSize / 10)))
-            print("[Packet Lag] Sent packet size: " .. Features.PacketLag.packetSize)
-            task.wait(3e-05)
+            SpawnLagToy()
+            task.wait(0.05)
         end
     end)
 end
