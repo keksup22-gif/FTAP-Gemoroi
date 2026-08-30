@@ -777,7 +777,9 @@ local Config = {
     LoopKillDelay = 0.5,
     LoopKillTarget = nil,
     FlingPower = 1,
-    AnchorGrabEnabled = false
+    AnchorGrabEnabled = false,
+    ModelHighlightEnabled = false,
+    ModelBillboardEnabled = false
 }
 
 -- Safe FOV Circle
@@ -846,68 +848,68 @@ local function getClosestPlayer()
 end
 
 local flingForces = {
-    function(root) root.AssemblyLinearVelocity = Vector3.new(0, 80 * Config.FlingPower, 0) end,
-    function(root) root.AssemblyLinearVelocity = Camera.CFrame.LookVector * (120 * Config.FlingPower) + Vector3.new(0, 40, 0) end,
-    function(root) root.AssemblyAngularVelocity = Vector3.new(0, 80 * Config.FlingPower, 0); root.AssemblyLinearVelocity = Vector3.new(0, 150 * Config.FlingPower, 0) end,
-    function(root) root.CFrame = root.CFrame + Vector3.new(0, 20 * Config.FlingPower, 0); root.AssemblyLinearVelocity = Vector3.new(0, 200 * Config.FlingPower, 0) end,
-    function(root) root.AssemblyLinearVelocity = Vector3.new(math.random(-1,1), 1, math.random(-1,1)).Unit * (250 * Config.FlingPower) end,
-    function(root) root.CFrame = CFrame.new(root.Position + Vector3.new(0, 500, 0)) end,
+    function(root)
+        pcall(function()
+            root.AssemblyLinearVelocity = Vector3.new(0, 80 * Config.FlingPower, 0)
+        end)
+    end,
+    function(root)
+        pcall(function()
+            root.AssemblyLinearVelocity = Camera.CFrame.LookVector * (120 * Config.FlingPower) + Vector3.new(0, 40, 0)
+        end)
+    end,
+    function(root)
+        pcall(function()
+            root.AssemblyAngularVelocity = Vector3.new(0, 80 * Config.FlingPower, 0)
+            root.AssemblyLinearVelocity = Vector3.new(0, 150 * Config.FlingPower, 0)
+        end)
+        pcall(function()
+            local bav = Instance.new("BodyAngularVelocity")
+            bav.MaxTorque = Vector3.new(1, 1, 1) * 1e9
+            bav.P = 1e9
+            bav.AngularVelocity = Vector3.new(0, 80 * Config.FlingPower, 0)
+            bav.Parent = root
+            task.delay(0.5, function()
+                pcall(function() bav:Destroy() end)
+            end)
+        end)
+    end,
+    function(root)
+        pcall(function()
+            root.CFrame = root.CFrame + Vector3.new(0, 20 * Config.FlingPower, 0)
+            root.AssemblyLinearVelocity = Vector3.new(0, 200 * Config.FlingPower, 0)
+        end)
+    end,
+    function(root)
+        pcall(function()
+            root.AssemblyLinearVelocity = Vector3.new(math.random(-1,1), 1, math.random(-1,1)).Unit * (250 * Config.FlingPower)
+        end)
+        pcall(function()
+            local bav = Instance.new("BodyAngularVelocity")
+            bav.MaxTorque = Vector3.new(1, 1, 1) * 1e9
+            bav.P = 1e9
+            bav.AngularVelocity = Vector3.new(1e5, 1e5, 1e5)
+            bav.Parent = root
+            task.delay(0.5, function()
+                pcall(function() bav:Destroy() end)
+            end)
+        end)
+    end,
+    function(root)
+        pcall(function()
+            root.CFrame = CFrame.new(root.Position + Vector3.new(0, 500, 0))
+        end)
+        pcall(function()
+            local bv = Instance.new("BodyVelocity")
+            bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            bv.Velocity = Vector3.new(0, 1e5, 0)
+            bv.Parent = root
+            task.delay(0.5, function()
+                pcall(function() bv:Destroy() end)
+            end)
+        end)
+    end,
 }
-
-local function flingClosestTarget()
-    local closest, dist = nil, 50
-    local myRoot = getRoot(LocalPlayer)
-    if not myRoot then return end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local root = getRoot(player)
-            if root then
-                local d = (root.Position - myRoot.Position).Magnitude
-                if d < dist then
-                    closest = player
-                    dist = d
-                end
-            end
-        end
-    end
-    if closest then
-        local root = getRoot(closest)
-        if root then
-            pcall(function()
-                local setNetOwner = ReplicatedStorage:FindFirstChild("GrabEvents") and ReplicatedStorage.GrabEvents:FindFirstChild("SetNetworkOwner")
-                if setNetOwner then
-                    setNetOwner:FireServer(root, root.CFrame)
-                end
-            end)
-            task.wait(0.05)
-            local power = math.clamp(math.floor(Config.FlingPower), 1, 6)
-            pcall(function()
-                flingForces[power](root)
-            end)
-            Fluent:Notify({ Title = "Fling", Content = "Flinged " .. closest.Name .. " (Power " .. power .. ")", Duration = 2 })
-        end
-    else
-        Fluent:Notify({ Title = "Fling", Content = "No player nearby to fling!", Duration = 2 })
-    end
-end
-
--- Safe recursive part checker (avoiding infinite loops)
-local function getSafeParts(model)
-    local parts = {}
-    if not model then return parts end
-    for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant and descendant:IsA("BasePart") then
-            table.insert(parts, descendant)
-        end
-    end
-    return parts
-end
-
-local playerNames = {"None"}
-local function refreshPlayers()
-    playerNames = {"None"}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
             table.insert(playerNames, player.Name)
         end
     end
@@ -982,6 +984,83 @@ local function updateESPHighlights()
             end
         end
     end
+end
+
+local workspaceModelHighlights = {}
+local workspaceModelBillboards = {}
+
+local function updateModelHighlights(state)
+    Config.ModelHighlightEnabled = state
+    pcall(function()
+        if not state then
+            for model, hl in pairs(workspaceModelHighlights) do
+                if hl then
+                    pcall(function() hl:Destroy() end)
+                end
+            end
+            workspaceModelHighlights = {}
+        else
+            for _, obj in ipairs(Workspace:GetChildren()) do
+                if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) then
+                    if not workspaceModelHighlights[obj] or not workspaceModelHighlights[obj].Parent then
+                        pcall(function()
+                            local hl = Instance.new("Highlight")
+                            hl.Name = "FTAP_Model_Highlight"
+                            hl.Adornee = obj
+                            hl.FillColor = Color3.fromRGB(0, 255, 170)
+                            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                            hl.FillTransparency = 0.5
+                            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                            hl.Parent = CoreGui
+                            workspaceModelHighlights[obj] = hl
+                        end)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function updateModelBillboards(state)
+    Config.ModelBillboardEnabled = state
+    pcall(function()
+        if not state then
+            for model, gui in pairs(workspaceModelBillboards) do
+                if gui then
+                    pcall(function() gui:Destroy() end)
+                end
+            end
+            workspaceModelBillboards = {}
+        else
+            for _, obj in ipairs(Workspace:GetChildren()) do
+                if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) then
+                    local primaryPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                    if primaryPart and (not workspaceModelBillboards[obj] or not workspaceModelBillboards[obj].Parent) then
+                        pcall(function()
+                            local bb = Instance.new("BillboardGui")
+                            bb.Name = "FTAP_Model_Billboard"
+                            bb.Adornee = primaryPart
+                            bb.Size = UDim2.new(0, 100, 0, 30)
+                            bb.StudsOffset = Vector3.new(0, 3, 0)
+                            bb.AlwaysOnTop = true
+
+                            local label = Instance.new("TextLabel")
+                            label.Size = UDim2.new(1, 0, 1, 0)
+                            label.BackgroundTransparency = 1
+                            label.Text = obj.Name
+                            label.TextColor3 = Color3.fromRGB(255, 255, 0)
+                            label.TextScaled = true
+                            label.Font = Enum.Font.SourceSansBold
+                            label.Parent = bb
+
+                            bb.Parent = CoreGui
+                            workspaceModelBillboards[obj] = bb
+                        end)
+                    end
+                end
+            end
+        end
+    end)
 end
 
 -- === COMBAT TAB ===
@@ -1119,6 +1198,24 @@ Tabs.Visuals:AddToggle("PCLDESPToggle", {
     Default = false,
     Callback = function(Value)
         Config.PCLD_ESPEnabled = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("ModelHighlightToggle", {
+    Title = "Enable Workspace Model Highlights",
+    Default = false,
+    Callback = function(Value)
+        updateModelHighlights(Value)
+        Fluent:Notify({ Title = "Visuals", Content = Value and "Model Highlights Enabled" or "Model Highlights Disabled", Duration = 2 })
+    end
+})
+
+Tabs.Visuals:AddToggle("ModelBillboardToggle", {
+    Title = "Enable Workspace Model BillboardGui",
+    Default = false,
+    Callback = function(Value)
+        updateModelBillboards(Value)
+        Fluent:Notify({ Title = "Visuals", Content = Value and "Model BillboardGui Enabled" or "Model BillboardGui Disabled", Duration = 2 })
     end
 })
 
@@ -1431,6 +1528,15 @@ RunService.RenderStepped:Connect(function()
     -- PCLD ESP update
     if Config.PCLD_ESPEnabled then
         updatePCLDESP()
+    end
+
+    -- Workspace Models Visuals update
+    if Config.ModelHighlightEnabled then
+        pcall(function() updateModelHighlights(true) end)
+    end
+
+    if Config.ModelBillboardEnabled then
+        pcall(function() updateModelBillboards(true) end)
     end
 end)
 
