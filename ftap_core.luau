@@ -910,6 +910,60 @@ local flingForces = {
         end)
     end,
 }
+local playerNames = { "None" }
+local function flingClosestTarget()
+    local closest, dist = nil, 50
+    local myRoot = getRoot(LocalPlayer)
+    if not myRoot then return end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local root = getRoot(player)
+            if root then
+                local d = (root.Position - myRoot.Position).Magnitude
+                if d < dist then
+                    closest = player
+                    dist = d
+                end
+            end
+        end
+    end
+    if closest then
+        local root = getRoot(closest)
+        if root then
+            pcall(function()
+                local setNetOwner = ReplicatedStorage:FindFirstChild("GrabEvents") and ReplicatedStorage.GrabEvents:FindFirstChild("SetNetworkOwner")
+                if setNetOwner then
+                    setNetOwner:FireServer(root, root.CFrame)
+                end
+            end)
+            task.wait(0.05)
+            local power = math.clamp(math.floor(Config.FlingPower), 1, 6)
+            pcall(function()
+                flingForces[power](root)
+            end)
+            Fluent:Notify({ Title = "Fling", Content = "Flinged " .. closest.Name .. " (Power " .. power .. ")", Duration = 2 })
+        end
+    else
+        Fluent:Notify({ Title = "Fling", Content = "No player nearby to fling!", Duration = 2 })
+    end
+end
+
+-- Safe recursive part checker (avoiding infinite loops)
+local function getSafeParts(model)
+    local parts = {}
+    if not model then return parts end
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant and descendant:IsA("BasePart") then
+            table.insert(parts, descendant)
+        end
+    end
+    return parts
+end
+
+local function refreshPlayers()
+    playerNames = { "None" }
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
             table.insert(playerNames, player.Name)
         end
     end
