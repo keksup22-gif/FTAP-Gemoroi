@@ -399,4 +399,69 @@ function Defense.ToggleAntiSticky(state)
     Shared.Notify("Anti Sticky", state and "Enabled" or "Disabled", 2)
 end
 
+-- Anti-Input Lag
+function Defense.ToggleAntiInputLag(state)
+    Defense.AntiInputLag.enabled = state
+    if state then
+        Defense.AntiInputLag.loopThread = task.spawn(function()
+            while Defense.AntiInputLag.enabled do
+                pcall(function()
+                    local myToys = Shared.Workspace:FindFirstChild(Shared.LocalPlayer.Name .. "SpawnedInToys")
+                    if myToys then
+                        for _, item in ipairs(myToys:GetChildren()) do
+                            if Defense.IsInputLagItem(item.Name) then
+                                item:Destroy()
+                            end
+                        end
+                    end
+                end)
+                task.wait(1)
+            end
+        end)
+        Shared.Notify("Anti Input Lag", "Enabled", 2)
+    else
+        if Defense.AntiInputLag.loopThread then
+            task.cancel(Defense.AntiInputLag.loopThread)
+            Defense.AntiInputLag.loopThread = nil
+        end
+        Shared.Notify("Anti Input Lag", "Disabled", 2)
+    end
+end
+
+-- Helper aliases for UI compatibility
+function Defense.StartAntiGrab() Defense.ToggleAntiGrab(true) end
+function Defense.StopAntiGrab() Defense.ToggleAntiGrab(false) end
+
+function Defense.StartAntiKickStick()
+    Defense.AntiKickStick.enabled = true
+    if not Defense.AntiKickStick.loopThread then
+        Defense.AntiKickStick.loopThread = task.spawn(Defense.StartAntiKickStickLoop)
+    end
+    Shared.Notify("Anti Kick Stick", "Enabled", 2)
+end
+
+function Defense.StopAntiKickStick()
+    Defense.AntiKickStick.enabled = false
+    if Defense.AntiKickStick.loopThread then
+        task.cancel(Defense.AntiKickStick.loopThread)
+        Defense.AntiKickStick.loopThread = nil
+    end
+    Shared.Notify("Anti Kick Stick", "Disabled", 2)
+end
+
+function Defense.StartAntiInputLag() Defense.ToggleAntiInputLag(true) end
+function Defense.StopAntiInputLag() Defense.ToggleAntiInputLag(false) end
+
+function Defense.StartAntiVoid() Defense.ToggleAntiVoid(true) end
+function Defense.StopAntiVoid() Defense.ToggleAntiVoid(false) end
+
+function Defense.StartAntiExplode() Defense.ToggleAntiExplode(true) end
+function Defense.StopAntiExplode() Defense.ToggleAntiExplode(false) end
+
+function Defense.StartAntiPaint() Defense.ToggleAntiPaint(true) end
+function Defense.StopAntiPaint() Defense.ToggleAntiPaint(false) end
+
+function Defense.StartAntiSticky() Defense.ToggleAntiSticky(true) end
+function Defense.StopAntiSticky() Defense.ToggleAntiSticky(false) end
+
 return Defense

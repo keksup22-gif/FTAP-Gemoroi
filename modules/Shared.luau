@@ -49,6 +49,14 @@ function Shared.PlaySound(soundId, delayTime)
     end)
 end
 
+function Shared.PlayEnableSound()
+    Shared.PlaySound(6895079853, 1)
+end
+
+function Shared.PlayKickSound()
+    Shared.PlaySound(79150789336480, 1)
+end
+
 function Shared.GetCharHumanoid()
     local character = Shared.LocalPlayer and Shared.LocalPlayer.Character
     if not character then
