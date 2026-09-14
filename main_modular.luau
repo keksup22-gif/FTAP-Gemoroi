@@ -27,6 +27,13 @@ local Player = loadModule("Player")
 local Visuals = loadModule("Visuals")
 local Cosmetics = loadModule("Cosmetics")
 local Teleports = loadModule("Teleports")
+local Combat = loadModule("Combat")
+local Target = loadModule("Target")
+local Auras = loadModule("Auras")
+local Server = loadModule("Server")
+local Misc = loadModule("Misc")
+local Protection = loadModule("Protection")
+local Keybinds = loadModule("Keybinds")
 
 local success, Fluent = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
@@ -39,25 +46,327 @@ end
 
 Shared.Fluent = Fluent
 
-local Window = Fluent:CreateWindow({
-    Title = "FTAP - Gemoroi (Modular)",
-    SubTitle = "Refactored Modular Edition",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(600, 500),
-    Acrylic = true,
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.RightControl
+local UI = loadModule("UI")
+local Window, Tabs = UI.CreateWindow()
+
+-- ==================== COMBAT TAB ====================
+Tabs.Combat:AddSection("Silent Aim & Targeting")
+
+Tabs.Combat:AddToggle("SilentAimToggle", {
+    Title = "Silent Aim",
+    Default = false,
+    Callback = function(Value)
+        Combat.Config.SilentAimEnabled = Value
+    end
 })
 
-local Tabs = {
-    Defense = Window:AddTab({ Title = "Defense", Icon = "shield" }),
-    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
-    Visuals = Window:AddTab({ Title = "Visuals", Icon = "eye" }),
-    Teleports = Window:AddTab({ Title = "Teleports", Icon = "map-pin" }),
-    Cosmetics = Window:AddTab({ Title = "Cosmetics", Icon = "sparkles" }),
-}
+Tabs.Combat:AddToggle("WallCheckToggle", {
+    Title = "Wall Check",
+    Default = true,
+    Callback = function(Value)
+        Combat.Config.WallCheck = Value
+    end
+})
 
--- Setup Defense Tab
+Tabs.Combat:AddToggle("ShowFOVToggle", {
+    Title = "Show FOV",
+    Default = false,
+    Callback = function(Value)
+        Combat.Config.ShowFOV = Value
+    end
+})
+
+Tabs.Combat:AddSlider("FOVSizeSlider", {
+    Title = "FOV Size",
+    Default = 120,
+    Min = 30,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(Value)
+        Combat.Config.FOVRadius = Value
+    end
+})
+
+Tabs.Combat:AddSlider("MaxDistanceSlider", {
+    Title = "Max Distance",
+    Default = 200,
+    Min = 50,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        Combat.Config.MaxDistance = Value
+    end
+})
+
+Tabs.Combat:AddDropdown("HitboxDropdown", {
+    Title = "Target Hitbox",
+    Values = { "Head", "HumanoidRootPart", "Torso" },
+    Default = "Head",
+    Callback = function(Value)
+        Combat.Config.Hitbox = Value
+    end
+})
+
+Tabs.Combat:AddSection("Fling Utilities")
+
+Tabs.Combat:AddSlider("FlingPowerSlider", {
+    Title = "Fling Power Level",
+    Default = 1,
+    Min = 1,
+    Max = 6,
+    Rounding = 0,
+    Callback = function(Value)
+        Combat.Config.FlingPower = Value
+    end
+})
+
+Tabs.Combat:AddButton({
+    Title = "Fling Closest Target (Hotkey: F)",
+    Callback = function()
+        Combat.FlingClosestTarget()
+    end
+})
+
+-- ==================== PLAYER TAB ====================
+Tabs.Player:AddSection("Movement & Physics")
+
+Tabs.Player:AddToggle("SpeedToggle", {
+    Title = "WalkSpeed Loop",
+    Default = false,
+    Callback = function(Value)
+        if Value then Player.EnableSpeed() else Player.DisableSpeed() end
+    end
+})
+
+Tabs.Player:AddSlider("SpeedSlider", {
+    Title = "WalkSpeed Value",
+    Default = 16,
+    Min = 16,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        Player.Speed.value = Value
+    end
+})
+
+Tabs.Player:AddToggle("NoclipToggle", {
+    Title = "Noclip (Players & Items)",
+    Default = false,
+    Callback = function(Value)
+        Player.ToggleNoclip(Value)
+    end
+})
+
+Tabs.Player:AddButton({
+    Title = "Delete Legs",
+    Callback = function()
+        Player.DeleteLegs()
+    end
+})
+
+-- ==================== VISUALS TAB ====================
+Tabs.Visuals:AddSection("ESP & Highlights")
+
+Tabs.Visuals:AddToggle("ESPToggle", {
+    Title = "Player ESP",
+    Default = false,
+    Callback = function(Value)
+        Visuals.Config.ESPEnabled = Value
+        Visuals.UpdateESPHighlights()
+    end
+})
+
+Tabs.Visuals:AddToggle("ModelHighlightToggle", {
+    Title = "Model Highlights",
+    Default = false,
+    Callback = function(Value)
+        Visuals.UpdateModelHighlights(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("ModelBillboardToggle", {
+    Title = "Model Billboards",
+    Default = false,
+    Callback = function(Value)
+        Visuals.UpdateModelBillboards(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("PCLDESPToggle", {
+    Title = "PCLD ESP",
+    Default = false,
+    Callback = function(Value)
+        Visuals.Config.PCLD_ESPEnabled = Value
+        Visuals.UpdatePCLDESP()
+    end
+})
+
+-- ==================== COSMETICS & SHADERS TAB ====================
+Tabs.Cosmetics:AddSection("Cosmetic Accessories")
+
+Tabs.Cosmetics:AddToggle("AngelWingsToggle", {
+    Title = "Angel Wings",
+    Default = false,
+    Callback = function(Value)
+        Cosmetics.ToggleAngelWings(Value)
+    end
+})
+
+Tabs.Cosmetics:AddSection("Lighting & Atmosphere Shaders")
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Warm Sunshine",
+    Callback = function() Cosmetics.ApplyWarmSunshine() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Sakura Dream",
+    Callback = function() Cosmetics.ApplySakuraDream() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Clear Sky",
+    Callback = function() Cosmetics.ApplyClearSky() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Mint Fresh",
+    Callback = function() Cosmetics.ApplyMintFresh() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Peach Smooth",
+    Callback = function() Cosmetics.ApplyPeachSmooth() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Ocean Breeze",
+    Callback = function() Cosmetics.ApplyOceanBreeze() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Golden Hour",
+    Callback = function() Cosmetics.ApplyGoldenHour() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Frost Morning",
+    Callback = function() Cosmetics.ApplyFrostMorning() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Soft Sunset",
+    Callback = function() Cosmetics.ApplySoftSunset() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Cyberpunk",
+    Callback = function() Cosmetics.ApplyCyberpunk() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Night Vision",
+    Callback = function() Cosmetics.ApplyNightVision() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Synthwave",
+    Callback = function() Cosmetics.ApplySynthwave() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Matrix",
+    Callback = function() Cosmetics.ApplyMatrix() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Purple Vibe",
+    Callback = function() Cosmetics.ApplyPurpleVibe() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Reset Shaders (Default)",
+    Callback = function()
+        Cosmetics.ClearShaders()
+        Shared.Notify("Shaders", "Reset to default!", 2)
+    end
+})
+
+-- ==================== TARGET TAB ====================
+Tabs.Target:AddSection("Select Target Player")
+
+Target.PlayerDropDown = Tabs.Target:AddDropdown("SelectedPlayerDropdown", {
+    Title = "Target Player",
+    Values = Target.PlayerNames,
+    Default = "None",
+    Callback = function(Value)
+        Target.SetSelectedPlayer(Value)
+    end
+})
+
+Tabs.Target:AddButton({
+    Title = "Refresh Player List",
+    Callback = function()
+        Target.RefreshPlayerList()
+        Shared.Notify("Target", "Player list refreshed!", 2)
+    end
+})
+
+Tabs.Target:AddSection("Target Actions")
+
+Tabs.Target:AddButton({
+    Title = "Fling Selected Target",
+    Callback = function()
+        local target = Target.GetTarget()
+        if target then
+            local root = Shared.GetRoot(target)
+            if root then
+                Combat.FlingForces[Combat.Config.FlingPower](root)
+                Shared.Notify("Target", "Flinged " .. target.Name, 2)
+            end
+        else
+            Shared.Notify("Target", "No target selected!", 2)
+        end
+    end
+})
+
+Tabs.Target:AddButton({
+    Title = "Teleport to Target",
+    Callback = function()
+        local target = Target.GetTarget()
+        if target then
+            local root = Shared.GetRoot(target)
+            if root then
+                Teleports.TeleportTo(root.CFrame)
+                Shared.Notify("Teleport", "Teleported to " .. target.Name, 2)
+            end
+        else
+            Shared.Notify("Target", "No target selected!", 2)
+        end
+    end
+})
+
+Target.RefreshPlayerList()
+
+-- ==================== MASS / TROLL TAB ====================
+Tabs.Mass:AddSection("Server Interaction & Mass Actions")
+
+Tabs.Mass:AddButton({
+    Title = "Kill All Players",
+    Callback = function()
+        for _, player in ipairs(Shared.Players:GetPlayers()) do
+            if player ~= Shared.LocalPlayer and player.Character then
+                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                if hum then hum.Health = 0 end
+            end
+        end
+        Shared.Notify("Mass", "Attempted to kill all players", 2)
+    end
+})
+
+-- ==================== PROTECTION & DEFENSE TAB ====================
+Tabs.Defense:AddSection("Anti-Function & Protection")
+
 Tabs.Defense:AddToggle("AntiGrabToggle", {
     Title = "Anti Grab",
     Default = false,
@@ -130,68 +439,52 @@ Tabs.Defense:AddToggle("AntiStickyToggle", {
     end
 })
 
--- Setup Player Tab
-Tabs.Player:AddToggle("SpeedToggle", {
-    Title = "WalkSpeed Loop",
-    Default = false,
-    Callback = function(Value)
-        if Value then Player.EnableSpeed() else Player.DisableSpeed() end
-    end
-})
+-- ==================== AURAS TAB ====================
+Tabs.Auras:AddSection("Proximity Auras")
 
-Tabs.Player:AddSlider("SpeedSlider", {
-    Title = "WalkSpeed Value",
-    Default = 16,
-    Min = 16,
-    Max = 1000,
+Tabs.Auras:AddSlider("AuraRadiusSlider", {
+    Title = "Aura Radius",
+    Default = 30,
+    Min = 10,
+    Max = 200,
     Rounding = 0,
     Callback = function(Value)
-        Player.Speed.value = Value
+        Auras.TelekinesisAura.radius = Value
+        Auras.DeathAura.radius = Value
+        Auras.LaunchAura.radius = Value
     end
 })
 
-Tabs.Player:AddToggle("NoclipToggle", {
-    Title = "Noclip (Players & Items)",
+-- ==================== SERVER TAB ====================
+Tabs.Server:AddSection("Server Manipulation")
+
+Tabs.Server:AddToggle("PacketLagToggle", {
+    Title = "Packet / Server Lag",
     Default = false,
     Callback = function(Value)
-        Player.ToggleNoclip(Value)
+        if Value then Server.StartPacketLag() else Server.StopPacketLag() end
     end
 })
 
-Tabs.Player:AddButton({
-    Title = "Delete Legs",
+Tabs.Server:AddToggle("LineLagToggle", {
+    Title = "Line Lag",
+    Default = false,
+    Callback = function(Value)
+        if Value then Server.StartLineLag() else Server.StopLineLag() end
+    end
+})
+
+Tabs.Server:AddButton({
+    Title = "Destroy Server",
     Callback = function()
-        Player.DeleteLegs()
+        Server.DestroyServerAction()
+        Shared.Notify("Server", "Destroy Server Triggered!", 3)
     end
 })
 
--- Setup Visuals Tab
-Tabs.Visuals:AddToggle("ESPToggle", {
-    Title = "Player ESP",
-    Default = false,
-    Callback = function(Value)
-        Visuals.Config.ESPEnabled = Value
-        Visuals.UpdateESPHighlights()
-    end
-})
+-- ==================== TELEPORTS TAB ====================
+Tabs.Teleports:AddSection("Location Teleports")
 
-Tabs.Visuals:AddToggle("ModelHighlightToggle", {
-    Title = "Model Highlights",
-    Default = false,
-    Callback = function(Value)
-        Visuals.UpdateModelHighlights(Value)
-    end
-})
-
-Tabs.Visuals:AddToggle("ModelBillboardToggle", {
-    Title = "Model Billboards",
-    Default = false,
-    Callback = function(Value)
-        Visuals.UpdateModelBillboards(Value)
-    end
-})
-
--- Setup Teleports Tab
 for _, house in ipairs(Teleports.Houses) do
     Tabs.Teleports:AddButton({
         Title = "Teleport to " .. house[1],
@@ -202,14 +495,23 @@ for _, house in ipairs(Teleports.Houses) do
     })
 end
 
--- Setup Cosmetics Tab
-Tabs.Cosmetics:AddToggle("AngelWingsToggle", {
-    Title = "Angel Wings",
+-- ==================== MISC TAB ====================
+Tabs.Misc:AddSection("Map & Utilities")
+
+Tabs.Misc:AddToggle("BreakBarriersToggle", {
+    Title = "Break House Barriers",
     Default = false,
     Callback = function(Value)
-        Cosmetics.ToggleAngelWings(Value)
+        Misc.ToggleBreakBarriers(Value)
     end
 })
 
-Shared.Notify("FTAP Gemoroi", "Modular Script Loaded Successfully!", 4)
+-- Hotkey Connection (F Key Fling)
+Shared.UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.F then
+        Combat.FlingClosestTarget()
+    end
+end)
+
+Shared.Notify("FTAP Gemoroi", "XOCU Enhanced Edition Loaded Successfully!", 4)
 

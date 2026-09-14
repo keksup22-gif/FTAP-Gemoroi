@@ -191,4 +191,127 @@ end
 
 
 
+function Cosmetics.ApplyWarmSunshine()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.25, Contrast = 0.1, Saturation = 0.3, TintColor = Color3.fromRGB(255, 245, 220) },
+        SunRays = { Intensity = 0.35 },
+        Lighting = { Brightness = 2.5, FogEnd = 2000, ClockTime = 12 }
+    })
+    Shared.Notify("Shaders", "Warm Sunshine applied!", 2)
+end
+
+function Cosmetics.ApplySakuraDream()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.2, Contrast = 0.05, Saturation = 0.2, TintColor = Color3.fromRGB(255, 225, 235) },
+        SunRays = { Intensity = 0.25 },
+        Lighting = { Brightness = 2.3, FogEnd = 1500, ClockTime = 8 }
+    })
+    Shared.Notify("Shaders", "Sakura Dream applied!", 2)
+end
+
+function Cosmetics.ApplyClearSky()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.15, Contrast = 0.1, Saturation = 0.15, TintColor = Color3.fromRGB(220, 235, 255) },
+        SunRays = { Intensity = 0.3 },
+        Lighting = { Brightness = 2.8, FogEnd = 5000, ClockTime = 11 }
+    })
+    Shared.Notify("Shaders", "Clear Sky applied!", 2)
+end
+
+function Cosmetics.ApplyMintFresh()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.2, Contrast = 0.08, Saturation = 0.1, TintColor = Color3.fromRGB(200, 240, 220) },
+        SunRays = { Intensity = 0.2 },
+        Lighting = { Brightness = 2.4, FogEnd = 2000, ClockTime = 10 }
+    })
+    Shared.Notify("Shaders", "Mint Fresh applied!", 2)
+end
+
+function Cosmetics.ApplyPeachSmooth()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.2, Contrast = 0.05, Saturation = 0.25, TintColor = Color3.fromRGB(255, 220, 200) },
+        SunRays = { Intensity = 0.3 },
+        Lighting = { Brightness = 2.5, FogEnd = 1800, ClockTime = 16 }
+    })
+    Shared.Notify("Shaders", "Peach Smooth applied!", 2)
+end
+
+function Cosmetics.ApplyOceanBreeze()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.15, Contrast = 0.1, Saturation = 0.1, TintColor = Color3.fromRGB(180, 215, 240) },
+        Lighting = { Brightness = 2.2, FogEnd = 1200, ClockTime = 13 }
+    })
+    Shared.Notify("Shaders", "Ocean Breeze applied!", 2)
+end
+
+function Cosmetics.ApplyGoldenHour()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.2, Contrast = 0.1, Saturation = 0.3, TintColor = Color3.fromRGB(255, 235, 200) },
+        SunRays = { Intensity = 0.4 },
+        Lighting = { Brightness = 2.6, FogEnd = 2000, ClockTime = 17 }
+    })
+    Shared.Notify("Shaders", "Golden Hour applied!", 2)
+end
+
+function Cosmetics.ApplyFrostMorning()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.3, Contrast = 0.05, Saturation = -0.2, TintColor = Color3.fromRGB(220, 230, 255) },
+        Lighting = { Brightness = 3, FogEnd = 1000, ClockTime = 7 }
+    })
+    Shared.Notify("Shaders", "Frost Morning applied!", 2)
+end
+
+function Cosmetics.ApplySoftSunset()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.15, Contrast = 0.08, Saturation = 0.3, TintColor = Color3.fromRGB(255, 210, 190) },
+        SunRays = { Intensity = 0.5 },
+        Lighting = { Brightness = 2, FogEnd = 1500, ClockTime = 18.5 }
+    })
+    Shared.Notify("Shaders", "Soft Sunset applied!", 2)
+end
+
+function Cosmetics.ApplyCyberpunk()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.1, Contrast = 0.3, Saturation = 0.5, TintColor = Color3.fromRGB(0, 230, 255) },
+        Bloom = { Intensity = 1.2, Size = 24, Threshold = 0.8 },
+        Lighting = { Brightness = 1.5, ClockTime = 0 }
+    })
+    Shared.Notify("Shaders", "Cyberpunk applied!", 2)
+end
+
+function Cosmetics.ApplyNightVision()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.3, Contrast = 0.4, Saturation = -0.5, TintColor = Color3.fromRGB(50, 255, 50) },
+        Bloom = { Intensity = 1.5, Size = 30, Threshold = 0.5 },
+        Lighting = { Brightness = 3, ClockTime = 0 }
+    })
+    Shared.Notify("Shaders", "Night Vision applied!", 2)
+end
+
+function Cosmetics.ApplySynthwave()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.15, Contrast = 0.25, Saturation = 0.4, TintColor = Color3.fromRGB(255, 50, 200) },
+        Bloom = { Intensity = 1.0, Size = 20, Threshold = 0.7 },
+        Lighting = { Brightness = 1.8, ClockTime = 20 }
+    })
+    Shared.Notify("Shaders", "Synthwave applied!", 2)
+end
+
+function Cosmetics.ApplyMatrix()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.1, Contrast = 0.3, Saturation = -0.3, TintColor = Color3.fromRGB(20, 255, 100) },
+        Lighting = { Brightness = 1.2, ClockTime = 0 }
+    })
+    Shared.Notify("Shaders", "Matrix applied!", 2)
+end
+
+function Cosmetics.ApplyPurpleVibe()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.2, Contrast = 0.2, Saturation = 0.3, TintColor = Color3.fromRGB(180, 100, 255) },
+        Bloom = { Intensity = 0.8, Size = 16, Threshold = 0.8 },
+        Lighting = { Brightness = 2, ClockTime = 22 }
+    })
+    Shared.Notify("Shaders", "Purple Vibe applied!", 2)
+end
+
 return Cosmetics
