@@ -90,4 +90,59 @@ function Auras.GetNearbyPlayers(range)
     return near
 end
 
+-- Remove Anti-Kick Aura
+Auras.RemoveAntiKickAura = {
+    enabled = false,
+    radius = 30,
+    connection = nil
+}
+
+function Auras.ToggleRemoveAntiKickAura(state, radius)
+    Auras.RemoveAntiKickAura.enabled = state
+    Auras.RemoveAntiKickAura.radius = radius or Auras.RemoveAntiKickAura.radius or 30
+
+    if state then
+        if Auras.RemoveAntiKickAura.connection then Auras.RemoveAntiKickAura.connection:Disconnect() end
+        Auras.RemoveAntiKickAura.connection = Shared.RunService.Heartbeat:Connect(function()
+            local myChar = Shared.LocalPlayer.Character
+            local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if not myRoot then return end
+
+            local grabEvents = Shared.ReplicatedStorage:FindFirstChild("GrabEvents")
+            local setNetOwner = grabEvents and grabEvents:FindFirstChild("SetNetworkOwner")
+            if not setNetOwner then return end
+
+            for _, target in ipairs(Shared.Players:GetPlayers()) do
+                if target ~= Shared.LocalPlayer then
+                    local tChar = target.Character
+                    local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                    if tRoot and (tRoot.Position - myRoot.Position).Magnitude <= Auras.RemoveAntiKickAura.radius then
+                        local spawned = Shared.Workspace:FindFirstChild(target.Name .. "SpawnedInToys")
+                        if spawned then
+                            for _, toyName in ipairs({"NinjaKunai", "NinjaShuriken", "AntiKick"}) do
+                                local toy = spawned:FindFirstChild(toyName)
+                                if toy then
+                                    local part = toy:FindFirstChild("SoundPart") or toy:FindFirstChildWhichIsA("BasePart")
+                                    if part then
+                                        pcall(function()
+                                            setNetOwner:FireServer(part, part.CFrame)
+                                        end)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        Shared.Notify("Auras", "Remove Anti-Kick Aura Enabled", 2)
+    else
+        if Auras.RemoveAntiKickAura.connection then
+            Auras.RemoveAntiKickAura.connection:Disconnect()
+            Auras.RemoveAntiKickAura.connection = nil
+        end
+        Shared.Notify("Auras", "Remove Anti-Kick Aura Disabled", 2)
+    end
+end
+
 return Auras

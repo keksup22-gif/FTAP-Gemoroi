@@ -452,6 +452,15 @@ Tabs.Auras:AddSlider("AuraRadiusSlider", {
         Auras.TelekinesisAura.radius = Value
         Auras.DeathAura.radius = Value
         Auras.LaunchAura.radius = Value
+        Auras.RemoveAntiKickAura.radius = Value
+    end
+})
+
+Tabs.Auras:AddToggle("RemoveAntiKickAuraToggle", {
+    Title = "Remove Anti-Kick Aura (Strip Anti-Kick from target)",
+    Default = false,
+    Callback = function(Value)
+        Auras.ToggleRemoveAntiKickAura(Value, Auras.RemoveAntiKickAura.radius)
     end
 })
 
@@ -505,6 +514,23 @@ Tabs.Misc:AddToggle("BreakBarriersToggle", {
         Misc.ToggleBreakBarriers(Value)
     end
 })
+
+Tabs.Misc:AddSection("Figure Poses (Target Grab)")
+
+local poseNames = {"Pose1", "Pose2", "Pose3", "Pose4", "Pose5", "Pose6", "Pose7", "JojoStand"}
+for _, pose in ipairs(poseNames) do
+    Tabs.Misc:AddButton({
+        Title = "Apply Figure " .. pose,
+        Callback = function()
+            local target = Target.GetTarget()
+            if target and target.Character then
+                Misc.ApplyFigurePose(pose, target.Character)
+            else
+                Shared.Notify("Figure Pose", "Select target first in Target tab!", 2)
+            end
+        end
+    })
+end
 
 -- Hotkey Connection (F Key Fling)
 Shared.UserInputService.InputBegan:Connect(function(input, processed)
