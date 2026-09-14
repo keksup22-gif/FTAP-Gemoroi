@@ -1,14 +1,32 @@
 -- FTAP-Gemoroi Loader
 -- Modularized Version
 
-local modulesFolder = script:FindFirstChild("modules") or script.Parent:FindFirstChild("modules") or game:GetService("ReplicatedStorage"):FindFirstChild("modules")
+local baseUrl = "https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/modules/"
 
-local Shared = require(modulesFolder:WaitForChild("Shared"))
-local Defense = require(modulesFolder:WaitForChild("Defense"))
-local Player = require(modulesFolder:WaitForChild("Player"))
-local Visuals = require(modulesFolder:WaitForChild("Visuals"))
-local Cosmetics = require(modulesFolder:WaitForChild("Cosmetics"))
-local Teleports = require(modulesFolder:WaitForChild("Teleports"))
+local function loadModule(name)
+    local success, result = pcall(function()
+        local folder = (typeof(script) == "Instance" and script:FindFirstChild("modules")) 
+            or (typeof(script) == "Instance" and script.Parent and script.Parent:FindFirstChild("modules")) 
+            or game:GetService("ReplicatedStorage"):FindFirstChild("modules")
+        if folder and folder:FindFirstChild(name) then
+            return require(folder[name])
+        end
+    end)
+    if success and result then
+        return result
+    end
+    local code = game:HttpGet(baseUrl .. name .. ".luau")
+    return loadstring(code)()
+end
+
+local Shared = loadModule("Shared")
+if getgenv then getgenv().FTAP_Shared = Shared end
+
+local Defense = loadModule("Defense")
+local Player = loadModule("Player")
+local Visuals = loadModule("Visuals")
+local Cosmetics = loadModule("Cosmetics")
+local Teleports = loadModule("Teleports")
 
 local success, Fluent = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()

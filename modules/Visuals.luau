@@ -1,4 +1,4 @@
-local Shared = require(script.Parent.Shared)
+local Shared = (getgenv and getgenv().FTAP_Shared) or require(script.Parent.Shared)
 local Visuals = {}
 
 Visuals.ESPHighlights = {}
