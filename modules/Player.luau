@@ -189,27 +189,88 @@ function Player.DeleteLegs()
     local root = char:FindFirstChild("HumanoidRootPart")
     local ragdollRemote = Shared.ReplicatedStorage:FindFirstChild("CharacterEvents") and Shared.ReplicatedStorage.CharacterEvents:FindFirstChild("RagdollRemote")
     
-    if not char or not ragdollRemote then return end
-    if not (char:FindFirstChild("Left Leg")) then
+    if not (char:FindFirstChild("Left Leg") or char:FindFirstChild("LeftUpperLeg")) then
         Shared.Notify("Delete Legs", "Error: Missing body parts", 3)
         return
     end
     
-    local torso = char:FindFirstChild("Torso")
-    Shared.Workspace.FallenPartsDestroyHeight = -100
-    Shared.Notify("Delete Legs", "Deleting legs...", 3)
+    Shared.Workspace.FallenPartsDestroyHeight = -1000
+    Shared.Notify("Delete Legs", "Deleting legs...", 2)
     Shared.PlayEnableSound()
-    
-    ragdollRemote:FireServer(root, 2)
-    task.wait(0.5)
-    if char:FindFirstChild("Right Leg") then char["Right Leg"].CFrame = CFrame.new(0, -10000, 0) end
-    if char:FindFirstChild("Left Leg") then char["Left Leg"].CFrame = CFrame.new(0, -10000, 0) end
-    task.wait(0.3)
-    if torso then torso.CFrame = CFrame.new(0, -9970, 0) end
-    task.wait(0.5)
-    if torso then
-        local grab = torso.CFrame
-        torso.CFrame = grab
+
+    pcall(function()
+        for _, partName in ipairs({"Left Leg", "Right Leg", "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg"}) do
+            local limb = char:FindFirstChild(partName)
+            if limb then
+                for _, child in ipairs(limb:GetChildren()) do
+                    if child:IsA("JointInstance") or child:IsA("Weld") or child:IsA("Motor6D") then
+                        child:Destroy()
+                    end
+                end
+                limb.CFrame = CFrame.new(0, -5000, 0)
+                limb:Destroy()
+            end
+        end
+    end)
+
+    if ragdollRemote and root then
+        pcall(function()
+            ragdollRemote:FireServer(root, 2)
+        end)
+    end
+    Shared.Notify("Delete Legs", "Legs successfully removed!", 2)
+end
+-- Third Person View
+Player.ThirdPerson = {
+    enabled = false,
+    distance = 15,
+    originalMin = 0.5,
+    originalMax = 400,
+    connection = nil
+}
+
+function Player.ToggleThirdPerson(state, distance)
+    Player.ThirdPerson.enabled = state
+    Player.ThirdPerson.distance = distance or Player.ThirdPerson.distance or 15
+
+    if state then
+        pcall(function()
+            Player.ThirdPerson.originalMin = Shared.LocalPlayer.CameraMinZoomDistance
+            Player.ThirdPerson.originalMax = Shared.LocalPlayer.CameraMaxZoomDistance
+
+            Shared.LocalPlayer.CameraMinZoomDistance = Player.ThirdPerson.distance
+            Shared.LocalPlayer.CameraMaxZoomDistance = Player.ThirdPerson.distance
+            Shared.LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
+        end)
+        if Player.ThirdPerson.connection then Player.ThirdPerson.connection:Disconnect() end
+        Player.ThirdPerson.connection = Shared.RunService.RenderStepped:Connect(function()
+            if Player.ThirdPerson.enabled then
+                Shared.LocalPlayer.CameraMinZoomDistance = Player.ThirdPerson.distance
+                Shared.LocalPlayer.CameraMaxZoomDistance = Player.ThirdPerson.distance
+            end
+        end)
+        Shared.Notify("3rd Person", "3rd Person View Enabled (" .. tostring(Player.ThirdPerson.distance) .. " studs)", 2)
+    else
+        if Player.ThirdPerson.connection then
+            Player.ThirdPerson.connection:Disconnect()
+            Player.ThirdPerson.connection = nil
+        end
+        pcall(function()
+            Shared.LocalPlayer.CameraMinZoomDistance = 0.5
+            Shared.LocalPlayer.CameraMaxZoomDistance = 400
+            Shared.LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Zoom
+        end)
+        Shared.Notify("3rd Person", "3rd Person View Disabled", 2)
+    end
+end
+
+function Player.SetThirdPersonDistance(dist)
+    Player.ThirdPerson.distance = dist
+    if Player.ThirdPerson.enabled then
+        pcall(function()
+            Shared.LocalPlayer.CameraMinZoomDistance = dist
+            Shared.LocalPlayer.CameraMaxZoomDistance = dist
+        end)
     end
 end
 

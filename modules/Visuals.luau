@@ -9,6 +9,7 @@ Visuals.ModelBillboards = {}
 Visuals.Config = {
     ESPEnabled = false,
     ESPColor = Color3.fromRGB(0, 170, 255),
+    RainbowESP = false,
     BoxESP = true,
     NameESP = true,
     HealthBar = true,
@@ -16,6 +17,33 @@ Visuals.Config = {
     ModelHighlightEnabled = false,
     ModelBillboardEnabled = false
 }
+
+Visuals.RainbowConnection = nil
+
+function Visuals.ToggleRainbowESP(state)
+    Visuals.Config.RainbowESP = state
+    if state then
+        if Visuals.RainbowConnection then Visuals.RainbowConnection:Disconnect() end
+        Visuals.RainbowConnection = Shared.RunService.RenderStepped:Connect(function()
+            if Visuals.Config.RainbowESP and Visuals.Config.ESPEnabled then
+                local hue = (tick() % 5) / 5
+                local rainbowColor = Color3.fromHSV(hue, 1, 1)
+                for _, hl in pairs(Visuals.ESPHighlights) do
+                    if hl then
+                        hl.FillColor = rainbowColor
+                    end
+                end
+            end
+        end)
+        Shared.Notify("Visuals", "Rainbow ESP Enabled", 2)
+    else
+        if Visuals.RainbowConnection then
+            Visuals.RainbowConnection:Disconnect()
+            Visuals.RainbowConnection = nil
+        end
+        Shared.Notify("Visuals", "Rainbow ESP Disabled", 2)
+    end
+end
 
 function Visuals.UpdatePCLDESP()
     if not Visuals.Config.PCLD_ESPEnabled then

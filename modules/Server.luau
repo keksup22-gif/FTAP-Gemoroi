@@ -83,5 +83,36 @@ function Server.DestroyServerAction()
         end
     end
 end
+-- Rejoin & Server Hop
+function Server.Rejoin()
+    pcall(function()
+        local ts = Shared.TeleportService
+        if ts then
+            ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, Shared.LocalPlayer)
+        end
+    end)
+    Shared.Notify("Server", "Rejoining current server...", 2)
+end
+
+function Server.ServerHop()
+    pcall(function()
+        local ts = Shared.TeleportService
+        local http = Shared.HttpService
+        if ts and http then
+            local serversApi = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+            local raw = game:HttpGet(serversApi)
+            local data = http:JSONDecode(raw)
+            if data and data.data then
+                for _, s in ipairs(data.data) do
+                    if s.id ~= game.JobId and s.playing < s.maxPlayers then
+                        ts:TeleportToPlaceInstance(game.PlaceId, s.id, Shared.LocalPlayer)
+                        return
+                    end
+                end
+            end
+        end
+    end)
+    Shared.Notify("Server", "Searching for new server...", 2)
+end
 
 return Server

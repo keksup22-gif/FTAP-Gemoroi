@@ -164,6 +164,27 @@ Tabs.Player:AddButton({
     end
 })
 
+Tabs.Player:AddSection("Camera & View Modes")
+
+Tabs.Player:AddToggle("ThirdPersonToggle", {
+    Title = "3rd Person View Mode",
+    Default = false,
+    Callback = function(Value)
+        Player.ToggleThirdPerson(Value, Player.ThirdPerson.distance)
+    end
+})
+
+Tabs.Player:AddSlider("ThirdPersonDistanceSlider", {
+    Title = "3rd Person Camera Distance",
+    Default = 15,
+    Min = 5,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        Player.SetThirdPersonDistance(Value)
+    end
+})
+
 -- ==================== VISUALS TAB ====================
 Tabs.Visuals:AddSection("ESP & Highlights")
 
@@ -173,6 +194,14 @@ Tabs.Visuals:AddToggle("ESPToggle", {
     Callback = function(Value)
         Visuals.Config.ESPEnabled = Value
         Visuals.UpdateESPHighlights()
+    end
+})
+
+Tabs.Visuals:AddToggle("RainbowESPToggle", {
+    Title = "Rainbow ESP Highlights",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleRainbowESP(Value)
     end
 })
 
@@ -257,6 +286,30 @@ Tabs.Cosmetics:AddButton({
 Tabs.Cosmetics:AddButton({
     Title = "Shader: Soft Sunset",
     Callback = function() Cosmetics.ApplySoftSunset() end
+})
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Bright Environment",
+    Callback = function() Cosmetics.ApplyBrightPreset() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Desert Wasteland",
+    Callback = function() Cosmetics.ApplyDesertPreset() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Dreamy Atmosphere",
+    Callback = function() Cosmetics.ApplyDreamyPreset() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Rainy Mood",
+    Callback = function() Cosmetics.ApplyRainyPreset() end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Shader: Sunset Glow",
+    Callback = function() Cosmetics.ApplySunsetPreset() end
 })
 
 Tabs.Cosmetics:AddButton({
@@ -488,6 +541,21 @@ Tabs.Server:AddButton({
     Callback = function()
         Server.DestroyServerAction()
         Shared.Notify("Server", "Destroy Server Triggered!", 3)
+    end
+})
+Tabs.Server:AddSection("Server Hop & Utilities")
+
+Tabs.Server:AddButton({
+    Title = "Rejoin Current Server",
+    Callback = function()
+        Server.Rejoin()
+    end
+})
+
+Tabs.Server:AddButton({
+    Title = "Server Hop (Different Server)",
+    Callback = function()
+        Server.ServerHop()
     end
 })
 

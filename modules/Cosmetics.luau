@@ -313,5 +313,49 @@ function Cosmetics.ApplyPurpleVibe()
     })
     Shared.Notify("Shaders", "Purple Vibe applied!", 2)
 end
+-- Extra Skyboxes & Preset Environments from extra scripts
+function Cosmetics.ApplyBrightPreset()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0, Contrast = 0, Saturation = 0.05, TintColor = Color3.fromRGB(255, 224, 219) },
+        Bloom = { Intensity = 0.1, Size = 100, Threshold = 0 },
+        SunRays = { Intensity = 0.05 },
+        Lighting = { Brightness = 2, ClockTime = 10, FogEnd = 10000 }
+    })
+    Shared.Notify("Shaders", "Bright Environment applied!", 2)
+end
+
+function Cosmetics.ApplyDesertPreset()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0, Contrast = 0, Saturation = 0.05, TintColor = Color3.fromRGB(255, 200, 150) },
+        Lighting = { Brightness = 2.5, ClockTime = 7, FogColor = Color3.fromRGB(100, 55, 20), FogEnd = 1000 }
+    })
+    Shared.Notify("Shaders", "Desert Wasteland applied!", 2)
+end
+
+function Cosmetics.ApplyDreamyPreset()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.1, Contrast = 0.1, Saturation = 0.3, TintColor = Color3.fromRGB(255, 180, 220) },
+        Bloom = { Intensity = 0.8, Size = 30, Threshold = 0.4 },
+        Lighting = { Brightness = 2.2, ClockTime = 18, FogColor = Color3.fromRGB(200, 150, 220), FogEnd = 1500 }
+    })
+    Shared.Notify("Shaders", "Dreamy Atmosphere applied!", 2)
+end
+
+function Cosmetics.ApplyRainyPreset()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = -0.1, Contrast = 0.15, Saturation = -0.4, TintColor = Color3.fromRGB(160, 190, 210) },
+        Lighting = { Brightness = 1.2, ClockTime = 14, FogColor = Color3.fromRGB(120, 140, 160), FogEnd = 800 }
+    })
+    Shared.Notify("Shaders", "Rainy Mood applied!", 2)
+end
+
+function Cosmetics.ApplySunsetPreset()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0, Contrast = 0, Saturation = 0.05, TintColor = Color3.fromRGB(255, 224, 219) },
+        SunRays = { Intensity = 0.05 },
+        Lighting = { Brightness = 3.5, ClockTime = 6.7, FogColor = Color3.fromRGB(94, 76, 106), FogEnd = 1000 }
+    })
+    Shared.Notify("Shaders", "Sunset Glow applied!", 2)
+end
 
 return Cosmetics
