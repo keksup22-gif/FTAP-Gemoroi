@@ -230,6 +230,137 @@ Tabs.Visuals:AddToggle("PCLDESPToggle", {
     end
 })
 
+-- ==================== NEON DREAM SHADER ====================
+Tabs.Visuals:AddSection("Neon Dream Shader")
+
+local NeonDreamToggle = Tabs.Visuals:AddToggle("NeonDreamToggle", {
+    Title = "Enable Neon Dream Shader",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleNeonDream(Value)
+    end
+})
+
+local GlowIntensitySlider = Tabs.Visuals:AddSlider("NeonDreamGlowSlider", {
+    Title = "Glow Intensity",
+    Min = 0,
+    Max = 10,
+    Default = 3,
+    Rounding = 1,
+    Callback = function(Value)
+        Visuals.NeonDreamConfig.GlowIntensity = Value
+    end
+})
+
+local PulseSpeedSlider = Tabs.Visuals:AddSlider("NeonDreamPulseSlider", {
+    Title = "Pulse Speed",
+    Min = 0,
+    Max = 5,
+    Default = 1.5,
+    Rounding = 1,
+    Callback = function(Value)
+        Visuals.NeonDreamConfig.PulseSpeed = Value
+    end
+})
+
+local ParticleDensitySlider = Tabs.Visuals:AddSlider("NeonDreamDensitySlider", {
+    Title = "Particle Density",
+    Min = 0,
+    Max = 100,
+    Default = 30,
+    Rounding = 0,
+    Callback = function(Value)
+        Visuals.NeonDreamConfig.ParticleDensity = Value
+    end
+})
+
+local VignetteSlider = Tabs.Visuals:AddSlider("NeonDreamVignetteSlider", {
+    Title = "Vignette Transparency",
+    Min = 0,
+    Max = 1,
+    Default = 0.4,
+    Rounding = 2,
+    Callback = function(Value)
+        Visuals.NeonDreamConfig.VignetteTransparency = Value
+    end
+})
+
+local PaletteDropdown = Tabs.Visuals:AddDropdown("NeonDreamPaletteDropdown", {
+    Title = "Palette",
+    Values = { "Neon Purple", "Cyber Blue", "Sunset Pink", "Matrix Green", "Custom" },
+    Default = "Neon Purple",
+    Callback = function(Value)
+        Visuals.NeonDreamConfig.Palette = Value
+    end
+})
+
+local CustomColorPicker = Tabs.Visuals:AddColorpicker("NeonDreamCustomColor", {
+    Title = "Custom Palette Color",
+    Default = Color3.fromRGB(180, 0, 255),
+    Callback = function(Value)
+        Visuals.NeonDreamConfig.CustomColor = Value
+        Visuals.NeonDreamConfig.CustomR = math.floor(Value.R * 255)
+        Visuals.NeonDreamConfig.CustomG = math.floor(Value.G * 255)
+        Visuals.NeonDreamConfig.CustomB = math.floor(Value.B * 255)
+    end
+})
+
+local CustomRSlider = Tabs.Visuals:AddSlider("NeonDreamCustomR", {
+    Title = "Custom R",
+    Min = 0,
+    Max = 255,
+    Default = 180,
+    Rounding = 0,
+    Callback = function(Value)
+        Visuals.NeonDreamConfig.CustomR = Value
+        Visuals.NeonDreamConfig.CustomColor = Color3.fromRGB(Value, Visuals.NeonDreamConfig.CustomG, Visuals.NeonDreamConfig.CustomB)
+    end
+})
+
+local CustomGSlider = Tabs.Visuals:AddSlider("NeonDreamCustomG", {
+    Title = "Custom G",
+    Min = 0,
+    Max = 255,
+    Default = 0,
+    Rounding = 0,
+    Callback = function(Value)
+        Visuals.NeonDreamConfig.CustomG = Value
+        Visuals.NeonDreamConfig.CustomColor = Color3.fromRGB(Visuals.NeonDreamConfig.CustomR, Value, Visuals.NeonDreamConfig.CustomB)
+    end
+})
+
+local CustomBSlider = Tabs.Visuals:AddSlider("NeonDreamCustomB", {
+    Title = "Custom B",
+    Min = 0,
+    Max = 255,
+    Default = 255,
+    Rounding = 0,
+    Callback = function(Value)
+        Visuals.NeonDreamConfig.CustomB = Value
+        Visuals.NeonDreamConfig.CustomColor = Color3.fromRGB(Visuals.NeonDreamConfig.CustomR, Visuals.NeonDreamConfig.CustomG, Value)
+    end
+})
+
+Tabs.Visuals:AddButton({
+    Title = "Reset Settings",
+    Description = "Reset Neon Dream Shader settings to default",
+    Callback = function()
+        pcall(function()
+            NeonDreamToggle:SetValue(false)
+            GlowIntensitySlider:SetValue(3)
+            PulseSpeedSlider:SetValue(1.5)
+            ParticleDensitySlider:SetValue(30)
+            VignetteSlider:SetValue(0.4)
+            PaletteDropdown:SetValue("Neon Purple")
+            CustomColorPicker:SetValue(Color3.fromRGB(180, 0, 255))
+            CustomRSlider:SetValue(180)
+            CustomGSlider:SetValue(0)
+            CustomBSlider:SetValue(255)
+            Visuals.ResetNeonDreamConfig()
+        end)
+    end
+})
+
 -- ==================== COSMETICS & SHADERS TAB ====================
 Tabs.Cosmetics:AddSection("Cosmetic Accessories")
 
