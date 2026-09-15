@@ -308,19 +308,25 @@ function Defense.IsInputLagItem(name)
 end
 
 -- Anti-Void
+-- Anti-Void (Amethyst Defense Upgrade)
 function Defense.ToggleAntiVoid(state)
     Defense.AntiVoid.enabled = state
     if state then
         Defense.AntiVoid.originalDestroyHeight = Shared.Workspace.FallenPartsDestroyHeight
+        Shared.Workspace.FallenPartsDestroyHeight = -2000
+        if Defense.AntiVoid.loopThread then task.cancel(Defense.AntiVoid.loopThread) end
         Defense.AntiVoid.loopThread = task.spawn(function()
             while Defense.AntiVoid.enabled do
-                pcall(function()
-                    Shared.Workspace.FallenPartsDestroyHeight = 0
-                end)
-                task.wait(0.5)
+                local root = Shared.GetRoot()
+                if root and root.Position.Y < -500 then
+                    root.CFrame = CFrame.new(0, 10, 0)
+                    root.AssemblyLinearVelocity = Vector3.zero
+                    Shared.Notify("Anti Void", "Saved player from void!", 2)
+                end
+                task.wait(0.1)
             end
         end)
-        Shared.Notify("Anti Void", "Enabled - FallenPartsDestroyHeight = 0", 2)
+        Shared.Notify("Anti Void", "Enabled - Void protection active", 2)
     else
         Defense.AntiVoid.enabled = false
         if Defense.AntiVoid.loopThread then
@@ -328,33 +334,131 @@ function Defense.ToggleAntiVoid(state)
             Defense.AntiVoid.loopThread = nil
         end
         pcall(function()
-            Shared.Workspace.FallenPartsDestroyHeight = Defense.AntiVoid.originalDestroyHeight
+            Shared.Workspace.FallenPartsDestroyHeight = Defense.AntiVoid.originalDestroyHeight or -500
         end)
         Shared.Notify("Anti Void", "Disabled", 2)
     end
 end
 
--- Anti-Explode
+-- Anti-Explode (Amethyst Defense Engine)
+Defense.AntiExplode = Defense.AntiExplode or { enabled = false, connections = {} }
+
+function Defense.FindBombRemote()
+    local searchFolders = {
+        Shared.ReplicatedStorage,
+        Shared.ReplicatedStorage:FindFirstChild("GameEvents"),
+        Shared.ReplicatedStorage:FindFirstChild("CharacterEvents"),
+        Shared.ReplicatedStorage:FindFirstChild("PlayerEvents"),
+        Shared.Workspace
+    }
+    local names = { "BombEvent", "ExplosionEvent", "BombExplosion", "ExplodeRemote" }
+    for _, folder in ipairs(searchFolders) do
+        if folder then
+            for _, name in ipairs(names) do
+                local ev = folder:FindFirstChild(name)
+                if ev and ev:IsA("RemoteEvent") then
+                    return ev
+                end
+            end
+        end
+    end
+    return nil
+end
+
 function Defense.ToggleAntiExplode(state)
     Defense.AntiExplode.enabled = state
     if state then
-        Defense.AntiExplode.connection = Shared.RunService.Heartbeat:Connect(function()
+        for _, conn in pairs(Defense.AntiExplode.connections or {}) do
+            if conn then pcall(function() conn:Disconnect() end) end
+        end
+        Defense.AntiExplode.connections = {}
+
+        local limbs = { "Left Leg", "Right Leg", "Left Arm", "Right Arm", "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg" }
+
+        local function handleExplosion(pos, radius)
             local char = Shared.LocalPlayer.Character
-            if char then
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
+            local root = Shared.GetRoot()
+            local hum = Shared.GetCharHumanoid()
+            if not char or not root or not hum then return end
+
+            local explosionRadius = radius or 25
+            local dist = (pos - root.Position).Magnitude
+
+            if dist <= explosionRadius + 15 then
+                pcall(function()
+                    root.Anchored = true
+                    root.AssemblyLinearVelocity = Vector3.zero
+                    root.AssemblyAngularVelocity = Vector3.zero
+                    hum:ChangeState(Enum.HumanoidStateType.Running)
+
+                    for _, limbName in ipairs(limbs) do
+                        local limb = char:FindFirstChild(limbName)
+                        local rag = limb and limb:FindFirstChild("RagdollLimbPart")
+                        if rag then rag.CanCollide = false end
                     end
+                end)
+
+                task.wait(0.05)
+
+                pcall(function()
+                    root.Anchored = false
+                    root.AssemblyLinearVelocity = Vector3.zero
+                    root.AssemblyAngularVelocity = Vector3.zero
+                    hum:ChangeState(Enum.HumanoidStateType.Running)
+                end)
+
+                task.delay(1.5, function()
+                    if char and char.Parent then
+                        for _, limbName in ipairs(limbs) do
+                            local limb = char:FindFirstChild(limbName)
+                            local rag = limb and limb:FindFirstChild("RagdollLimbPart")
+                            if rag then rag.CanCollide = true end
+                        end
+                    end
+                end)
+            end
+        end
+
+        local bombEv = Defense.FindBombRemote()
+        if bombEv then
+            Defense.AntiExplode.connections.remote = bombEv.OnClientEvent:Connect(function(info, pos)
+                if not Defense.AntiExplode.enabled then return end
+                local targetPos = nil
+                local radius = 25
+                if typeof(pos) == "Vector3" then
+                    targetPos = pos
+                elseif typeof(info) == "Vector3" then
+                    targetPos = info
+                elseif typeof(info) == "table" and typeof(info.Position) == "Vector3" then
+                    targetPos = info.Position
+                    radius = info.Radius or 25
                 end
+                if targetPos then
+                    handleExplosion(targetPos, radius)
+                end
+            end)
+        end
+
+        Defense.AntiExplode.connections.workspace = Shared.Workspace.DescendantAdded:Connect(function(desc)
+            if not Defense.AntiExplode.enabled then return end
+            if desc:IsA("Explosion") then
+                handleExplosion(desc.Position, desc.BlastRadius or 25)
             end
         end)
-        Shared.Notify("Anti Explode", "Enabled", 2)
+
+        for _, desc in ipairs(Shared.Workspace:GetDescendants()) do
+            if desc:IsA("Explosion") then
+                handleExplosion(desc.Position, desc.BlastRadius or 25)
+            end
+        end
+
+        Shared.Notify("Anti Explode", "Enabled - Amethyst Explosion Defense active", 2)
     else
         Defense.AntiExplode.enabled = false
-        if Defense.AntiExplode.connection then
-            Defense.AntiExplode.connection:Disconnect()
-            Defense.AntiExplode.connection = nil
+        for _, conn in pairs(Defense.AntiExplode.connections or {}) do
+            if conn then pcall(function() conn:Disconnect() end) end
         end
+        Defense.AntiExplode.connections = {}
         Shared.Notify("Anti Explode", "Disabled", 2)
     end
 end
