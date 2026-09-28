@@ -8,30 +8,32 @@ function Keybinds.Bind(actionName, keyCode, callback)
         Keybinds.Unbind(actionName)
     end
     
-    local action = Instance.new("BindableEvent")
-    action.Name = actionName
-    
-    Shared.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    local conn = Shared.UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == keyCode then
-            callback()
+            pcall(callback)
         end
     end)
     
-    Keybinds.Bindings[actionName] = { keyCode = keyCode, callback = callback }
+    Keybinds.Bindings[actionName] = { keyCode = keyCode, callback = callback, connection = conn }
 end
 
 function Keybinds.Unbind(actionName)
-    Keybinds.Bindings[actionName] = nil
+    local item = Keybinds.Bindings[actionName]
+    if item then
+        if item.connection then
+            pcall(function() item.connection:Disconnect() end)
+        end
+        Keybinds.Bindings[actionName] = nil
+    end
 end
 
 function Keybinds.GetKeybind(actionName)
     return Keybinds.Bindings[actionName]
 end
 
--- Default keybinds
 function Keybinds.SetupDefaults(tabs, modules)
-    -- These will be set up in the main loader
+    -- Reserved for default user bindings
 end
 
 return Keybinds

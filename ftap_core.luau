@@ -1,6 +1,6 @@
---[[\
-    Project: FTAP-Gemoroi\
-    Core Script (ftap_core.luau) - Fully functional with operational ESP, Auras, Physics, and Fluent UI bindings\
+--[[
+    Project: FTAP-Gemoroi
+    Core Script (ftap_core.luau) - Fully functional with operational ESP, Auras, Physics, and Fluent UI bindings
 ]]
 
 local Players = game:GetService("Players")
@@ -11,6 +11,9 @@ local Workspace = game:GetService("Workspace")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local StarterGui = game:GetService("StarterGui")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -24,16 +27,31 @@ local S = {
     Workspace = Workspace,
     CoreGui = CoreGui,
     TweenService = TweenService,
-    TextService = game:GetService("TextService")
+    TextService = game:GetService("TextService"),
+    StarterGui = StarterGui,
+    TeleportService = TeleportService,
+    HttpService = HttpService
 }
+
+local success_fluent, Fluent = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
+end)
 
 local function Notify(title, content, duration)
     pcall(function()
-        Fluent:Notify({
-            Title = title,
-            Content = content,
-            Duration = duration or 3
-        })
+        if Fluent and typeof(Fluent.Notify) == "function" then
+            Fluent:Notify({
+                Title = tostring(title or "FTAP-Gemoroi"),
+                Content = tostring(content or ""),
+                Duration = duration or 3
+            })
+        else
+            StarterGui:SetCore("SendNotification", {
+                Title = tostring(title or "FTAP-Gemoroi"),
+                Text = tostring(content or ""),
+                Duration = duration or 3
+            })
+        end
     end)
 end
 local AmethystFeatures = {
@@ -715,11 +733,7 @@ local function MakeAntiKick(model, player)
     end)
 end
 
-local success, Fluent = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
-end)
-
-if not success or not Fluent then
+if not Fluent then
     warn("[FTAP-Gemoroi] Failed to load local Fluent.luau library.")
     return
 end
@@ -1279,6 +1293,380 @@ Tabs.Visuals:AddToggle("ModelBillboardToggle", {
         Fluent:Notify({ Title = "Visuals", Content = Value and "Model BillboardGui Enabled" or "Model BillboardGui Disabled", Duration = 2 })
     end
 })
+
+-- ============================================================================
+-- NEON DREAM SHADER ENGINE
+-- ============================================================================
+local NeonDreamConfig = {
+    Enabled = false,
+    GlowIntensity = 3.0,
+    PulseSpeed = 1.5,
+    ParticleDensity = 30,
+    VignetteTransparency = 0.4,
+    Palette = "Neon Purple",
+    CustomColor = Color3.fromRGB(180, 0, 255),
+    CustomR = 180,
+    CustomG = 0,
+    CustomB = 255
+}
+
+local NeonDreamPalettes = {
+    ["Neon Purple"] = Color3.fromRGB(180, 0, 255),
+    ["Cyber Blue"]  = Color3.fromRGB(0, 220, 255),
+    ["Sunset Pink"]  = Color3.fromRGB(255, 50, 150),
+    ["Matrix Green"] = Color3.fromRGB(0, 255, 100)
+}
+
+local NeonDreamState = {
+    OriginalLighting = { Saved = false },
+    Bloom = nil,
+    ColorCorrection = nil,
+    SunRays = nil,
+    VignetteGui = nil,
+    VignetteImage = nil,
+    Attachment = nil,
+    ParticleEmitter = nil,
+    RenderConnection = nil,
+    CharacterConnection = nil
+}
+
+local function GetNeonDreamColor()
+    if NeonDreamConfig.Palette == "Custom" then
+        return NeonDreamConfig.CustomColor or Color3.fromRGB(NeonDreamConfig.CustomR or 180, NeonDreamConfig.CustomG or 0, NeonDreamConfig.CustomB or 255)
+    end
+    return NeonDreamPalettes[NeonDreamConfig.Palette] or Color3.fromRGB(180, 0, 255)
+end
+
+local function CleanupNeonDreamInstances()
+    pcall(function()
+        if NeonDreamState.Bloom then NeonDreamState.Bloom:Destroy() NeonDreamState.Bloom = nil end
+        if NeonDreamState.ColorCorrection then NeonDreamState.ColorCorrection:Destroy() NeonDreamState.ColorCorrection = nil end
+        if NeonDreamState.SunRays then NeonDreamState.SunRays:Destroy() NeonDreamState.SunRays = nil end
+        if NeonDreamState.VignetteGui then NeonDreamState.VignetteGui:Destroy() NeonDreamState.VignetteGui = nil NeonDreamState.VignetteImage = nil end
+        if NeonDreamState.ParticleEmitter then NeonDreamState.ParticleEmitter:Destroy() NeonDreamState.ParticleEmitter = nil end
+        if NeonDreamState.Attachment then NeonDreamState.Attachment:Destroy() NeonDreamState.Attachment = nil end
+    end)
+    pcall(function()
+        for _, child in ipairs(Lighting:GetChildren()) do
+            if child.Name:sub(1, 10) == "NeonDream_" then
+                pcall(function() child:Destroy() end)
+            end
+        end
+        for _, child in ipairs(CoreGui:GetChildren()) do
+            if child.Name == "NeonDream_VignetteGui" then
+                pcall(function() child:Destroy() end)
+            end
+        end
+    end)
+end
+
+local function SetupNeonDreamParticles()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = getRoot(LocalPlayer)
+    if not root then return end
+
+    if NeonDreamState.Attachment then pcall(function() NeonDreamState.Attachment:Destroy() end) end
+    if NeonDreamState.ParticleEmitter then pcall(function() NeonDreamState.ParticleEmitter:Destroy() end) end
+
+    local att = Instance.new("Attachment")
+    att.Name = "NeonDream_Attachment"
+    att.Parent = root
+    NeonDreamState.Attachment = att
+
+    local pe = Instance.new("ParticleEmitter")
+    pe.Name = "NeonDream_Particles"
+    pe.Texture = "rbxassetid://2581223252"
+    pe.Color = ColorSequence.new(GetNeonDreamColor())
+    pe.Rate = NeonDreamConfig.ParticleDensity
+    pe.Lifetime = NumberRange.new(0.8, 1.5)
+    pe.Speed = NumberRange.new(1, 3.5)
+    pe.SpreadAngle = Vector2.new(180, 180)
+    pe.LightEmission = 1
+    pe.LightInfluence = 0
+    pe.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.4),
+        NumberSequenceKeypoint.new(0.5, 1.2),
+        NumberSequenceKeypoint.new(1, 0)
+    })
+    pe.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.2, 0.2),
+        NumberSequenceKeypoint.new(0.8, 0.2),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    pe.Parent = att
+    NeonDreamState.ParticleEmitter = pe
+end
+
+local function ToggleNeonDream(state)
+    NeonDreamConfig.Enabled = state
+    local st = NeonDreamState
+
+    if state then
+        pcall(function()
+            if not st.OriginalLighting.Saved then
+                st.OriginalLighting.Ambient = Lighting.Ambient
+                st.OriginalLighting.OutdoorAmbient = Lighting.OutdoorAmbient
+                st.OriginalLighting.Saved = true
+            end
+
+            CleanupNeonDreamInstances()
+
+            local bloom = Instance.new("BloomEffect")
+            bloom.Name = "NeonDream_Bloom"
+            bloom.Intensity = NeonDreamConfig.GlowIntensity * 0.8
+            bloom.Size = 28
+            bloom.Threshold = 0.8
+            bloom.Parent = Lighting
+            st.Bloom = bloom
+
+            local cc = Instance.new("ColorCorrectionEffect")
+            cc.Name = "NeonDream_ColorCorrection"
+            cc.TintColor = GetNeonDreamColor()
+            cc.Brightness = 0.05
+            cc.Contrast = 0.15
+            cc.Saturation = 0.5
+            cc.Parent = Lighting
+            st.ColorCorrection = cc
+
+            local sunRays = Instance.new("SunRaysEffect")
+            sunRays.Name = "NeonDream_SunRays"
+            sunRays.Intensity = math.clamp(NeonDreamConfig.GlowIntensity * 0.08, 0, 1)
+            sunRays.Spread = 0.8
+            sunRays.Parent = Lighting
+            st.SunRays = sunRays
+
+            local gui = Instance.new("ScreenGui")
+            gui.Name = "NeonDream_VignetteGui"
+            gui.ResetOnSpawn = false
+            gui.IgnoreGuiInset = true
+            gui.Parent = CoreGui
+
+            local img = Instance.new("ImageLabel")
+            img.Name = "VignetteFrame"
+            img.Size = UDim2.new(1, 0, 1, 0)
+            img.BackgroundTransparency = 1
+            img.Image = "rbxassetid://4576475446"
+            img.ImageColor3 = GetNeonDreamColor()
+            img.ImageTransparency = math.clamp(1 - NeonDreamConfig.VignetteTransparency, 0, 1)
+            img.Parent = gui
+            st.VignetteGui = gui
+            st.VignetteImage = img
+
+            SetupNeonDreamParticles()
+
+            if not st.CharacterConnection then
+                st.CharacterConnection = LocalPlayer.CharacterAdded:Connect(function()
+                    if NeonDreamConfig.Enabled then
+                        task.wait(0.5)
+                        pcall(function() SetupNeonDreamParticles() end)
+                    end
+                end)
+            end
+
+            if st.RenderConnection then st.RenderConnection:Disconnect() end
+            st.RenderConnection = RunService.RenderStepped:Connect(function()
+                if not NeonDreamConfig.Enabled then return end
+                pcall(function()
+                    local pulseSpeed = NeonDreamConfig.PulseSpeed
+                    local sinVal = (pulseSpeed > 0) and math.sin(tick() * pulseSpeed * 3) or 0
+                    local activeColor = GetNeonDreamColor()
+
+                    if st.Bloom then
+                        st.Bloom.Intensity = math.clamp((NeonDreamConfig.GlowIntensity * 0.5) + (sinVal * 0.25 * NeonDreamConfig.GlowIntensity), 0, 20)
+                    end
+                    if st.ColorCorrection then
+                        st.ColorCorrection.TintColor = activeColor
+                        st.ColorCorrection.Saturation = 0.4 + (sinVal * 0.2)
+                        st.ColorCorrection.Brightness = (sinVal * 0.04 * (NeonDreamConfig.GlowIntensity / 5))
+                    end
+                    if st.SunRays then
+                        st.SunRays.Intensity = math.clamp((NeonDreamConfig.GlowIntensity * 0.06) + (sinVal * 0.03), 0, 1)
+                    end
+                    if st.VignetteImage then
+                        st.VignetteImage.ImageColor3 = activeColor
+                        st.VignetteImage.ImageTransparency = math.clamp(1 - NeonDreamConfig.VignetteTransparency, 0, 1)
+                    end
+                    if st.ParticleEmitter then
+                        st.ParticleEmitter.Color = ColorSequence.new(activeColor)
+                        st.ParticleEmitter.Rate = NeonDreamConfig.ParticleDensity
+                    end
+                end)
+            end)
+
+            Notify("Visuals", "Neon Dream Shader Enabled ✨", 2)
+            PlayEnableSound()
+        end)
+    else
+        pcall(function()
+            CleanupNeonDreamInstances()
+            if st.RenderConnection then
+                st.RenderConnection:Disconnect()
+                st.RenderConnection = nil
+            end
+            if st.CharacterConnection then
+                st.CharacterConnection:Disconnect()
+                st.CharacterConnection = nil
+            end
+
+            if st.OriginalLighting.Saved then
+                if st.OriginalLighting.Ambient then Lighting.Ambient = st.OriginalLighting.Ambient end
+                if st.OriginalLighting.OutdoorAmbient then Lighting.OutdoorAmbient = st.OriginalLighting.OutdoorAmbient end
+                st.OriginalLighting.Saved = false
+            end
+
+            Notify("Visuals", "Neon Dream Shader Disabled", 2)
+        end)
+    end
+end
+
+local function ResetNeonDreamConfig()
+    NeonDreamConfig.GlowIntensity = 3.0
+    NeonDreamConfig.PulseSpeed = 1.5
+    NeonDreamConfig.ParticleDensity = 30
+    NeonDreamConfig.VignetteTransparency = 0.4
+    NeonDreamConfig.Palette = "Neon Purple"
+    NeonDreamConfig.CustomColor = Color3.fromRGB(180, 0, 255)
+    NeonDreamConfig.CustomR = 180
+    NeonDreamConfig.CustomG = 0
+    NeonDreamConfig.CustomB = 255
+    if NeonDreamConfig.Enabled then
+        ToggleNeonDream(false)
+    end
+end
+
+-- === NEON DREAM SHADER UI ===
+Tabs.Visuals:AddSection("Neon Dream Shader")
+
+local NeonDreamToggle = Tabs.Visuals:AddToggle("NeonDreamToggle", {
+    Title = "Enable Neon Dream Shader",
+    Default = false,
+    Callback = function(Value)
+        ToggleNeonDream(Value)
+    end
+})
+
+local GlowIntensitySlider = Tabs.Visuals:AddSlider("NeonDreamGlowSlider", {
+    Title = "Glow Intensity",
+    Min = 0,
+    Max = 10,
+    Default = 3,
+    Rounding = 1,
+    Callback = function(Value)
+        NeonDreamConfig.GlowIntensity = Value
+    end
+})
+
+local PulseSpeedSlider = Tabs.Visuals:AddSlider("NeonDreamPulseSlider", {
+    Title = "Pulse Speed",
+    Min = 0,
+    Max = 5,
+    Default = 1.5,
+    Rounding = 1,
+    Callback = function(Value)
+        NeonDreamConfig.PulseSpeed = Value
+    end
+})
+
+local ParticleDensitySlider = Tabs.Visuals:AddSlider("NeonDreamDensitySlider", {
+    Title = "Particle Density",
+    Min = 0,
+    Max = 100,
+    Default = 30,
+    Rounding = 0,
+    Callback = function(Value)
+        NeonDreamConfig.ParticleDensity = Value
+    end
+})
+
+local VignetteSlider = Tabs.Visuals:AddSlider("NeonDreamVignetteSlider", {
+    Title = "Vignette Transparency",
+    Min = 0,
+    Max = 1,
+    Default = 0.4,
+    Rounding = 2,
+    Callback = function(Value)
+        NeonDreamConfig.VignetteTransparency = Value
+    end
+})
+
+local PaletteDropdown = Tabs.Visuals:AddDropdown("NeonDreamPaletteDropdown", {
+    Title = "Palette",
+    Values = { "Neon Purple", "Cyber Blue", "Sunset Pink", "Matrix Green", "Custom" },
+    Default = "Neon Purple",
+    Callback = function(Value)
+        NeonDreamConfig.Palette = Value
+    end
+})
+
+local CustomColorPicker = Tabs.Visuals:AddColorpicker("NeonDreamCustomColor", {
+    Title = "Custom Palette Color",
+    Default = Color3.fromRGB(180, 0, 255),
+    Callback = function(Value)
+        NeonDreamConfig.CustomColor = Value
+        NeonDreamConfig.CustomR = math.floor(Value.R * 255)
+        NeonDreamConfig.CustomG = math.floor(Value.G * 255)
+        NeonDreamConfig.CustomB = math.floor(Value.B * 255)
+    end
+})
+
+local CustomRSlider = Tabs.Visuals:AddSlider("NeonDreamCustomR", {
+    Title = "Custom R",
+    Min = 0,
+    Max = 255,
+    Default = 180,
+    Rounding = 0,
+    Callback = function(Value)
+        NeonDreamConfig.CustomR = Value
+        NeonDreamConfig.CustomColor = Color3.fromRGB(Value, NeonDreamConfig.CustomG, NeonDreamConfig.CustomB)
+    end
+})
+
+local CustomGSlider = Tabs.Visuals:AddSlider("NeonDreamCustomG", {
+    Title = "Custom G",
+    Min = 0,
+    Max = 255,
+    Default = 0,
+    Rounding = 0,
+    Callback = function(Value)
+        NeonDreamConfig.CustomG = Value
+        NeonDreamConfig.CustomColor = Color3.fromRGB(NeonDreamConfig.CustomR, Value, NeonDreamConfig.CustomB)
+    end
+})
+
+local CustomBSlider = Tabs.Visuals:AddSlider("NeonDreamCustomB", {
+    Title = "Custom B",
+    Min = 0,
+    Max = 255,
+    Default = 255,
+    Rounding = 0,
+    Callback = function(Value)
+        NeonDreamConfig.CustomB = Value
+        NeonDreamConfig.CustomColor = Color3.fromRGB(NeonDreamConfig.CustomR, NeonDreamConfig.CustomG, Value)
+    end
+})
+
+Tabs.Visuals:AddButton({
+    Title = "Reset Settings",
+    Description = "Reset Neon Dream Shader settings to default",
+    Callback = function()
+        pcall(function()
+            NeonDreamToggle:SetValue(false)
+            GlowIntensitySlider:SetValue(3)
+            PulseSpeedSlider:SetValue(1.5)
+            ParticleDensitySlider:SetValue(30)
+            VignetteSlider:SetValue(0.4)
+            PaletteDropdown:SetValue("Neon Purple")
+            CustomColorPicker:SetValue(Color3.fromRGB(180, 0, 255))
+            CustomRSlider:SetValue(180)
+            CustomGSlider:SetValue(0)
+            CustomBSlider:SetValue(255)
+            ResetNeonDreamConfig()
+        end)
+    end
+})
+
 
 -- === MASS / TROLL TAB ===
 Tabs.Mass:AddSection("Server Interaction & Kill")

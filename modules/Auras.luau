@@ -63,6 +63,13 @@ Auras.LaunchAura = {
     radius = 30
 }
 
+-- Remove Anti-Kick Aura
+Auras.RemoveAntiKickAura = {
+    enabled = false,
+    radius = 30,
+    connection = nil
+}
+
 function Auras.IsTargetAlive(player)
     if not player or not player.Character then return false end
     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
@@ -72,30 +79,129 @@ end
 function Auras.GetNearbyPlayers(range)
     local char = Shared.LocalPlayer.Character
     if not char then return {} end
-    local root = char:FindFirstChild("HumanoidRootPart")
+    local root = Shared.GetRoot(Shared.LocalPlayer)
     if not root then return {} end
     local pos = root.Position
     local near = {}
     for _, player in ipairs(Shared.Players:GetPlayers()) do
         if player ~= Shared.LocalPlayer and Auras.IsTargetAlive(player) then
-            local pChar = player.Character
-            if pChar then
-                local pRoot = pChar:FindFirstChild("HumanoidRootPart")
-                if pRoot and (pRoot.Position - pos).Magnitude <= range then
-                    table.insert(near, player)
-                end
+            local pRoot = Shared.GetRoot(player)
+            if pRoot and (pRoot.Position - pos).Magnitude <= range then
+                table.insert(near, player)
             end
         end
     end
     return near
 end
 
--- Remove Anti-Kick Aura
-Auras.RemoveAntiKickAura = {
-    enabled = false,
-    radius = 30,
-    connection = nil
-}
+function Auras.ToggleLaunchAura(state, radius)
+    Auras.LaunchAura.enabled = state
+    Auras.LaunchAura.radius = radius or Auras.LaunchAura.radius or 30
+
+    if state then
+        if Auras.LaunchAura.loopThread then task.cancel(Auras.LaunchAura.loopThread) end
+        Auras.LaunchAura.loopThread = task.spawn(function()
+            local grabEvents = Shared.ReplicatedStorage:WaitForChild("GrabEvents", 5)
+            local setNetOwner = grabEvents and grabEvents:FindFirstChild("SetNetworkOwner")
+            while Auras.LaunchAura.enabled do
+                pcall(function()
+                    local targets = Auras.GetNearbyPlayers(Auras.LaunchAura.radius)
+                    for _, player in ipairs(targets) do
+                        local root = Shared.GetRoot(player)
+                        if root then
+                            if setNetOwner then
+                                setNetOwner:FireServer(root, root.CFrame)
+                            end
+                            root.AssemblyLinearVelocity = Vector3.new(0, 500, 0)
+                        end
+                    end
+                end)
+                task.wait(0.2)
+            end
+        end)
+        Shared.Notify("Auras", "Launch Aura Enabled", 2)
+    else
+        if Auras.LaunchAura.loopThread then
+            task.cancel(Auras.LaunchAura.loopThread)
+            Auras.LaunchAura.loopThread = nil
+        end
+        Shared.Notify("Auras", "Launch Aura Disabled", 2)
+    end
+end
+
+function Auras.ToggleTelekinesisAura(state, radius)
+    Auras.TelekinesisAura.enabled = state
+    Auras.TelekinesisAura.radius = radius or Auras.TelekinesisAura.radius or 30
+
+    if state then
+        if Auras.TelekinesisAura.loopThread then task.cancel(Auras.TelekinesisAura.loopThread) end
+        Auras.TelekinesisAura.loopThread = task.spawn(function()
+            local grabEvents = Shared.ReplicatedStorage:WaitForChild("GrabEvents", 5)
+            local setNetOwner = grabEvents and grabEvents:FindFirstChild("SetNetworkOwner")
+            while Auras.TelekinesisAura.enabled do
+                pcall(function()
+                    local myRoot = Shared.GetRoot(Shared.LocalPlayer)
+                    if not myRoot then return end
+                    local targets = Auras.GetNearbyPlayers(Auras.TelekinesisAura.radius)
+                    for _, player in ipairs(targets) do
+                        local root = Shared.GetRoot(player)
+                        if root then
+                            if setNetOwner then
+                                setNetOwner:FireServer(root, root.CFrame)
+                            end
+                            root.CFrame = myRoot.CFrame * CFrame.new(0, 2, -6)
+                            root.AssemblyLinearVelocity = Vector3.zero
+                        end
+                    end
+                end)
+                task.wait(0.05)
+            end
+        end)
+        Shared.Notify("Auras", "Telekinesis Aura Enabled", 2)
+    else
+        if Auras.TelekinesisAura.loopThread then
+            task.cancel(Auras.TelekinesisAura.loopThread)
+            Auras.TelekinesisAura.loopThread = nil
+        end
+        Shared.Notify("Auras", "Telekinesis Aura Disabled", 2)
+    end
+end
+
+function Auras.ToggleDeathAura(state, radius)
+    Auras.DeathAura.enabled = state
+    Auras.DeathAura.radius = radius or Auras.DeathAura.radius or 30
+
+    if state then
+        if Auras.DeathAura.loopThread then task.cancel(Auras.DeathAura.loopThread) end
+        Auras.DeathAura.loopThread = task.spawn(function()
+            local grabEvents = Shared.ReplicatedStorage:WaitForChild("GrabEvents", 5)
+            local setNetOwner = grabEvents and grabEvents:FindFirstChild("SetNetworkOwner")
+            while Auras.DeathAura.enabled do
+                pcall(function()
+                    local targets = Auras.GetNearbyPlayers(Auras.DeathAura.radius)
+                    for _, player in ipairs(targets) do
+                        local root = Shared.GetRoot(player)
+                        if root then
+                            if setNetOwner then
+                                setNetOwner:FireServer(root, root.CFrame)
+                            end
+                            root.AssemblyLinearVelocity = Vector3.new(0, -1e6, 0)
+                            root.CFrame = CFrame.new(root.Position.X, -3000, root.Position.Z)
+                        end
+                    end
+                end)
+                task.wait(0.3)
+            end
+        end)
+        Shared.Notify("Auras", "Death Aura Enabled", 2)
+    else
+        if Auras.DeathAura.loopThread then
+            task.cancel(Auras.DeathAura.loopThread)
+            Auras.DeathAura.loopThread = nil
+        end
+        Shared.Notify("Auras", "Death Aura Disabled", 2)
+    end
+end
 
 function Auras.ToggleRemoveAntiKickAura(state, radius)
     Auras.RemoveAntiKickAura.enabled = state
@@ -104,8 +210,7 @@ function Auras.ToggleRemoveAntiKickAura(state, radius)
     if state then
         if Auras.RemoveAntiKickAura.connection then Auras.RemoveAntiKickAura.connection:Disconnect() end
         Auras.RemoveAntiKickAura.connection = Shared.RunService.Heartbeat:Connect(function()
-            local myChar = Shared.LocalPlayer.Character
-            local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            local myRoot = Shared.GetRoot(Shared.LocalPlayer)
             if not myRoot then return end
 
             local grabEvents = Shared.ReplicatedStorage:FindFirstChild("GrabEvents")
@@ -114,8 +219,7 @@ function Auras.ToggleRemoveAntiKickAura(state, radius)
 
             for _, target in ipairs(Shared.Players:GetPlayers()) do
                 if target ~= Shared.LocalPlayer then
-                    local tChar = target.Character
-                    local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                    local tRoot = Shared.GetRoot(target)
                     if tRoot and (tRoot.Position - myRoot.Position).Magnitude <= Auras.RemoveAntiKickAura.radius then
                         local spawned = Shared.Workspace:FindFirstChild(target.Name .. "SpawnedInToys")
                         if spawned then

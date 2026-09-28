@@ -3,7 +3,6 @@ local Target = {}
 
 Target.SelectedPlayer = nil
 Target.PlayerNames = { "None" }
-
 Target.PlayerDropDown = nil
 
 function Target.RefreshPlayerList()
@@ -13,22 +12,23 @@ function Target.RefreshPlayerList()
             table.insert(Target.PlayerNames, player.Name)
         end
     end
-    if Target.PlayerDropDown then
+    if Target.PlayerDropDown and typeof(Target.PlayerDropDown.SetValues) == "function" then
         Target.PlayerDropDown:SetValues(Target.PlayerNames)
     end
 end
 
 function Target.SetSelectedPlayer(name)
-    if name == "None" then
+    if not name or name == "None" then
         Target.SelectedPlayer = nil
         return
     end
     for _, player in ipairs(Shared.Players:GetPlayers()) do
-        if player.Name == name then
+        if player.Name == name or player.DisplayName == name then
             Target.SelectedPlayer = player
-            break
+            return
         end
     end
+    Target.SelectedPlayer = nil
 end
 
 function Target.GetTarget()
@@ -48,16 +48,28 @@ function Target.StartLoopKill(target, delay)
     Target.LoopKill.enabled = true
     Target.LoopKill.target = target
     Target.LoopKill.delay = delay or 0.5
+    if Target.LoopKill.loopThread then
+        task.cancel(Target.LoopKill.loopThread)
+    end
     Target.LoopKill.loopThread = task.spawn(function()
+        local grabEvents = Shared.ReplicatedStorage:WaitForChild("GrabEvents", 5)
+        local setOwner = grabEvents and grabEvents:FindFirstChild("SetNetworkOwner")
         while Target.LoopKill.enabled and Target.LoopKill.target do
-            local char = Target.LoopKill.target.Character
-            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.Health = 0
-            end
+            pcall(function()
+                local char = Target.LoopKill.target.Character
+                local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+                if root then
+                    if setOwner then
+                        setOwner:FireServer(root, root.CFrame)
+                    end
+                    root.AssemblyLinearVelocity = Vector3.new(0, -1e6, 0)
+                    root.CFrame = CFrame.new(root.Position.X, -2000, root.Position.Z)
+                end
+            end)
             task.wait(Target.LoopKill.delay)
         end
     end)
+    Shared.Notify("Target", "Loop Kill Started on " .. target.Name, 2)
 end
 
 function Target.StopLoopKill()
@@ -67,6 +79,7 @@ function Target.StopLoopKill()
         Target.LoopKill.loopThread = nil
     end
     Target.LoopKill.target = nil
+    Shared.Notify("Target", "Loop Kill Stopped", 2)
 end
 
 -- Loop Ragdoll
