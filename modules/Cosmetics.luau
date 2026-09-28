@@ -94,6 +94,166 @@ Cosmetics.CustomEffects = {
         "Bubble", "Stars", "Ice Shards", "Shadow Clones", "Meteor Rain"
     }
 }
+-- ============================================================================
+-- PHANTOM PARTS (Headless / Korblox)
+-- ============================================================================
+Cosmetics.Phantom = { saved = {}, rainbowThread = nil }
+
+local function phantomTargets()
+    local char = Shared.LocalPlayer.Character
+    return char
+end
+
+function Cosmetics.TogglePhantomHeadless(state)
+    pcall(function()
+        local char = phantomTargets()
+        if not char then return end
+        local head = char:FindFirstChild("Head")
+        if state then
+            if head and not Cosmetics.Phantom.saved.Head then
+                Cosmetics.Phantom.saved.Head = { Transparency = head.Transparency }
+                head.Transparency = 1
+                for _, d in ipairs(head:GetDescendants()) do
+                    if d:IsA("Decal") or d:IsA("Texture") then
+                        d.Transparency = 1
+                    end
+                end
+            end
+            Shared.Notify("Phantom", "Headless look enabled", 2)
+        else
+            if head and Cosmetics.Phantom.saved.Head then
+                head.Transparency = Cosmetics.Phantom.saved.Head.Transparency or 0
+                for _, d in ipairs(head:GetDescendants()) do
+                    if d:IsA("Decal") or d:IsA("Texture") then
+                        d.Transparency = 0
+                    end
+                end
+            end
+            Cosmetics.Phantom.saved.Head = nil
+            Shared.Notify("Phantom", "Head restored", 2)
+        end
+    end)
+end
+
+function Cosmetics.TogglePhantomKorblox(state)
+    pcall(function()
+        local char = phantomTargets()
+        if not char then return end
+        local leg = char:FindFirstChild("Right Leg") or char:FindFirstChild("RightLowerLeg")
+        if state then
+            if leg and not Cosmetics.Phantom.saved.Korblox then
+                Cosmetics.Phantom.saved.Korblox = { Transparency = leg.Transparency, Material = leg.Material, Color = leg.Color }
+                leg.Transparency = 0.45
+                leg.Material = Enum.Material.Neon
+                leg.Color = Color3.fromRGB(57, 255, 20)
+            end
+            Shared.Notify("Phantom", "Phantom Korblox Leg enabled", 2)
+        else
+            if leg and Cosmetics.Phantom.saved.Korblox then
+                leg.Transparency = Cosmetics.Phantom.saved.Korblox.Transparency or 0
+                leg.Material = Cosmetics.Phantom.saved.Korblox.Material or Enum.Material.Plastic
+                leg.Color = Cosmetics.Phantom.saved.Korblox.Color or Color3.fromRGB(255, 255, 255)
+            end
+            Cosmetics.Phantom.saved.Korblox = nil
+            Shared.Notify("Phantom", "Leg restored", 2)
+        end
+    end)
+end
+
+-- ============================================================================
+-- RAINBOW HAT & RAINBOW FORCEFIELD
+-- ============================================================================
+Cosmetics.RainbowHat = { part = nil, thread = nil }
+Cosmetics.RainbowForceField = { highlight = nil, thread = nil }
+
+function Cosmetics.ToggleRainbowHat(state)
+    if state then
+        pcall(function()
+            local char = Shared.LocalPlayer.Character
+            local head = char and (char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart"))
+            if not head then return end
+            if Cosmetics.RainbowHat.part and Cosmetics.RainbowHat.part.Parent then
+                Cosmetics.RainbowHat.part:Destroy()
+            end
+            local hat = Instance.new("Part")
+            hat.Name = "Gemoroi_RainbowHat"
+            hat.Size = Vector3.new(1.6, 0.9, 1.6)
+            hat.Material = Enum.Material.Neon
+            hat.CanCollide = false
+            hat.Massless = true
+            hat.Anchored = false
+            hat.Parent = char
+            local weld = Instance.new("WeldConstraint")
+            weld.Part0 = hat
+            weld.Part1 = head
+            weld.Parent = hat
+            hat.CFrame = head.CFrame * CFrame.new(0, 1.1, 0)
+            Cosmetics.RainbowHat.part = hat
+            if Cosmetics.RainbowHat.thread then task.cancel(Cosmetics.RainbowHat.thread) end
+            Cosmetics.RainbowHat.thread = task.spawn(function()
+                local hue = 0
+                while Cosmetics.RainbowHat.part and Cosmetics.RainbowHat.part.Parent do
+                    Cosmetics.RainbowHat.part.Color = Color3.fromHSV(hue % 1, 1, 1)
+                    hue = hue + 0.01
+                    task.wait(0.03)
+                end
+            end)
+            Shared.Notify("Cosmetics", "Rainbow Hat equipped", 2)
+        end)
+    else
+        if Cosmetics.RainbowHat.thread then
+            task.cancel(Cosmetics.RainbowHat.thread)
+            Cosmetics.RainbowHat.thread = nil
+        end
+        if Cosmetics.RainbowHat.part then
+            pcall(function() Cosmetics.RainbowHat.part:Destroy() end)
+            Cosmetics.RainbowHat.part = nil
+        end
+        Shared.Notify("Cosmetics", "Rainbow Hat removed", 2)
+    end
+end
+
+function Cosmetics.ToggleRainbowForceField(state)
+    if state then
+        pcall(function()
+            local char = Shared.LocalPlayer.Character
+            if not char then return end
+            if not Cosmetics.RainbowForceField.highlight then
+                local hl = Instance.new("Highlight")
+                hl.Name = "Gemoroi_RainbowFF"
+                hl.Adornee = char
+                hl.FillTransparency = 0.55
+                hl.OutlineTransparency = 0
+                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                hl.Parent = Shared.CoreGui
+                Cosmetics.RainbowForceField.highlight = hl
+            end
+            if Cosmetics.RainbowForceField.thread then task.cancel(Cosmetics.RainbowForceField.thread) end
+            Cosmetics.RainbowForceField.thread = task.spawn(function()
+                local hue = 0
+                while Cosmetics.RainbowForceField.highlight do
+                    local color = Color3.fromHSV(hue % 1, 1, 1)
+                    Cosmetics.RainbowForceField.highlight.FillColor = color
+                    Cosmetics.RainbowForceField.highlight.OutlineColor = color
+                    hue = hue + 0.005
+                    task.wait(0.03)
+                end
+            end)
+            Shared.Notify("Cosmetics", "Rainbow ForceField enabled", 2)
+        end)
+    else
+        if Cosmetics.RainbowForceField.thread then
+            task.cancel(Cosmetics.RainbowForceField.thread)
+            Cosmetics.RainbowForceField.thread = nil
+        end
+        if Cosmetics.RainbowForceField.highlight then
+            pcall(function() Cosmetics.RainbowForceField.highlight:Destroy() end)
+            Cosmetics.RainbowForceField.highlight = nil
+        end
+        Shared.Notify("Cosmetics", "Rainbow ForceField disabled", 2)
+    end
+end
+
 function Cosmetics.ToggleAngelWings(state)
     pcall(function()
         local char = Shared.LocalPlayer.Character
@@ -356,6 +516,72 @@ function Cosmetics.ApplySunsetPreset()
         Lighting = { Brightness = 3.5, ClockTime = 6.7, FogColor = Color3.fromRGB(94, 76, 106), FogEnd = 1000 }
     })
     Shared.Notify("Shaders", "Sunset Glow applied!", 2)
+end
+
+-- ============================================================================
+-- GEMOROI PRESET SHADERS v3.6 (Cyberpunk / Midnight / Dreamy / Rainy / Desert)
+-- ============================================================================
+
+function Cosmetics.ApplyCyberpunkCity()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.05, Contrast = 0.25, Saturation = 0.35, TintColor = Color3.fromRGB(120, 200, 255) },
+        Bloom = { Intensity = 0.8, Size = 40, Threshold = 0.9 },
+        SunRays = 0.15,
+        L = { Brightness = 1.6, ClockTime = 0, FogEnd = 450, FogColor = Color3.fromRGB(10, 20, 40),
+            Ambient = Color3.fromRGB(30, 60, 120), OutdoorAmbient = Color3.fromRGB(40, 80, 140) },
+    })
+    Shared.Notify("Shaders", "Cyberpunk City applied!", 2)
+end
+
+function Cosmetics.ApplyMidnightPurple()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = -0.05, Contrast = 0.15, Saturation = 0.1, TintColor = Color3.fromRGB(160, 120, 255) },
+        Bloom = { Intensity = 0.5, Size = 32, Threshold = 0.8 },
+        SunRays = 0.05,
+        L = { Brightness = 0.9, ClockTime = 0, FogEnd = 600, FogColor = Color3.fromRGB(40, 20, 70),
+            Ambient = Color3.fromRGB(60, 40, 100), OutdoorAmbient = Color3.fromRGB(70, 50, 110) },
+    })
+    Shared.Notify("Shaders", "Midnight Purple applied!", 2)
+end
+
+function Cosmetics.ApplyDreamySunset()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.1, Contrast = 0.1, Saturation = 0.25, TintColor = Color3.fromRGB(255, 180, 140) },
+        Bloom = { Intensity = 0.7, Size = 36, Threshold = 0.85 },
+        SunRays = 0.4,
+        L = { Brightness = 1.4, ClockTime = 17.6, FogEnd = 800, FogColor = Color3.fromRGB(255, 150, 100),
+            Ambient = Color3.fromRGB(200, 140, 120), OutdoorAmbient = Color3.fromRGB(255, 170, 120) },
+    })
+    Shared.Notify("Shaders", "Dreamy Sunset applied!", 2)
+end
+
+function Cosmetics.ApplyRainyDay()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = -0.1, Contrast = 0.05, Saturation = -0.15, TintColor = Color3.fromRGB(180, 200, 220) },
+        Bloom = { Intensity = 0.3, Size = 24, Threshold = 0.9 },
+        L = { Brightness = 1.0, ClockTime = 14, FogEnd = 250, FogStart = 20, FogColor = Color3.fromRGB(150, 165, 180),
+            Ambient = Color3.fromRGB(120, 130, 145), OutdoorAmbient = Color3.fromRGB(130, 140, 155) },
+    })
+    pcall(function()
+        local atmo = Instance.new("Atmosphere")
+        atmo.Density = 0.45
+        atmo.Color = Color3.fromRGB(180, 195, 210)
+        atmo.Glare = 0
+        atmo.Haze = 2.5
+        atmo.Parent = Shared.Lighting
+    end)
+    Shared.Notify("Shaders", "Rainy Day applied!", 2)
+end
+
+function Cosmetics.ApplyDesertHeat()
+    Cosmetics.ApplyShader({
+        CC = { Brightness = 0.15, Contrast = 0.2, Saturation = 0.15, TintColor = Color3.fromRGB(255, 220, 160) },
+        Bloom = { Intensity = 0.6, Size = 34, Threshold = 0.88 },
+        SunRays = 0.5,
+        L = { Brightness = 2.0, ClockTime = 13.5, FogEnd = 900, FogColor = Color3.fromRGB(230, 200, 150),
+            Ambient = Color3.fromRGB(220, 190, 150), OutdoorAmbient = Color3.fromRGB(235, 205, 160) },
+    })
+    Shared.Notify("Shaders", "Desert Heat applied!", 2)
 end
 
 return Cosmetics

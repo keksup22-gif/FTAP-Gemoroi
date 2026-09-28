@@ -3,7 +3,7 @@ local Defense = {}
 
 Defense.AntiGrab = { enabled = false, connection = nil, isHeldConn = nil, charConn = nil }
 Defense.AntiKickStick = { enabled = false, loopThread = nil, currentItem = nil, selectedItem = "NinjaShuriken" }
-Defense.AntiVoid = { enabled = false, loopThread = nil, originalDestroyHeight = -100 }
+Defense.AntiVoid = { enabled = false, loopThread = nil, originalDestroyHeight = -100, safePosition = nil, threshold = -15 }
 Defense.AntiExplode = { enabled = false, connections = {} }
 Defense.AntiBurn = { enabled = false, connection = nil }
 Defense.AntiPaint = { enabled = false, connection = nil }
@@ -12,6 +12,8 @@ Defense.AntiLineLag = { enabled = false }
 Defense.AntiInputLag = { enabled = false, loopThread = nil }
 Defense.AntiBlobman = { enabled = false, loopThread = nil }
 Defense.PCLDBreaker = { enabled = false, loopThread = nil }
+Defense.AntiFling = { enabled = false, loopThread = nil, threshold = 150 }
+Defense.AutoAntiRagdoll = { enabled = false, loopThread = nil }
 Defense.CounterAttack = { enabled = false, mode = "Hell", connection = nil }
 
 Defense.AntiKickStick.items = {
@@ -198,10 +200,21 @@ function Defense.ToggleAntiVoid(state)
         Defense.AntiVoid.loopThread = task.spawn(function()
             while Defense.AntiVoid.enabled do
                 local root = Shared.GetRoot(Shared.LocalPlayer)
-                if root and root.Position.Y < -100 then
-                    root.CFrame = CFrame.new(root.Position.X, 15, root.Position.Z)
-                    Shared.StopAllVelocity()
-                    Shared.Notify("Anti-Void", "Rescued from void!", 2)
+                if root then
+                    -- remember the last safe position (above ground)
+                    if root.Position.Y > 0 then
+                        Defense.AntiVoid.safePosition = root.CFrame
+                    end
+                    -- auto-rescue when falling below Y = -15
+                    if root.Position.Y < Defense.AntiVoid.threshold then
+                        if Defense.AntiVoid.safePosition then
+                            root.CFrame = Defense.AntiVoid.safePosition
+                        else
+                            root.CFrame = CFrame.new(root.Position.X, 15, root.Position.Z)
+                        end
+                        Shared.StopAllVelocity()
+                        Shared.Notify("Anti-Void", "Rescued from void! (Y < -15)", 2)
+                    end
                 end
                 task.wait(0.1)
             end
@@ -220,6 +233,66 @@ function Defense.ToggleAntiVoid(state)
 end
 
 -- Anti-Explosion
+-- Anti-Fling: zeroes velocities when AssemblyLinearVelocity exceeds 150
+function Defense.ToggleAntiFling(state)
+    Defense.AntiFling.enabled = state
+    if state then
+        if Defense.AntiFling.loopThread then task.cancel(Defense.AntiFling.loopThread) end
+        Defense.AntiFling.loopThread = task.spawn(function()
+            while Defense.AntiFling.enabled do
+                pcall(function()
+                    local root = Shared.GetRoot(Shared.LocalPlayer)
+                    if root and root.AssemblyLinearVelocity.Magnitude > Defense.AntiFling.threshold then
+                        root.AssemblyLinearVelocity = Vector3.zero
+                        root.AssemblyAngularVelocity = Vector3.zero
+                    end
+                end)
+                task.wait()
+            end
+        end)
+        Shared.Notify("Anti Fling", "Enabled - velocity capped at 150", 2)
+    else
+        if Defense.AntiFling.loopThread then
+            task.cancel(Defense.AntiFling.loopThread)
+            Defense.AntiFling.loopThread = nil
+        end
+        Shared.Notify("Anti Fling", "Disabled", 2)
+    end
+end
+
+-- Auto Anti-Ragdoll: instantly gets the player back up from ragdoll
+function Defense.ToggleAutoAntiRagdoll(state)
+    Defense.AutoAntiRagdoll.enabled = state
+    if state then
+        if Defense.AutoAntiRagdoll.loopThread then task.cancel(Defense.AutoAntiRagdoll.loopThread) end
+        Defense.AutoAntiRagdoll.loopThread = task.spawn(function()
+            while Defense.AutoAntiRagdoll.enabled do
+                pcall(function()
+                    local hum = Shared.GetCharHumanoid(Shared.LocalPlayer)
+                    local root = Shared.GetRoot(Shared.LocalPlayer)
+                    if hum and root then
+                        if hum.PlatformStand or hum:GetState() == Enum.HumanoidStateType.Physics
+                            or hum:GetState() == Enum.HumanoidStateType.Ragdoll then
+                            hum.PlatformStand = false
+                            hum.Sit = false
+                            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                            root.AssemblyAngularVelocity = Vector3.zero
+                        end
+                    end
+                end)
+                task.wait(0.05)
+            end
+        end)
+        Shared.Notify("Anti Ragdoll", "Auto Anti-Ragdoll Enabled", 2)
+    else
+        if Defense.AutoAntiRagdoll.loopThread then
+            task.cancel(Defense.AutoAntiRagdoll.loopThread)
+            Defense.AutoAntiRagdoll.loopThread = nil
+        end
+        Shared.Notify("Anti Ragdoll", "Auto Anti-Ragdoll Disabled", 2)
+    end
+end
+
 function Defense.ToggleAntiExplode(state)
     Defense.AntiExplode.enabled = state
     if state then

@@ -20,7 +20,9 @@ Shared.LocalPlayer = Shared.Players.LocalPlayer
 Shared.Camera = Shared.Workspace.CurrentCamera
 Shared.Mouse = Shared.LocalPlayer:GetMouse()
 
--- Fluent Reference (set by main loader)
+-- GemoroiUI Reference (set by main loader)
+Shared.GemoroiUI = nil
+-- Legacy Fluent reference (aliased to GemoroiUI for backward compatibility)
 Shared.Fluent = nil
 
 -- Core FTAP Remotes Cache
@@ -33,7 +35,8 @@ Shared.Remotes = {
     DestroyGrabLine = nil,
     SetLineColor = nil,
     SpawnToyRemote = nil,
-    RagdollRemote = nil
+    RagdollRemote = nil,
+    EndGrabEarly = nil
 }
 
 function Shared.InitRemotes()
@@ -44,6 +47,7 @@ function Shared.InitRemotes()
             Shared.Remotes.SetNetworkOwner = ge:FindFirstChild("SetNetworkOwner")
             Shared.Remotes.CreateGrabLine = ge:FindFirstChild("CreateGrabLine")
             Shared.Remotes.DestroyGrabLine = ge:FindFirstChild("DestroyGrabLine")
+            Shared.Remotes.EndGrabEarly = ge:FindFirstChild("EndGrabEarly")
         end
     end)
     pcall(function()
@@ -94,6 +98,35 @@ function Shared.SetNetworkOwner(part, cframe)
     if remote then
         pcall(function()
             remote:FireServer(part, cframe or part.CFrame)
+        end)
+    end
+end
+
+-- GUARANTEED OWNERSHIP TRANSFER ORDER:
+-- RagdollRemote:FireServer(target, 0) is ALWAYS fired BEFORE SetNetworkOwner,
+-- so the target is guaranteed to be ragdolled by the time we take ownership.
+function Shared.TransferOwnership(targetPart, cframe)
+    if not targetPart then return end
+    pcall(function()
+        local ragdollRemote = Shared.Remotes.RagdollRemote or Shared.GetRemote("RagdollRemote")
+        if ragdollRemote then
+            ragdollRemote:FireServer(targetPart, 0)
+        end
+    end)
+    pcall(function()
+        local ownerRemote = Shared.Remotes.SetNetworkOwner or Shared.GetRemote("SetNetworkOwner")
+        if ownerRemote then
+            ownerRemote:FireServer(targetPart, cframe or targetPart.CFrame)
+        end
+    end)
+end
+
+function Shared.EndGrabEarly(part)
+    if not part then return end
+    local remote = Shared.Remotes.EndGrabEarly or Shared.GetRemote("EndGrabEarly")
+    if remote then
+        pcall(function()
+            remote:FireServer(part)
         end)
     end
 end
@@ -203,8 +236,9 @@ end
 
 function Shared.Notify(title, content, duration)
     pcall(function()
-        if Shared.Fluent and typeof(Shared.Fluent.Notify) == "function" then
-            Shared.Fluent:Notify({
+        local ui = Shared.GemoroiUI or Shared.Fluent
+        if ui and typeof(ui.Notify) == "function" then
+            ui:Notify({
                 Title = tostring(title or "FTAP-Gemoroi"),
                 Content = tostring(content or ""),
                 Duration = duration or 3

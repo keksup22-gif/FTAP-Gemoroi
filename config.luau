@@ -1,6 +1,6 @@
 local Config = {
     Settings = {
-        Theme = "Dark",
+        Theme = "Lime Dark",
         Acrylic = true,
         Transparency = true,
         MenuKeybind = "RightControl"
@@ -20,9 +20,9 @@ local Config = {
         MaxDistance = 1000
     },
     Colors = {
-        Accent = Color3.fromRGB(0, 170, 255),
-        Background = Color3.fromRGB(20, 20, 20),
-        Text = Color3.fromRGB(255, 255, 255)
+        Accent = Color3.fromRGB(163, 230, 53),
+        Background = Color3.fromRGB(11, 14, 12),
+        Text = Color3.fromRGB(233, 240, 234)
     }
 }
 

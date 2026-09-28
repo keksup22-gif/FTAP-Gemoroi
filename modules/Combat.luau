@@ -3,6 +3,7 @@ local Combat = {}
 
 Combat.Config = {
     SilentAimEnabled = false,
+    SilentAimHook = false,
     FOVRadius = 120,
     MaxDistance = 200,
     Hitbox = "Head",
@@ -30,8 +31,34 @@ Combat.GrabMods = {
     FreezeGrab = false,
     SpinGrab = false,
     MasslessGrab = false,
-    InfiniteLine = false
+    InfiniteLine = false,
+    LaunchGrab = false,
+    ZeroVelocityGrab = false,
 }
+
+-- Apply active grab modifiers to a grabbed target root
+function Combat.ApplyGrabModifiers(targetRoot, throwDirection)
+    if not targetRoot then return end
+    if Combat.GrabMods.ZeroVelocityGrab then
+        targetRoot.AssemblyLinearVelocity = Vector3.zero
+        targetRoot.AssemblyAngularVelocity = Vector3.zero
+    end
+    if Combat.GrabMods.LaunchGrab then
+        targetRoot.AssemblyLinearVelocity = Vector3.new(0, 200, 0)
+    end
+    if Combat.GrabMods.SpinGrab then
+        targetRoot.AssemblyAngularVelocity = Vector3.new(0, 50, 0)
+    end
+    if Combat.GrabMods.MasslessGrab then
+        pcall(function()
+            for _, part in ipairs(targetRoot.Parent:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Massless = true
+                end
+            end
+        end)
+    end
+end
 
 Combat.FovCircle = nil
 
@@ -256,7 +283,8 @@ function Combat.ToggleTriggerBot(state)
                         task.spawn(function()
                             task.wait(Combat.TriggerBot.preGrabDelay)
                             Shared.CreateGrabLine(targetRoot, targetRoot.Position)
-                            Shared.SetNetworkOwner(targetRoot, targetRoot.CFrame)
+                            -- guaranteed order: RagdollRemote(target, 0) fires BEFORE SetNetworkOwner
+                            Shared.TransferOwnership(targetRoot, targetRoot.CFrame)
                             task.wait(Combat.TriggerBot.postGrabDelay)
                             if Combat.GrabMods.SuperStrength then
                                 targetRoot.AssemblyLinearVelocity = mouseRay.Direction * (Combat.GrabMods.ThrowPower * 500)
@@ -265,6 +293,7 @@ function Combat.ToggleTriggerBot(state)
                                 targetRoot.AssemblyLinearVelocity = Vector3.new(0, -1e6, 0)
                                 targetRoot.CFrame = CFrame.new(targetRoot.Position.X, -3000, targetRoot.Position.Z)
                             end
+                            Combat.ApplyGrabModifiers(targetRoot, mouseRay.Direction)
                         end)
                     end
                 end
@@ -277,6 +306,70 @@ function Combat.ToggleTriggerBot(state)
             Combat.TriggerBot.connection = nil
         end
         Shared.Notify("TriggerBot", "TriggerBot Disabled", 2)
+    end
+end
+
+-- === SILENT AIM (__namecall hook for Raycast / FindPartOnRay) ===
+-- Redirects the game's raycasts to the closest player's hitbox so grabs,
+-- hits and tools all silently lock onto the target.
+Combat.SilentAimHookState = { installed = false, oldNamecall = nil }
+
+function Combat.ToggleSilentAimHook(state)
+    Combat.Config.SilentAimHook = state
+    if state then
+        local ok, err = pcall(function()
+            if not hookmetamethod or not getnamecallmethod then
+                error("hookmetamethod is not available in this executor")
+            end
+            if Combat.SilentAimHookState.installed then
+                return
+            end
+            local oldNamecall
+            oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+                local method = getnamecallmethod()
+                if Combat.Config.SilentAimHook and Combat.Config.SilentAimEnabled
+                    and (method == "Raycast" or method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList"
+                        or method == "FindPartOnRayWithWhitelist") then
+                    local target = Combat.GetClosestPlayerToMouse()
+                    if target then
+                        local origin
+                        if method == "Raycast" then
+                            local args = { ... }
+                            if typeof(args[1]) == "CFrame" then
+                                origin = args[1].Position
+                            elseif typeof(args[1]) == "Vector3" then
+                                origin = args[1]
+                            end
+                            if origin then
+                                local direction = (target.Position - origin)
+                                if method == "Raycast" then
+                                    return oldNamecall(self, origin, direction, select(3, ...))
+                                end
+                            end
+                        else
+                            local args = { ... }
+                            if typeof(args[1]) == "Ray" then
+                                origin = args[1].Origin
+                                local direction = Ray.new(origin, target.Position - origin)
+                                return oldNamecall(self, direction, select(2, ...))
+                            end
+                        end
+                    end
+                end
+                return oldNamecall(self, ...)
+            end))
+            Combat.SilentAimHookState.oldNamecall = oldNamecall
+            Combat.SilentAimHookState.installed = true
+        end)
+        if ok then
+            Shared.Notify("Silent Aim", "__namecall hook installed (Raycast / FindPartOnRay redirect)", 3)
+        else
+            Combat.Config.SilentAimHook = false
+            Shared.Notify("Silent Aim", "Hook unavailable: " .. tostring(err), 4)
+        end
+    else
+        -- hook stays installed but becomes a pass-through (flag disabled)
+        Shared.Notify("Silent Aim", "__namecall hook redirect disabled", 2)
     end
 end
 

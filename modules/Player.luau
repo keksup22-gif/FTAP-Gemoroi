@@ -39,6 +39,13 @@ Player.ThirdPerson = {
 }
 
 -- Spin
+Player.WaterWalk = {
+    enabled = false,
+    waterParts = {},
+    originalStates = {},
+    loopThread = nil
+}
+
 Player.Spin = {
     enabled = false,
     speed = 20,
@@ -209,6 +216,7 @@ function Player.ToggleThirdPerson(state, distance)
 
     if state then
         pcall(function()
+            Shared.LocalPlayer.CameraMode = Enum.CameraMode.Classic
             Shared.LocalPlayer.CameraMinZoomDistance = Player.ThirdPerson.distance
             Shared.LocalPlayer.CameraMaxZoomDistance = Player.ThirdPerson.distance
             Shared.LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
@@ -216,22 +224,26 @@ function Player.ToggleThirdPerson(state, distance)
         if Player.ThirdPerson.connection then Player.ThirdPerson.connection:Disconnect() end
         Player.ThirdPerson.connection = Shared.RunService.RenderStepped:Connect(function()
             if Player.ThirdPerson.enabled then
-                Shared.LocalPlayer.CameraMinZoomDistance = Player.ThirdPerson.distance
-                Shared.LocalPlayer.CameraMaxZoomDistance = Player.ThirdPerson.distance
+                pcall(function()
+                    Shared.LocalPlayer.CameraMode = Enum.CameraMode.Classic
+                    Shared.LocalPlayer.CameraMinZoomDistance = Player.ThirdPerson.distance
+                    Shared.LocalPlayer.CameraMaxZoomDistance = Player.ThirdPerson.distance
+                end)
             end
         end)
-        Shared.Notify("3rd Person", "3rd Person View Enabled (" .. tostring(Player.ThirdPerson.distance) .. " studs)", 2)
+        Shared.Notify("3rd Person Fix", "3rd Person View Enabled - enforced via RenderStepped (" .. tostring(Player.ThirdPerson.distance) .. " studs)", 2)
     else
         if Player.ThirdPerson.connection then
             Player.ThirdPerson.connection:Disconnect()
             Player.ThirdPerson.connection = nil
         end
         pcall(function()
+            Shared.LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
             Shared.LocalPlayer.CameraMinZoomDistance = 0.5
-            Shared.LocalPlayer.CameraMaxZoomDistance = 400
+            Shared.LocalPlayer.CameraMaxZoomDistance = 0.5
             Shared.LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Zoom
         end)
-        Shared.Notify("3rd Person", "3rd Person View Disabled", 2)
+        Shared.Notify("3rd Person Fix", "3rd Person View Disabled - first person restored", 2)
     end
 end
 
@@ -242,6 +254,113 @@ function Player.SetThirdPersonDistance(dist)
             Shared.LocalPlayer.CameraMinZoomDistance = dist
             Shared.LocalPlayer.CameraMaxZoomDistance = dist
         end)
+    end
+end
+
+-- Water Walk: makes water parts solid so you can walk on water (Amethyst method)
+function Player.CollectWaterParts()
+    local found = 0
+    pcall(function()
+        local ocean = Shared.Workspace:FindFirstChild("Ocean")
+        local object = ocean and ocean:FindFirstChild("Object")
+        if object then
+            for _, p in ipairs(object:GetDescendants()) do
+                if p:IsA("BasePart") and Player.WaterWalk.originalStates[p] == nil then
+                    Player.WaterWalk.originalStates[p] = p.CanCollide
+                    table.insert(Player.WaterWalk.waterParts, p)
+                    p.CanCollide = true
+                    found = found + 1
+                end
+            end
+        end
+        for _, name in ipairs({ "Water", "Ocean", "Sea", "Lake", "River", "Pool" }) do
+            local folder = Shared.Workspace:FindFirstChild(name)
+            if folder then
+                for _, p in ipairs(folder:GetDescendants()) do
+                    if p:IsA("BasePart") and p.Transparency > 0.5 and Player.WaterWalk.originalStates[p] == nil then
+                        Player.WaterWalk.originalStates[p] = p.CanCollide
+                        table.insert(Player.WaterWalk.waterParts, p)
+                        p.CanCollide = true
+                        found = found + 1
+                    end
+                end
+            end
+        end
+        -- terrain water
+        local terrain = Shared.Workspace:FindFirstChildOfClass("Terrain")
+        if terrain then
+            local regions = 0
+            local myRoot = Shared.GetRoot(Shared.LocalPlayer)
+            if myRoot and Player.WaterWalk.platform == nil then
+                -- invisible follower platform for terrain water
+                local platform = Instance.new("Part")
+                platform.Name = "Gemoroi_WaterWalkPlatform"
+                platform.Size = Vector3.new(6, 0.5, 6)
+                platform.Transparency = 1
+                platform.Anchored = true
+                platform.CanCollide = true
+                platform.Parent = Shared.Workspace
+                Player.WaterWalk.platform = platform
+            end
+        end
+    end)
+    return found
+end
+
+function Player.ToggleWaterWalk(state)
+    Player.WaterWalk.enabled = state
+    if state then
+        local found = Player.CollectWaterParts()
+        Player.WaterWalk.loopThread = task.spawn(function()
+            while Player.WaterWalk.enabled do
+                pcall(function()
+                    -- keep collected water solid
+                    for _, p in ipairs(Player.WaterWalk.waterParts) do
+                        if p and p.Parent then
+                            p.CanCollide = true
+                        end
+                    end
+                    -- move the follower platform to stay under the player
+                    local platform = Player.WaterWalk.platform
+                    local myRoot = Shared.GetRoot(Shared.LocalPlayer)
+                    if platform and myRoot then
+                        local ray = Shared.Workspace:Raycast(
+                            myRoot.Position,
+                            Vector3.new(0, -8, 0),
+                            RaycastParams.new()
+                        )
+                        local inWater = ray == nil or (ray.Instance and ray.Instance.Material == Enum.Material.Water)
+                        if inWater then
+                            platform.Position = Vector3.new(myRoot.Position.X, myRoot.Position.Y - 3.4, myRoot.Position.Z)
+                            platform.CanCollide = true
+                        else
+                            platform.CanCollide = false
+                        end
+                    end
+                end)
+                task.wait(0.1)
+            end
+        end)
+        Shared.Notify("Water Walk", "Enabled - found " .. found .. " water parts", 2)
+    else
+        if Player.WaterWalk.loopThread then
+            task.cancel(Player.WaterWalk.loopThread)
+            Player.WaterWalk.loopThread = nil
+        end
+        for p, st in pairs(Player.WaterWalk.originalStates) do
+            pcall(function()
+                if p and p.Parent then
+                    p.CanCollide = st
+                end
+            end)
+        end
+        if Player.WaterWalk.platform then
+            pcall(function() Player.WaterWalk.platform:Destroy() end)
+            Player.WaterWalk.platform = nil
+        end
+        Player.WaterWalk.waterParts = {}
+        Player.WaterWalk.originalStates = {}
+        Shared.Notify("Water Walk", "Disabled", 2)
     end
 end
 

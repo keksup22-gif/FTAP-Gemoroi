@@ -1,5 +1,5 @@
 -- FTAP-Gemoroi Loader
--- Modularized Edition v3.0 (XOCU Enhanced)
+-- Modularized Edition v3.5 (Lime Dark / GemoroiUI)
 
 local baseUrl = "https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/modules/"
 
@@ -35,19 +35,36 @@ local Misc = loadModule("Misc")
 local Protection = loadModule("Protection")
 local Keybinds = loadModule("Keybinds")
 
-local success, Fluent = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
+local success, GemoroiUI = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/GemoroiUI.luau"))()
 end)
 
-if not success or not Fluent then
-    warn("[FTAP-Gemoroi] Failed to load Fluent UI")
+if not success or not GemoroiUI then
+    -- fallback: load the synced module copy from /modules/GemoroiUI.luau
+    local ok2, modUI = pcall(function()
+        return loadModule("GemoroiUI")
+    end)
+    if ok2 and modUI then
+        GemoroiUI = modUI
+    end
+end
+
+if not GemoroiUI then
+    warn("[FTAP-Gemoroi] Failed to load GemoroiUI (Lime Dark)")
     return
 end
 
-Shared.Fluent = Fluent
+Shared.GemoroiUI = GemoroiUI
+Shared.Fluent = GemoroiUI -- backward compatibility alias
 
 local UI = loadModule("UI")
 local Window, Tabs = UI.CreateWindow()
+
+-- Give Misc a live reference to the currently selected target's character
+Misc.TargetCharacterProvider = function()
+    local target = Target.GetTarget()
+    return target and target.Character or nil
+end
 
 -- ==================== COMBAT TAB ====================
 Tabs.Combat:AddSection("Silent Aim & Targeting")
@@ -104,6 +121,33 @@ Tabs.Combat:AddSlider("MaxDistanceSlider", {
     Rounding = 0,
     Callback = function(Value)
         Combat.Config.MaxDistance = Value
+    end
+})
+
+Tabs.Combat:AddToggle("SilentAimHookToggle", {
+    Title = "Silent Aim (__namecall Hook)",
+    Description = "Redirects Raycast / FindPartOnRay to the target hitbox",
+    Default = false,
+    Callback = function(Value)
+        Combat.ToggleSilentAimHook(Value)
+    end
+})
+
+Tabs.Combat:AddSection("Grab Modifiers")
+
+Tabs.Combat:AddToggle("LaunchGrabToggle", {
+    Title = "Launch Grab (200 speed upkick)",
+    Default = false,
+    Callback = function(Value)
+        Combat.GrabMods.LaunchGrab = Value
+    end
+})
+
+Tabs.Combat:AddToggle("ZeroVelocityGrabToggle", {
+    Title = "Zero Velocity Grab",
+    Default = false,
+    Callback = function(Value)
+        Combat.GrabMods.ZeroVelocityGrab = Value
     end
 })
 
@@ -264,7 +308,8 @@ Tabs.Player:AddButton({
 Tabs.Player:AddSection("Camera & View Modes")
 
 Tabs.Player:AddToggle("ThirdPersonToggle", {
-    Title = "Force 3rd Person View",
+    Title = "Third Person View Fix (RenderStepped)",
+    Description = "Unlocks the forced first-person camera every frame",
     Default = false,
     Callback = function(Value)
         Player.ToggleThirdPerson(Value, Player.ThirdPerson.distance)
@@ -282,11 +327,40 @@ Tabs.Player:AddSlider("ThirdPersonDistanceSlider", {
     end
 })
 
+Tabs.Player:AddToggle("WaterWalkToggle", {
+    Title = "Water Walk",
+    Description = "Walk on water like a god",
+    Default = false,
+    Callback = function(Value)
+        Player.ToggleWaterWalk(Value)
+    end
+})
+
 Tabs.Player:AddToggle("SpinBotToggle", {
     Title = "Spin Bot",
     Default = false,
     Callback = function(Value)
         Player.ToggleSpin(Value, Player.Spin.speed)
+    end
+})
+
+Tabs.Defense:AddSection("Gemoroi Defense v3.6")
+
+Tabs.Defense:AddToggle("AntiFlingToggle", {
+    Title = "Anti Fling",
+    Description = "Zeroes velocity when AssemblyLinearVelocity > 150",
+    Default = false,
+    Callback = function(Value)
+        Defense.ToggleAntiFling(Value)
+    end
+})
+
+Tabs.Defense:AddToggle("AutoAntiRagdollToggle", {
+    Title = "Auto Anti-Ragdoll",
+    Description = "Instantly gets you back on your feet",
+    Default = false,
+    Callback = function(Value)
+        Defense.ToggleAutoAntiRagdoll(Value)
     end
 })
 
@@ -332,6 +406,119 @@ Tabs.Visuals:AddToggle("PCLDESPToggle", {
     Callback = function(Value)
         Visuals.Config.PCLD_ESPEnabled = Value
         Visuals.UpdatePCLDESP()
+    end
+})
+
+-- ==================== GEMOROI VISUALS & OPTIMIZATION ====================
+Tabs.Visuals:AddSection("Gemoroi Visuals & Optimization")
+
+Tabs.Visuals:AddToggle("PCLDBoxESPToggle", {
+    Title = "PCLD Box ESP (BoxHandleAdornments)",
+    Description = "Draws 3D boxes on hidden physics hitboxes",
+    Default = false,
+    Callback = function(Value)
+        Visuals.Config.PCLD_BoxesEnabled = Value
+        Visuals.UpdatePCLDBoxes()
+    end
+})
+
+Tabs.Visuals:AddColorpicker("PCLDBoxColorPicker", {
+    Title = "PCLD Box Color",
+    Default = Color3.fromRGB(163, 230, 53),
+    Callback = function(Value)
+        Visuals.SetPCLDBoxColor(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("ProfileESPToggle", {
+    Title = "Profile ESP (Avatars Above Head)",
+    Description = "Shows player avatars, names and health above heads",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleProfileESP(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("SoapTexturesToggle", {
+    Title = "Soap Textures (FPS Boost)",
+    Description = "Smooth-plastic everything + hides decals & textures",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleSoapTextures(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("OverheadTagsToggle", {
+    Title = "Overhead Tags",
+    Description = "Name, @user, distance in studs & health bar",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleOverheadTags(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("XRayToggle", {
+    Title = "X-Ray Vision",
+    Description = "Semi-transparent map walls (Transparency 0.6)",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleXRay(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("FullbrightToggle", {
+    Title = "Fullbright",
+    Description = "100% lighting, no shadows",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleFullbright(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("NoFogToggle", {
+    Title = "NoFog",
+    Description = "Removes all fog from the map",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleNoFog(Value)
+    end
+})
+
+-- ==================== MAP CUSTOMIZER ====================
+Tabs.Visuals:AddSection("Map Customizer (Live Recolor)")
+
+local mapMaterials = {
+    { Name = "Grass", Material = Enum.Material.Grass },
+    { Name = "Rock",  Material = Enum.Material.Rock },
+    { Name = "Sand",  Material = Enum.Material.Sand },
+    { Name = "Snow",  Material = Enum.Material.Snow },
+}
+
+for _, mat in ipairs(mapMaterials) do
+    Tabs.Visuals:AddColorpicker("MapColor" .. mat.Name, {
+        Title = mat.Name .. " Color",
+        Default = Color3.fromRGB(57, 255, 20),
+        Callback = function(Value)
+            Visuals.ApplyMapColor(mat.Material, Value)
+        end
+    })
+end
+
+Tabs.Visuals:AddButton({
+    Title = "Reset Map Colors",
+    Callback = function()
+        Visuals.ResetMapColors()
+    end
+})
+
+Tabs.Auras:AddSection("Fling Aura")
+
+Tabs.Auras:AddToggle("FlingAuraToggle", {
+    Title = "Fling Aura",
+    Description = "Randomly flings nearby enemies at extreme speed",
+    Default = false,
+    Callback = function(Value)
+        Auras.ToggleFlingAura(Value, Auras.FlingAura.radius)
     end
 })
 
@@ -868,6 +1055,56 @@ Tabs.Server:AddButton({
     end
 })
 
+-- ==================== PHANTOM & RAINBOW COSMETICS ====================
+Tabs.Cosmetics:AddSection("Phantom Parts & Rainbow")
+
+Tabs.Cosmetics:AddToggle("PhantomHeadlessToggle", {
+    Title = "Phantom Headless Mesh",
+    Default = false,
+    Callback = function(Value)
+        Cosmetics.TogglePhantomHeadless(Value)
+    end
+})
+
+Tabs.Cosmetics:AddToggle("PhantomKorbloxToggle", {
+    Title = "Phantom Korblox Leg",
+    Default = false,
+    Callback = function(Value)
+        Cosmetics.TogglePhantomKorblox(Value)
+    end
+})
+
+Tabs.Cosmetics:AddToggle("RainbowHatToggle", {
+    Title = "Rainbow Hat",
+    Default = false,
+    Callback = function(Value)
+        Cosmetics.ToggleRainbowHat(Value)
+    end
+})
+
+Tabs.Cosmetics:AddToggle("RainbowForceFieldToggle", {
+    Title = "Rainbow ForceField Skin",
+    Default = false,
+    Callback = function(Value)
+        Cosmetics.ToggleRainbowForceField(Value)
+    end
+})
+
+Tabs.Cosmetics:AddSection("Gemoroi Lighting Presets")
+
+for _, preset in ipairs({
+    { Name = "Cyberpunk City", Fn = function() Cosmetics.ApplyCyberpunkCity() end },
+    { Name = "Midnight Purple", Fn = function() Cosmetics.ApplyMidnightPurple() end },
+    { Name = "Dreamy Sunset", Fn = function() Cosmetics.ApplyDreamySunset() end },
+    { Name = "Rainy Day", Fn = function() Cosmetics.ApplyRainyDay() end },
+    { Name = "Desert Heat", Fn = function() Cosmetics.ApplyDesertHeat() end },
+}) do
+    Tabs.Cosmetics:AddButton({
+        Title = "Shader: " .. preset.Name,
+        Callback = preset.Fn
+    })
+end
+
 -- ==================== TELEPORTS TAB ====================
 Tabs.Teleports:AddSection("Location Teleports")
 
@@ -896,6 +1133,53 @@ Tabs.Teleports:AddButton({
         Teleports.RemoveSafeSkyPlatform()
     end
 })
+
+Tabs.Teleports:AddSection("Plot Bases")
+
+for _, plot in ipairs(Teleports.GetPlotCFrames()) do
+    Tabs.Teleports:AddButton({
+        Title = "Teleport to " .. plot[1],
+        Callback = function()
+            Teleports.TeleportTo(plot[2])
+            Shared.Notify("Teleport", "Teleported to " .. plot[1], 2)
+        end
+    })
+end
+
+Tabs.Teleports:AddSection("Click & Player Teleports")
+
+Tabs.Teleports:AddToggle("ClickTPToggle", {
+    Title = "Click TP (teleport on mouse click)",
+    Default = false,
+    Callback = function(Value)
+        Teleports.ToggleClickTP(Value)
+    end
+})
+
+local tpPlayerDropdown
+local function refreshTpPlayers()
+    local names = { "None" }
+    for _, p in ipairs(Shared.Players:GetPlayers()) do
+        if p ~= Shared.LocalPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    if tpPlayerDropdown then
+        tpPlayerDropdown:SetValues(names)
+    end
+end
+
+tpPlayerDropdown = Tabs.Teleports:AddDropdown("TeleportPlayerDropdown", {
+    Title = "Teleport to Player",
+    Values = { "None" },
+    Default = "None",
+    Callback = function(Value)
+        if Value ~= "None" then
+            Teleports.TeleportToPlayer(Value)
+        end
+    end
+})
+refreshTpPlayers()
 
 -- ==================== MISC TAB ====================
 Tabs.Misc:AddSection("Map & Utilities")
@@ -932,6 +1216,271 @@ for poseName, _ in pairs(Misc.FigurePresets) do
     })
 end
 
+-- ==================== FIGURE POSE PACK ====================
+Tabs.Misc:AddSection("Figure Grab Poses")
+
+local targetCharFn = function()
+    local t = Target.GetTarget()
+    return t and t.Character or nil
+end
+
+for _, pose in ipairs({
+    { Name = "Dog Pose Quick V1", Preset = "DogPoseQuickV1" },
+    { Name = "Dog Pose Quick V2", Preset = "DogPoseQuickV2" },
+    { Name = "Bang (Slow)", Preset = "BangSlow" },
+}) do
+    Tabs.Misc:AddButton({
+        Title = pose.Name,
+        Callback = function()
+            local char = targetCharFn()
+            if char then
+                Misc.ApplyFigurePose(pose.Preset, char)
+            else
+                Shared.Notify("Figure Pose", "Select a target first!", 2)
+            end
+        end
+    })
+end
+
+Tabs.Misc:AddButton({
+    Title = "Coconut Boobs & Ass",
+    Callback = function()
+        local char = targetCharFn()
+        if char then
+            Misc.AttachCoconuts(char, "BoobsAss")
+        else
+            Shared.Notify("Figure Pose", "Select a target first!", 2)
+        end
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Coconut Penis",
+    Callback = function()
+        local char = targetCharFn()
+        if char then
+            Misc.AttachCoconuts(char, "Penis")
+        else
+            Shared.Notify("Figure Pose", "Select a target first!", 2)
+        end
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Reset Pose",
+    Callback = function()
+        Misc.ResetFigurePose(targetCharFn())
+    end
+})
+
+-- ==================== TARGET LIMB CONTROLS ====================
+Tabs.Misc:AddSection("Target Limb Controls")
+
+Tabs.Misc:AddButton({
+    Title = "Freeze Limbs",
+    Callback = function()
+        Misc.FreezeLimbs(targetCharFn())
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Unfreeze Limbs",
+    Callback = function()
+        Misc.UnfreezeLimbs(targetCharFn())
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Remove Arms",
+    Callback = function()
+        Misc.RemoveLimbs(targetCharFn(), "Arms")
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Remove Legs",
+    Callback = function()
+        Misc.RemoveLimbs(targetCharFn(), "Legs")
+    end
+})
+
+Tabs.Misc:AddToggle("MirrorAnimationsToggle", {
+    Title = "Mirror My Animations",
+    Default = false,
+    Callback = function(Value)
+        Misc.ToggleMirrorAnimations(Value, targetCharFn())
+    end
+})
+
+Tabs.Misc:AddToggle("FaceTowardMeToggle", {
+    Title = "Face Toward Me",
+    Default = false,
+    Callback = function(Value)
+        Misc.ToggleFaceTowardMe(Value, targetCharFn())
+    end
+})
+
+Tabs.Misc:AddToggle("LockTorsoRotationToggle", {
+    Title = "Lock Torso Rotation",
+    Default = false,
+    Callback = function(Value)
+        Misc.ToggleLockTorso(Value, targetCharFn())
+    end
+})
+
+-- ==================== TROLL & DESYNC ====================
+Tabs.Misc:AddSection("Troll & Desync")
+
+Tabs.Misc:AddToggle("ChatSpamToggle", {
+    Title = "Chat Troll Spammer",
+    Default = false,
+    Callback = function(Value)
+        Misc.ToggleChatSpam(Value)
+    end
+})
+
+Tabs.Misc:AddSlider("ChatSpamDelaySlider", {
+    Title = "Spam Delay",
+    Default = 1,
+    Min = 0.5,
+    Max = 10,
+    Rounding = 1,
+    Suffix = "s",
+    Callback = function(Value)
+        Misc.ChatSpam.delay = Value
+    end
+})
+
+Tabs.Misc:AddToggle("ShurikenDesyncToggle", {
+    Title = "NinjaShuriken Desync / Crash",
+    Description = "Spams ownership-abused shurikens at the target",
+    Default = false,
+    Callback = function(Value)
+        Misc.ToggleShurikenDesync(Value, targetCharFn())
+    end
+})
+
+-- ==================== SLOTS FARM ====================
+Tabs.Misc:AddSection("Slots Farm")
+
+Tabs.Misc:AddToggle("AutoSpinSlotsToggle", {
+    Title = "Auto Spin Slots",
+    Description = "Auto-spins the slot machine when its timer hits 0:00",
+    Default = false,
+    Callback = function(Value)
+        Misc.ToggleAutoSpinSlots(Value)
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Check Slot Time",
+    Callback = function()
+        Misc.CheckSlotTime()
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Teleport to Slots",
+    Callback = function()
+        Misc.TeleportToSlots()
+    end
+})
+
+-- ==================== AUTO RECONNECT ====================
+Tabs.Server:AddSection("Connection")
+
+Tabs.Server:AddToggle("AutoReconnectToggle", {
+    Title = "Auto Reconnect",
+    Description = "Automatically rejoins after a kick / disconnect",
+    Default = false,
+    Callback = function(Value)
+        Server.ToggleAutoReconnect(Value)
+    end
+})
+
+Tabs.Server:AddButton({
+    Title = "Server Hop (find a new server)",
+    Callback = function()
+        Server.ServerHop()
+    end
+})
+
+-- ==================== KEYBINDS TAB ====================
+Tabs.Keybinds:AddSection("Bind Any Function to a Key")
+
+-- Register every bindable action (click a key, press any keyboard key)
+Keybinds.Register("Toggle UI", Enum.KeyCode.RightControl, function()
+    Window:Toggle()
+end)
+Keybinds.Register("Toggle Silent Aim", Enum.KeyCode.Q, function()
+    Combat.Config.SilentAimEnabled = not Combat.Config.SilentAimEnabled
+    Shared.Notify("Keybind", "Silent Aim: " .. tostring(Combat.Config.SilentAimEnabled), 2)
+end)
+Keybinds.Register("Toggle Player ESP", nil, function()
+    Visuals.Config.ESPEnabled = not Visuals.Config.ESPEnabled
+    Visuals.UpdateESPHighlights()
+    Shared.Notify("Keybind", "Player ESP: " .. tostring(Visuals.Config.ESPEnabled), 2)
+end)
+Keybinds.Register("Toggle Profile ESP", nil, function()
+    Visuals.ToggleProfileESP(not Visuals.Config.ProfileESPEnabled)
+end)
+Keybinds.Register("Toggle Fly", Enum.KeyCode.F, function()
+    Player.ToggleFly(not Player.Fly.enabled)
+end)
+Keybinds.Register("Toggle Noclip", Enum.KeyCode.N, function()
+    Player.ToggleNoclip(not Player.Noclip.enabled)
+end)
+Keybinds.Register("Toggle Speed Boost", nil, function()
+    if Player.Speed.enabled then
+        Player.DisableSpeed()
+    else
+        Player.EnableSpeed()
+    end
+end)
+Keybinds.Register("Toggle 3rd Person Fix", Enum.KeyCode.T, function()
+    Player.ToggleThirdPerson(not Player.ThirdPerson.enabled, Player.ThirdPerson.distance)
+end)
+Keybinds.Register("Toggle Spin Bot", nil, function()
+    Player.ToggleSpin(not Player.Spin.enabled, Player.Spin.speed)
+end)
+Keybinds.Register("Toggle Water Walk", nil, function()
+    Player.ToggleWaterWalk(not Player.WaterWalk.enabled)
+end)
+Keybinds.Register("Toggle X-Ray", Enum.KeyCode.X, function()
+    Visuals.ToggleXRay(not Visuals.Config.XRayEnabled)
+end)
+Keybinds.Register("Toggle Fullbright", nil, function()
+    Visuals.ToggleFullbright(not Visuals.Config.FullbrightEnabled)
+end)
+Keybinds.Register("Toggle Soap Textures", nil, function()
+    Visuals.ToggleSoapTextures(not Visuals.Soap.enabled)
+end)
+Keybinds.Register("Fling Closest Target", Enum.KeyCode.G, function()
+    Combat.FlingClosestTarget()
+end)
+Keybinds.Register("Teleport to Spawn", nil, function()
+    Teleports.TeleportTo(CFrame.new(3, -7, -2))
+    Shared.Notify("Keybind", "Teleported to Spawn", 2)
+end)
+Keybinds.Register("Toggle Chat Spam", nil, function()
+    Misc.ToggleChatSpam(not Misc.ChatSpam.enabled)
+end)
+Keybinds.Register("Toggle Click TP", Enum.KeyCode.C, function()
+    Teleports.ToggleClickTP(not Teleports.ClickTP.enabled)
+end)
+
+for _, actionName in ipairs(Keybinds.Order) do
+    local action = Keybinds.Actions[actionName]
+    Tabs.Keybinds:AddKeybind("KB_" .. actionName, {
+        Title = actionName,
+        Default = Keybinds.GetKey(actionName),
+        Callback = function(newKey)
+            Keybinds.Bind(actionName, newKey)
+            Shared.Notify("Keybinds", actionName .. " bound to " .. (newKey and newKey.Name or "None"), 2)
+        end
+    })
+end
+
 -- ==================== MAIN RUNTIME STEPPED LOOP ====================
 Shared.RunService.RenderStepped:Connect(function()
     -- Combat Silent Aim & FOV
@@ -946,6 +1495,11 @@ Shared.RunService.RenderStepped:Connect(function()
     if Visuals.Config.PCLD_ESPEnabled then
         Visuals.UpdatePCLDESP()
     end
+
+    -- PCLD BoxHandleAdornments update
+    if Visuals.Config.PCLD_BoxesEnabled then
+        Visuals.UpdatePCLDBoxes()
+    end
 end)
 
 -- Auto refresh player list on player join/leave
@@ -959,5 +1513,5 @@ Shared.Players.PlayerRemoving:Connect(function()
     Target.RefreshPlayerList()
 end)
 
-Shared.Notify("FTAP-Gemoroi", "Successfully loaded XOCU Enhanced Edition v3.0! ⚡", 3)
+Shared.Notify("FTAP-Gemoroi", "Successfully loaded Lime Dark Edition v3.5 (GemoroiUI)! ⚡", 3)
 Shared.PlayEnableSound()
