@@ -29,7 +29,7 @@ function Visuals.ToggleRainbowESP(state)
                 local hue = (tick() % 5) / 5
                 local rainbowColor = Color3.fromHSV(hue, 1, 1)
                 for _, hl in pairs(Visuals.ESPHighlights) do
-                    if hl then
+                    if hl and hl.Parent then
                         hl.FillColor = rainbowColor
                     end
                 end
@@ -48,7 +48,7 @@ end
 function Visuals.UpdatePCLDESP()
     if not Visuals.Config.PCLD_ESPEnabled then
         for _, hl in pairs(Visuals.PCLDHighlights) do
-            if hl then hl:Destroy() end
+            if hl and hl.Parent then hl:Destroy() end
         end
         Visuals.PCLDHighlights = {}
         return
@@ -56,7 +56,7 @@ function Visuals.UpdatePCLDESP()
 
     for _, obj in ipairs(Shared.Workspace:GetDescendants()) do
         if obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector") then
-            if not Visuals.PCLDHighlights[obj] then
+            if not Visuals.PCLDHighlights[obj] or not Visuals.PCLDHighlights[obj].Parent then
                 local hl = Instance.new("Highlight")
                 hl.Name = "PCLD_ESP_Highlight"
                 hl.Adornee = obj
@@ -74,7 +74,7 @@ end
 function Visuals.UpdateESPHighlights()
     if not Visuals.Config.ESPEnabled then
         for _, hl in pairs(Visuals.ESPHighlights) do
-            if hl then hl:Destroy() end
+            if hl and hl.Parent then hl:Destroy() end
         end
         Visuals.ESPHighlights = {}
         return
@@ -83,11 +83,12 @@ function Visuals.UpdateESPHighlights()
     for _, player in ipairs(Shared.Players:GetPlayers()) do
         if player ~= Shared.LocalPlayer and player.Character then
             local char = player.Character
-            if not Visuals.ESPHighlights[player] and char:FindFirstChild("HumanoidRootPart") then
+            local root = Shared.GetRoot(player)
+            if not Visuals.ESPHighlights[player] and root then
                 local hl = Instance.new("Highlight")
                 hl.Name = "FTAP_ESP_Highlight"
                 hl.Adornee = char
-                hl.FillColor = Visuals.Config.ESPColor
+                hl.FillColor = Visuals.Config.RainbowESP and Color3.fromHSV((tick() % 5) / 5, 1, 1) or Visuals.Config.ESPColor
                 hl.OutlineColor = Color3.fromRGB(255, 255, 255)
                 hl.FillTransparency = 0.4
                 hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
@@ -98,13 +99,13 @@ function Visuals.UpdateESPHighlights()
                 if hl.Adornee ~= char or not char.Parent then
                     hl:Destroy()
                     Visuals.ESPHighlights[player] = nil
-                else
+                elseif not Visuals.Config.RainbowESP then
                     hl.FillColor = Visuals.Config.ESPColor
                 end
             end
         else
             if Visuals.ESPHighlights[player] then
-                Visuals.ESPHighlights[player]:Destroy()
+                pcall(function() Visuals.ESPHighlights[player]:Destroy() end)
                 Visuals.ESPHighlights[player] = nil
             end
         end
@@ -116,7 +117,7 @@ function Visuals.UpdateModelHighlights(state)
     pcall(function()
         if not state then
             for model, hl in pairs(Visuals.ModelHighlights) do
-                if hl then
+                if hl and hl.Parent then
                     pcall(function() hl:Destroy() end)
                 end
             end
@@ -142,12 +143,13 @@ function Visuals.UpdateModelHighlights(state)
         end
     end)
 end
+
 function Visuals.UpdateModelBillboards(state)
     Visuals.Config.ModelBillboardEnabled = state
     pcall(function()
         if not state then
             for model, gui in pairs(Visuals.ModelBillboards) do
-                if gui then
+                if gui and gui.Parent then
                     pcall(function() gui:Destroy() end)
                 end
             end
@@ -169,6 +171,7 @@ function Visuals.UpdateModelBillboards(state)
                             local label = Instance.new("TextLabel")
                             label.Size = UDim2.new(1, 0, 1, 0)
                             label.BackgroundTransparency = 1
+                            label.Font = Enum.Font.GothamBold
                             label.Text = obj.Name
                             label.TextColor3 = Color3.new(1, 1, 1)
                             label.TextStrokeTransparency = 0
@@ -182,8 +185,6 @@ function Visuals.UpdateModelBillboards(state)
         end
     end)
 end
-
-
 
 -- ============================================================================
 -- NEON DREAM SHADER ENGINE
@@ -258,7 +259,7 @@ function Visuals.SetupNeonDreamParticles()
     local st = Visuals.NeonDreamState
     local char = Shared.LocalPlayer.Character
     if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
+    local root = Shared.GetRoot(Shared.LocalPlayer)
     if not root then return end
 
     if st.Attachment then pcall(function() st.Attachment:Destroy() end) end

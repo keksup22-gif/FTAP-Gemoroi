@@ -71,7 +71,6 @@ function Fluent:CreateWindow(options)
     MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
-    MainFrame.Draggable = true
     MainFrame.Parent = ScreenGui
 
     local MainCorner = Instance.new("UICorner")
@@ -99,6 +98,41 @@ function Fluent:CreateWindow(options)
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
     TitleLabel.Parent = TopBar
 
+    -- Draggable implementation
+    local dragging = false
+    local dragInput, dragStart, startPos
+    TopBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    TopBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    -- Toggle visibility on MinimizeKey
+    local minimizeKey = options.MinimizeKey or Enum.KeyCode.RightControl
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == minimizeKey then
+            MainFrame.Visible = not MainFrame.Visible
+        end
+    end)
+
     local Sidebar = Instance.new("ScrollingFrame")
     Sidebar.Size = UDim2.new(0, 160, 1, -50)
     Sidebar.Position = UDim2.new(0, 10, 0, 45)
@@ -106,6 +140,7 @@ function Fluent:CreateWindow(options)
     Sidebar.BorderSizePixel = 0
     Sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
     Sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    Sidebar.ScrollBarThickness = 2
     Sidebar.Parent = MainFrame
 
     local UIListLayout = Instance.new("UIListLayout")
@@ -123,50 +158,47 @@ function Fluent:CreateWindow(options)
         TabButton.Size = UDim2.new(1, 0, 0, 32)
         TabButton.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
         TabButton.BorderSizePixel = 0
-        TabButton.Font = Enum.Font.GothamSemibold
+        TabButton.Font = Enum.Font.GothamMedium
         TabButton.Text = "  " .. tabTitle
         TabButton.TextColor3 = Color3.fromRGB(180, 180, 180)
         TabButton.TextSize = 13
         TabButton.TextXAlignment = Enum.TextXAlignment.Left
         TabButton.Parent = Sidebar
 
-        local BtnCorner = Instance.new("UICorner")
-        BtnCorner.CornerRadius = UDim.new(0, 6)
-        BtnCorner.Parent = TabButton
+        local TabBtnCorner = Instance.new("UICorner")
+        TabBtnCorner.CornerRadius = UDim.new(0, 6)
+        TabBtnCorner.Parent = TabButton
 
         local TabContainer = Instance.new("ScrollingFrame")
-        TabContainer.Size = UDim2.new(1, -185, 1, -55)
-        TabContainer.Position = UDim2.new(0, 175, 0, 45)
+        TabContainer.Size = UDim2.new(1, -190, 1, -55)
+        TabContainer.Position = UDim2.new(0, 180, 0, 45)
         TabContainer.BackgroundTransparency = 1
         TabContainer.BorderSizePixel = 0
         TabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
         TabContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        TabContainer.ScrollBarThickness = 4
         TabContainer.Visible = false
         TabContainer.Parent = MainFrame
 
-        local TabListLayout = Instance.new("UIListLayout")
-        TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        TabListLayout.Padding = UDim.new(0, 8)
-        TabListLayout.Parent = TabContainer
+        local ContentLayout = Instance.new("UIListLayout")
+        ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        ContentLayout.Padding = UDim.new(0, 8)
+        ContentLayout.Parent = TabContainer
 
+        local ContentPadding = Instance.new("UIPadding")
+        ContentPadding.PaddingRight = UDim.new(0, 8)
+        ContentPadding.Parent = TabContainer
+
+        local currentTabIndex = #tabsList + 1
         table.insert(tabsList, { Button = TabButton, Container = TabContainer })
 
-        if #tabsList == 1 then
-            TabContainer.Visible = true
-            TabButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-            TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        end
-
         TabButton.MouseButton1Click:Connect(function()
-            for _, t in ipairs(tabsList) do
-                t.Container.Visible = false
-                t.Button.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-                t.Button.TextColor3 = Color3.fromRGB(180, 180, 180)
-            end
-            TabContainer.Visible = true
-            TabButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-            TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            WindowObj:SelectTab(currentTabIndex)
         end)
+
+        if currentTabIndex == 1 then
+            WindowObj:SelectTab(1)
+        end
 
         function TabObj:AddSection(secTitle)
             local SecLabel = Instance.new("TextLabel")
@@ -178,6 +210,7 @@ function Fluent:CreateWindow(options)
             SecLabel.TextSize = 13
             SecLabel.TextXAlignment = Enum.TextXAlignment.Left
             SecLabel.Parent = TabContainer
+            return SecLabel
         end
 
         function TabObj:AddParagraph(paraOptions)
@@ -212,6 +245,7 @@ function Fluent:CreateWindow(options)
             Content.TextSize = 12
             Content.TextXAlignment = Enum.TextXAlignment.Left
             Content.Parent = Para
+            return Para
         end
 
         function TabObj:AddToggle(flagName, toggleOptions)
@@ -264,6 +298,9 @@ function Fluent:CreateWindow(options)
             local ToggleObj = {
                 SetValue = function(self, val)
                     updateToggle(val)
+                end,
+                GetValue = function(self)
+                    return toggled
                 end
             }
             return ToggleObj
@@ -273,6 +310,7 @@ function Fluent:CreateWindow(options)
             local min = sliderOptions.Min or 0
             local max = sliderOptions.Max or 100
             local default = sliderOptions.Default or min
+            local rounding = sliderOptions.Rounding or 0
             local callback = sliderOptions.Callback or function() end
 
             local Elem = Instance.new("Frame")
@@ -285,12 +323,20 @@ function Fluent:CreateWindow(options)
             Corner.CornerRadius = UDim.new(0, 6)
             Corner.Parent = Elem
 
+            local function formatVal(v)
+                if rounding > 0 then
+                    return string.format("%." .. rounding .. "f", v)
+                else
+                    return tostring(math.floor(v))
+                end
+            end
+
             local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(1, -20, 0, 24)
             Label.Position = UDim2.new(0, 12, 0, 4)
             Label.BackgroundTransparency = 1
             Label.Font = Enum.Font.GothamSemibold
-            Label.Text = (sliderOptions.Title or flagName) .. ": " .. tostring(default)
+            Label.Text = (sliderOptions.Title or flagName) .. ": " .. formatVal(default)
             Label.TextColor3 = Color3.fromRGB(240, 240, 240)
             Label.TextSize = 13
             Label.TextXAlignment = Enum.TextXAlignment.Left
@@ -307,8 +353,10 @@ function Fluent:CreateWindow(options)
             SCorner.CornerRadius = UDim.new(1, 0)
             SCorner.Parent = SliderBar
 
+            local currentVal = default
             local Fill = Instance.new("Frame")
-            Fill.Size = UDim2.new(math.clamp((default - min)/(max - min), 0, 1), 0, 1, 0)
+            local initRatio = (max == min) and 0 or math.clamp((default - min)/(max - min), 0, 1)
+            Fill.Size = UDim2.new(initRatio, 0, 1, 0)
             Fill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
             Fill.BorderSizePixel = 0
             Fill.Parent = SliderBar
@@ -319,24 +367,34 @@ function Fluent:CreateWindow(options)
 
             local dragging = false
             SliderBar.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     dragging = true
+                    local mousePos = UserInputService:GetMouseLocation().X
+                    local absPos = SliderBar.AbsolutePosition.X
+                    local absSize = SliderBar.AbsoluteSize.X
+                    local val = (absSize == 0) and 0 or math.clamp((mousePos - absPos) / absSize, 0, 1)
+                    local mult = 10 ^ rounding
+                    currentVal = math.floor((min + (max - min) * val) * mult + 0.5) / mult
+                    Fill.Size = UDim2.new(val, 0, 1, 0)
+                    Label.Text = (sliderOptions.Title or flagName) .. ": " .. formatVal(currentVal)
+                    pcall(function() callback(currentVal) end)
                 end
             end)
             UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     dragging = false
                 end
             end)
             UserInputService.InputChanged:Connect(function(input)
-                if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                     local mousePos = UserInputService:GetMouseLocation().X
                     local absPos = SliderBar.AbsolutePosition.X
                     local absSize = SliderBar.AbsoluteSize.X
-                    local val = math.clamp((mousePos - absPos) / absSize, 0, 1)
-                    local currentVal = math.floor(min + (max - min) * val)
+                    local val = (absSize == 0) and 0 or math.clamp((mousePos - absPos) / absSize, 0, 1)
+                    local mult = 10 ^ rounding
+                    currentVal = math.floor((min + (max - min) * val) * mult + 0.5) / mult
                     Fill.Size = UDim2.new(val, 0, 1, 0)
-                    Label.Text = (sliderOptions.Title or flagName) .. ": " .. tostring(currentVal)
+                    Label.Text = (sliderOptions.Title or flagName) .. ": " .. formatVal(currentVal)
                     pcall(function() callback(currentVal) end)
                 end
             end)
@@ -346,10 +404,16 @@ function Fluent:CreateWindow(options)
                     return Elem
                 end,
                 SetValue = function(self, val)
-                    local clamped = math.clamp((val - min) / (max - min), 0, 1)
+                    val = tonumber(val) or default
+                    local mult = 10 ^ rounding
+                    currentVal = math.floor(val * mult + 0.5) / mult
+                    local clamped = (max == min) and 0 or math.clamp((currentVal - min) / (max - min), 0, 1)
                     Fill.Size = UDim2.new(clamped, 0, 1, 0)
-                    Label.Text = (sliderOptions.Title or flagName) .. ": " .. tostring(val)
-                    pcall(function() callback(val) end)
+                    Label.Text = (sliderOptions.Title or flagName) .. ": " .. formatVal(currentVal)
+                    pcall(function() callback(currentVal) end)
+                end,
+                GetValue = function(self)
+                    return currentVal
                 end
             }
             return SliderObj
@@ -422,14 +486,87 @@ function Fluent:CreateWindow(options)
                 end,
                 SetValue = function(self, val)
                     DropBtn.Text = tostring(val)
+                end,
+                GetValue = function(self)
+                    return DropBtn.Text
                 end
             }
 
-            function TabObj:SetValues(newVals)
-                DropdownObj:SetValues(newVals)
+            return DropdownObj
+        end
+
+        function TabObj:AddColorpicker(flagName, colorOptions)
+            local default = colorOptions.Default or Color3.fromRGB(255, 255, 255)
+            local callback = colorOptions.Callback or function() end
+            local currentColor = default
+
+            local Elem = Instance.new("Frame")
+            Elem.Size = UDim2.new(1, 0, 0, 40)
+            Elem.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+            Elem.BorderSizePixel = 0
+            Elem.Parent = TabContainer
+
+            local Corner = Instance.new("UICorner")
+            Corner.CornerRadius = UDim.new(0, 6)
+            Corner.Parent = Elem
+
+            local Label = Instance.new("TextLabel")
+            Label.Size = UDim2.new(1, -70, 1, 0)
+            Label.Position = UDim2.new(0, 12, 0, 0)
+            Label.BackgroundTransparency = 1
+            Label.Font = Enum.Font.GothamSemibold
+            Label.Text = colorOptions.Title or flagName
+            Label.TextColor3 = Color3.fromRGB(240, 240, 240)
+            Label.TextSize = 13
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.Parent = Elem
+
+            local ColorBtn = Instance.new("TextButton")
+            ColorBtn.Size = UDim2.new(0, 48, 0, 24)
+            ColorBtn.Position = UDim2.new(1, -58, 0.5, -12)
+            ColorBtn.BackgroundColor3 = currentColor
+            ColorBtn.Text = ""
+            ColorBtn.AutoButtonColor = false
+            ColorBtn.Parent = Elem
+
+            local CCorner = Instance.new("UICorner")
+            CCorner.CornerRadius = UDim.new(0, 4)
+            CCorner.Parent = ColorBtn
+
+            local presetColors = {
+                Color3.fromRGB(180, 0, 255),
+                Color3.fromRGB(0, 220, 255),
+                Color3.fromRGB(255, 50, 150),
+                Color3.fromRGB(0, 255, 100),
+                Color3.fromRGB(255, 255, 0),
+                Color3.fromRGB(255, 50, 50),
+                Color3.fromRGB(255, 255, 255),
+                Color3.fromRGB(0, 170, 255)
+            }
+            local colorIdx = 1
+
+            local function updateColor(newColor)
+                currentColor = newColor
+                ColorBtn.BackgroundColor3 = currentColor
+                pcall(function() callback(currentColor) end)
             end
 
-            return DropdownObj
+            ColorBtn.MouseButton1Click:Connect(function()
+                colorIdx = (colorIdx % #presetColors) + 1
+                updateColor(presetColors[colorIdx])
+            end)
+
+            local ColorpickerObj = {
+                SetValue = function(self, val)
+                    if typeof(val) == "Color3" then
+                        updateColor(val)
+                    end
+                end,
+                GetValue = function(self)
+                    return currentColor
+                end
+            }
+            return ColorpickerObj
         end
 
         function TabObj:AddButton(btnOptions)
@@ -453,6 +590,7 @@ function Fluent:CreateWindow(options)
                     if btnOptions.Callback then btnOptions.Callback() end
                 end)
             end)
+            return Elem
         end
 
         return TabObj
