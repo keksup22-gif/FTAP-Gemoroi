@@ -77,18 +77,74 @@ Target.LoopRagdoll = {
     pallet = nil
 }
 
--- Remove Anti-Kick
-Target.RemoveAntiKick = {
-    enabled = false,
-    loopThread = nil,
-    targetPlayer = nil
-}
+-- Advanced Target Functions
 
--- Anti Input Lag Removal
-Target.RemoveAntiInputLag = {
-    enabled = false,
-    loopThread = nil,
-    targetPlayer = nil
-}
+function Target.PerformAdvancedKick(player)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local GrabEvents = Shared.ReplicatedStorage:FindFirstChild("GrabEvents")
+    local SetNetworkOwner = GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner")
+    local DestroyGrabLine = GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine")
+    
+    pcall(function()
+        if SetNetworkOwner then SetNetworkOwner:FireServer(root, root.CFrame) end
+        if DestroyGrabLine then DestroyGrabLine:FireServer(root) end
+        
+        -- Rinnegan Fling-Kick
+        root.CFrame = CFrame.new(0, 999999999999, 0)
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = "RinneganFling"
+        bv.MaxForce = Vector3.new(0, math.huge, 0)
+        bv.Velocity = Vector3.new(0, 99999999999999, 0)
+        bv.P = 12500
+        bv.Parent = root
+        game:GetService("Debris"):AddItem(bv, 0.05)
+    end)
+    Shared.Notify("Target", "Kick command sent to " .. player.Name, 2)
+end
+
+function Target.BringTarget(player)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local myRoot = Shared.GetRoot()
+    if not root or not myRoot then return end
+    
+    local GrabEvents = Shared.ReplicatedStorage:FindFirstChild("GrabEvents")
+    local SetNetworkOwner = GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner")
+    
+    pcall(function()
+        if SetNetworkOwner then SetNetworkOwner:FireServer(root, myRoot.CFrame) end
+        root.CFrame = myRoot.CFrame * CFrame.new(0, 0, -5)
+    end)
+    Shared.Notify("Target", "Brought " .. player.Name, 2)
+end
+
+function Target.KillTarget(player)
+    local char = player.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.Health = 0
+        Shared.Notify("Target", "Killed " .. player.Name, 2)
+    end
+end
+
+function Target.FreezeTarget(player)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local GrabEvents = Shared.ReplicatedStorage:FindFirstChild("GrabEvents")
+    local SetNetworkOwner = GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner")
+    
+    pcall(function()
+        if SetNetworkOwner then SetNetworkOwner:FireServer(root, root.CFrame) end
+        root.Anchored = true
+        task.wait(2)
+        root.Anchored = false
+    end)
+    Shared.Notify("Target", "Froze " .. player.Name, 2)
+end
 
 return Target

@@ -1,25 +1,23 @@
 local Shared = (getgenv and getgenv().FTAP_Shared) or require(script.Parent.Shared)
 local Server = {}
 
--- Server Lag / Packet Lag
+-- Advanced Server Lag / Packet Lag
 Server.PacketLag = {
     enabled = false,
     loopThread = nil,
-    packetSize = 100,
-    minSize = 100,
-    maxSize = 1000000
+    packetSize = 1000000 -- Default to 1MB based on XOCU
 }
 
 function Server.StartPacketLag()
     Server.PacketLag.enabled = true
     Server.PacketLag.loopThread = task.spawn(function()
-        local extendGrab = Shared.ReplicatedStorage:WaitForChild("GrabEvents"):WaitForChild("ExtendGrabLine")
+        local GrabEvents = Shared.ReplicatedStorage:WaitForChild("GrabEvents")
+        local ExtendGrabLine = GrabEvents:WaitForChild("ExtendGrabLine")
         while Server.PacketLag.enabled do
-            local hugeString = string.rep("a", Server.PacketLag.packetSize)
             pcall(function()
-                extendGrab:FireServer(CFrame.new(0, 0, 0), hugeString)
+                ExtendGrabLine:FireServer(string.rep("A", Server.PacketLag.packetSize))
             end)
-            task.wait()
+            task.wait(3e-05) -- High frequency spam
         end
     end)
 end
@@ -32,7 +30,7 @@ function Server.StopPacketLag()
     end
 end
 
--- Line Lag
+-- Advanced Line Lag
 Server.LineLag = {
     enabled = false,
     loopThread = nil
@@ -41,12 +39,15 @@ Server.LineLag = {
 function Server.StartLineLag()
     Server.LineLag.enabled = true
     Server.LineLag.loopThread = task.spawn(function()
-        local createGrab = Shared.ReplicatedStorage:WaitForChild("GrabEvents"):WaitForChild("CreateGrabLine")
-        while Server.LineLag.enabled do
-            pcall(function()
-                createGrab:FireServer(CFrame.new(math.random(-1e9,1e9), math.random(-1e9,1e9), math.random(-1e9,1e9)))
-            end)
-            task.wait()
+        local CreateGrabLine = Shared.ReplicatedStorage:WaitForChild("GrabEvents"):WaitForChild("CreateGrabLine")
+        local spawnLoc = Shared.Workspace:FindFirstChild("SpawnLocation") or Shared.Workspace:FindFirstChild("Spawn") or Shared.GetRoot()
+        while Server.LineLag.enabled and spawnLoc do
+            for i = 1, 500 do -- Original XOCU spam rate
+                pcall(function()
+                    CreateGrabLine:FireServer(spawnLoc, CFrame.new(math.random(-1e9, 1e9), math.random(-1e9, 1e9), math.random(-1e9, 1e9)))
+                end)
+            end
+            task.wait(0.5)
         end
     end)
 end
@@ -67,21 +68,38 @@ Server.DestroyServer = {
 function Server.DestroyServerAction()
     local createGrab = Shared.ReplicatedStorage:WaitForChild("GrabEvents"):WaitForChild("CreateGrabLine")
     local setOwner = Shared.ReplicatedStorage:WaitForChild("GrabEvents"):WaitForChild("SetNetworkOwner")
+    local destroyLine = Shared.ReplicatedStorage:WaitForChild("GrabEvents"):WaitForChild("DestroyGrabLine")
     
-    for _, player in ipairs(Shared.Players:GetPlayers()) do
-        if player ~= Shared.LocalPlayer then
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root then
-                pcall(function()
-                    setOwner:FireServer(root, root.CFrame)
-                end)
-                pcall(function()
-                    createGrab:FireServer(CFrame.new(0, 1e9, 0))
-                end)
+    Shared.Notify("Server", "Destroying Server... (Mass Kick & Lag)", 3)
+    
+    task.spawn(function()
+        for i = 1, 10 do -- Repeat to ensure effectiveness
+            for _, player in ipairs(Shared.Players:GetPlayers()) do
+                if player ~= Shared.LocalPlayer then
+                    local char = player.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        pcall(function()
+                            setOwner:FireServer(root, root.CFrame)
+                            task.wait()
+                            destroyLine:FireServer(root)
+                            -- Rinnegan Fling on mass scale
+                            local bv = Instance.new("BodyVelocity")
+                            bv.MaxForce = Vector3.new(0, math.huge, 0)
+                            bv.Velocity = Vector3.new(0, 9e12, 0)
+                            bv.Parent = root
+                            game:GetService("Debris"):AddItem(bv, 0.1)
+                        end)
+                    end
+                end
             end
+            task.wait(0.1)
         end
-    end
+    end)
+    
+    -- Start intense lag
+    Server.StartPacketLag()
+    Server.StartLineLag()
 end
 -- Rejoin & Server Hop
 function Server.Rejoin()
