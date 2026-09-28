@@ -1,16 +1,15 @@
 local Shared = (getgenv and getgenv().FTAP_Shared) or require(script.Parent.Shared)
-local Fluent = Shared.Fluent
 
 local UI = {}
 
 function UI.CreateWindow()
-    local Window = Shared.Fluent:CreateWindow({
-        Title = "FTAP - Gemoroi v3.0 (XOCU Enhanced Edition)",
-        SubTitle = "by keksup22 & XOCU",
-        TabWidth = 160,
-        Size = UDim2.fromOffset(620, 520),
+    local Window = Shared.GemoroiUI:CreateWindow({
+        Title = "FTAP - Gemoroi v3.5 (Lime Dark Edition)",
+        SubTitle = "by keksup22 - GemoroiUI",
+        TabWidth = 170,
+        Size = UDim2.fromOffset(640, 520),
         Acrylic = true,
-        Theme = "Dark",
+        Theme = "Lime Dark",
         MinimizeKey = Enum.KeyCode.RightControl
     })
 

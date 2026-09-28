@@ -70,4 +70,98 @@ function Misc.SpawnGucciBlobman()
     Shared.Notify("Misc", "Spawned Creature Blobman 👾", 2)
 end
 
+-- ============================================================================
+-- AUTO SPIN SLOTS (XOCU method) - GemoroiUI v3.5
+-- Auto-spins the slot machine whenever its timer hits 0:00:
+-- teleport to the handle, take network ownership, spin it, teleport back.
+-- ============================================================================
+
+Misc.Slots = {
+    enabled = false,
+    thread = nil,
+    slotHandle = nil,
+    timeText = nil,
+    teleportPosition = Vector3.new(-224.941177, 91.364975, 425.75116)
+}
+
+function Misc.ResolveSlotsRefs()
+    pcall(function()
+        local slotsFolder = Shared.Workspace:FindFirstChild("Slots")
+        local slotsModel = slotsFolder and slotsFolder:FindFirstChild("Slots")
+        if not slotsModel then
+            return
+        end
+        local handleModel = slotsModel:FindFirstChild("SlotHandle")
+        Misc.Slots.slotHandle = handleModel and handleModel:FindFirstChild("Handle")
+        local screen = slotsModel:FindFirstChild("Screen")
+        local slotGui = screen and screen:FindFirstChild("SlotGui")
+        local timeFrame = slotGui and slotGui:FindFirstChild("TimeLeftFrame")
+        Misc.Slots.timeText = timeFrame and timeFrame:FindFirstChild("TimeText")
+    end)
+end
+
+function Misc.GetSlotTime()
+    if not Misc.Slots.timeText or not Misc.Slots.timeText.Parent then
+        Misc.ResolveSlotsRefs()
+    end
+    if Misc.Slots.timeText then
+        return Misc.Slots.timeText.Text
+    end
+    return nil
+end
+
+function Misc.CheckSlotTime()
+    local timeText = Misc.GetSlotTime()
+    if timeText then
+        Shared.Notify("Slot Time", "Time left: " .. tostring(timeText), 3)
+    else
+        Shared.Notify("Slot Time", "Slot machine not found on this server!", 3)
+    end
+end
+
+function Misc.TeleportToSlots()
+    local root = Shared.GetRoot(Shared.LocalPlayer)
+    if root then
+        root.CFrame = CFrame.new(Misc.Slots.teleportPosition)
+        Shared.Notify("Teleport", "Teleported to the Slots machine", 2)
+    end
+end
+
+function Misc.ToggleAutoSpinSlots(state)
+    Misc.Slots.enabled = state
+    if state then
+        Misc.ResolveSlotsRefs()
+        Misc.Slots.thread = task.spawn(function()
+            while Misc.Slots.enabled do
+                task.wait(1)
+                pcall(function()
+                    local root = Shared.GetRoot(Shared.LocalPlayer)
+                    if not root then
+                        return
+                    end
+                    local timeText = Misc.GetSlotTime()
+                    if timeText == "0:00" and Misc.Slots.slotHandle then
+                        local savedCF = root.CFrame
+                        root.CFrame = CFrame.new(Misc.Slots.teleportPosition)
+                        task.wait(1)
+                        Shared.SetNetworkOwner(Misc.Slots.slotHandle, CFrame.new(Misc.Slots.teleportPosition))
+                        task.wait(1)
+                        if root and root.Parent then
+                            root.CFrame = savedCF
+                        end
+                    end
+                end)
+            end
+        end)
+        Shared.Notify("Slots", "Auto Spin Slots Enabled - spinning when timer hits 0:00", 3)
+        Shared.PlayEnableSound()
+    else
+        if Misc.Slots.thread then
+            task.cancel(Misc.Slots.thread)
+            Misc.Slots.thread = nil
+        end
+        Shared.Notify("Slots", "Auto Spin Slots Disabled", 2)
+    end
+end
+
 return Misc

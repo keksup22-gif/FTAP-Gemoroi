@@ -209,6 +209,7 @@ function Player.ToggleThirdPerson(state, distance)
 
     if state then
         pcall(function()
+            Shared.LocalPlayer.CameraMode = Enum.CameraMode.Classic
             Shared.LocalPlayer.CameraMinZoomDistance = Player.ThirdPerson.distance
             Shared.LocalPlayer.CameraMaxZoomDistance = Player.ThirdPerson.distance
             Shared.LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
@@ -216,22 +217,26 @@ function Player.ToggleThirdPerson(state, distance)
         if Player.ThirdPerson.connection then Player.ThirdPerson.connection:Disconnect() end
         Player.ThirdPerson.connection = Shared.RunService.RenderStepped:Connect(function()
             if Player.ThirdPerson.enabled then
-                Shared.LocalPlayer.CameraMinZoomDistance = Player.ThirdPerson.distance
-                Shared.LocalPlayer.CameraMaxZoomDistance = Player.ThirdPerson.distance
+                pcall(function()
+                    Shared.LocalPlayer.CameraMode = Enum.CameraMode.Classic
+                    Shared.LocalPlayer.CameraMinZoomDistance = Player.ThirdPerson.distance
+                    Shared.LocalPlayer.CameraMaxZoomDistance = Player.ThirdPerson.distance
+                end)
             end
         end)
-        Shared.Notify("3rd Person", "3rd Person View Enabled (" .. tostring(Player.ThirdPerson.distance) .. " studs)", 2)
+        Shared.Notify("3rd Person Fix", "3rd Person View Enabled - enforced via RenderStepped (" .. tostring(Player.ThirdPerson.distance) .. " studs)", 2)
     else
         if Player.ThirdPerson.connection then
             Player.ThirdPerson.connection:Disconnect()
             Player.ThirdPerson.connection = nil
         end
         pcall(function()
+            Shared.LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
             Shared.LocalPlayer.CameraMinZoomDistance = 0.5
-            Shared.LocalPlayer.CameraMaxZoomDistance = 400
+            Shared.LocalPlayer.CameraMaxZoomDistance = 0.5
             Shared.LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Zoom
         end)
-        Shared.Notify("3rd Person", "3rd Person View Disabled", 2)
+        Shared.Notify("3rd Person Fix", "3rd Person View Disabled - first person restored", 2)
     end
 end
 

@@ -1,6 +1,7 @@
 --[[
     Project: FTAP-Gemoroi
-    Core Script (ftap_core.luau) - Fully functional with operational ESP, Auras, Physics, and Fluent UI bindings
+    Core Script (ftap_core.luau) - Fully functional with operational ESP, Auras, Physics, and GemoroiUI (Lime Dark) bindings
+    v3.5 - GemoroiUI Lime Dark, Third Person Fix, PCLD BoxHandleAdornments, Profile ESP, Soap Textures FPS Boost, Auto Spin Slots
 ]]
 
 local Players = game:GetService("Players")
@@ -33,14 +34,14 @@ local S = {
     HttpService = HttpService
 }
 
-local success_fluent, Fluent = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
+local success_ui, GemoroiUI = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/GemoroiUI.luau"))()
 end)
 
 local function Notify(title, content, duration)
     pcall(function()
-        if Fluent and typeof(Fluent.Notify) == "function" then
-            Fluent:Notify({
+        if GemoroiUI and typeof(GemoroiUI.Notify) == "function" then
+            GemoroiUI:Notify({
                 Title = tostring(title or "FTAP-Gemoroi"),
                 Content = tostring(content or ""),
                 Duration = duration or 3
@@ -733,20 +734,25 @@ local function MakeAntiKick(model, player)
     end)
 end
 
-if not Fluent then
-    warn("[FTAP-Gemoroi] Failed to load local Fluent.luau library.")
+if not GemoroiUI then
+    warn("[FTAP-Gemoroi] Failed to load GemoroiUI (Lime Dark) library.")
     return
 end
 
-local Window = Fluent:CreateWindow({
-    Title = "FTAP - Gemoroi v2.5 (Fully Operational)",
-    SubTitle = "by keksup22",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
+local Window = GemoroiUI:CreateWindow({
+    Title = "FTAP - Gemoroi v3.5 (Lime Dark Edition)",
+    SubTitle = "by keksup22 - GemoroiUI",
+    TabWidth = 170,
+    Size = UDim2.fromOffset(620, 480),
     Acrylic = true,
-    Theme = "Dark",
+    Theme = "Lime Dark",
     MinimizeKey = Enum.KeyCode.RightControl
 })
+
+if not Window then
+    warn("[FTAP-Gemoroi] GemoroiUI failed to create the window.")
+    return
+end
 
 local Tabs = {
     Combat = Window:AddTab({ Title = "Combat", Icon = "sword" }),
@@ -800,7 +806,14 @@ local Config = {
     FlingPower = 1,
     AnchorGrabEnabled = false,
     ModelHighlightEnabled = false,
-    ModelBillboardEnabled = false
+    ModelBillboardEnabled = false,
+
+    -- GemoroiUI v3.5 features
+    ThirdPersonFix = false,
+    ThirdPersonDistance = 8,
+    PCLD_BoxesEnabled = false,
+    PCLD_BoxColor = Color3.fromRGB(163, 230, 53),
+    ProfileESPEnabled = false
 }
 
 -- Safe FOV Circle
@@ -962,10 +975,10 @@ local function flingClosestTarget()
             pcall(function()
                 flingForces[power](root)
             end)
-            Fluent:Notify({ Title = "Fling", Content = "Flinged " .. closest.Name .. " (Power " .. power .. ")", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Fling", Content = "Flinged " .. closest.Name .. " (Power " .. power .. ")", Duration = 2 })
         end
     else
-        Fluent:Notify({ Title = "Fling", Content = "No player nearby to fling!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Fling", Content = "No player nearby to fling!", Duration = 2 })
     end
 end
 
@@ -1138,6 +1151,477 @@ local function updateModelBillboards(state)
     end)
 end
 
+
+-- ============================================================================
+-- GemoroiUI v3.5 FEATURES: Third Person Fix, PCLD BoxHandleAdornments,
+-- Profile ESP (Avatars), Soap Textures FPS Boost, Auto Spin Slots
+-- ============================================================================
+
+-- === THIRD PERSON VIEW FIX (RenderStepped) ===
+-- The game force-locks the camera to first person. This re-enforces Classic
+-- camera mode + zoom distances on every RenderStepped frame so it stays unlocked.
+local function setThirdPersonFix(state)
+    Config.ThirdPersonFix = state
+    pcall(function()
+        if state then
+            LocalPlayer.CameraMode = Enum.CameraMode.Classic
+            LocalPlayer.CameraMinZoomDistance = 0.5
+            LocalPlayer.CameraMaxZoomDistance = Config.ThirdPersonDistance
+            Notify("3rd Person Fix", "Enabled - camera unlocked every frame (" .. tostring(Config.ThirdPersonDistance) .. " studs)", 3)
+        else
+            LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+            LocalPlayer.CameraMinZoomDistance = 0.5
+            LocalPlayer.CameraMaxZoomDistance = 0.5
+            Notify("3rd Person Fix", "Disabled - first person restored", 2)
+        end
+    end)
+end
+
+-- === PCLD BOXHANDLEADORNMENTS ===
+-- Draws lime 3D boxes on the hidden physics hitboxes ("partesp" /
+-- "playercharacterlocationdetector") using BoxHandleAdornment.
+local pcldBoxAdornments = {}
+local pcldBoxWatchers = {}
+
+local function isPCLDPart(obj)
+    return obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector")
+end
+
+local function addPCLDBox(obj)
+    if pcldBoxAdornments[obj] then
+        return
+    end
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "PCLD_BoxAdornment"
+    box.Adornee = obj
+    box.AlwaysOnTop = true
+    box.ZIndex = 5
+    box.Color3 = Config.PCLD_BoxColor
+    box.Transparency = 0.3
+    box.Size = obj.Size
+    box.Parent = CoreGui
+    pcldBoxAdornments[obj] = box
+
+    local conn = obj.AncestryChanged:Connect(function(_, parent)
+        if not parent and pcldBoxAdornments[obj] then
+            pcall(function() pcldBoxAdornments[obj]:Destroy() end)
+            pcldBoxAdornments[obj] = nil
+        end
+    end)
+    table.insert(pcldBoxWatchers, conn)
+end
+
+local function updatePCLDBoxes()
+    if not Config.PCLD_BoxesEnabled then
+        for _, box in pairs(pcldBoxAdornments) do
+            if box then
+                pcall(function() box:Destroy() end)
+            end
+        end
+        pcldBoxAdornments = {}
+        for _, c in ipairs(pcldBoxWatchers) do
+            pcall(function() c:Disconnect() end)
+        end
+        pcldBoxWatchers = {}
+        return
+    end
+
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if isPCLDPart(obj) and obj.Parent then
+            addPCLDBox(obj)
+        end
+    end
+
+    for obj, box in pairs(pcldBoxAdornments) do
+        if not box or not box.Parent or not obj or not obj.Parent then
+            if box then
+                pcall(function() box:Destroy() end)
+            end
+            pcldBoxAdornments[obj] = nil
+        end
+    end
+end
+
+local pcldBoxLoop = nil
+
+local function setPCLDBoxes(state)
+    Config.PCLD_BoxesEnabled = state
+    if state then
+        pcall(updatePCLDBoxes)
+        pcldBoxLoop = task.spawn(function()
+            while Config.PCLD_BoxesEnabled do
+                task.wait(0.5)
+                pcall(updatePCLDBoxes)
+            end
+        end)
+        Notify("PCLD Boxes", "BoxHandleAdornments Enabled (boxes on hidden hitboxes)", 2)
+    else
+        if pcldBoxLoop then
+            task.cancel(pcldBoxLoop)
+            pcldBoxLoop = nil
+        end
+        pcall(updatePCLDBoxes)
+        Notify("PCLD Boxes", "Disabled", 2)
+    end
+end
+
+-- === PROFILE ESP (AVATARS ABOVE HEAD) ===
+-- Shows the player's real avatar thumbnail, display name, @username and a
+-- health bar floating above their head.
+local profileESP = { records = {}, loop = nil, thumbCache = {} }
+
+local function getProfileThumb(player)
+    local cached = profileESP.thumbCache[player.UserId]
+    if cached then
+        if cached.content then
+            return cached.content
+        end
+        if cached.retryAt and tick() < cached.retryAt then
+            return nil
+        end
+    end
+    local ok, content = pcall(function()
+        return Players:GetUserThumbnailAsync(
+            player.UserId,
+            Enum.ThumbnailType.HeadShot,
+            Enum.ThumbnailSize.Size420x420
+        )
+    end)
+    if ok and type(content) == "string" and content ~= "" then
+        profileESP.thumbCache[player.UserId] = { content = content }
+        return content
+    end
+    -- retry a failed fetch at most once every 15 seconds
+    profileESP.thumbCache[player.UserId] = { retryAt = tick() + 15 }
+    return nil
+end
+
+local function createProfileBillboard(player)
+    task.spawn(function()
+        if not Config.ProfileESPEnabled then
+            return
+        end
+        if profileESP.records[player] then
+            return
+        end
+        local char = player.Character
+        if not char then
+            return
+        end
+        local head = char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart")
+        if not head then
+            return
+        end
+
+        local bb = Instance.new("BillboardGui")
+        bb.Name = "Gemoroi_ProfileESP"
+        bb.Adornee = head
+        bb.Size = UDim2.new(0, 64, 0, 84)
+        bb.StudsOffset = Vector3.new(0, 2.8, 0)
+        bb.AlwaysOnTop = true
+        bb.MaxDistance = 1500
+        bb.Parent = CoreGui
+
+        local avatar = Instance.new("ImageLabel")
+        avatar.Name = "Avatar"
+        avatar.AnchorPoint = Vector2.new(0.5, 0)
+        avatar.Position = UDim2.new(0.5, 0, 0, 0)
+        avatar.Size = UDim2.new(0, 52, 0, 52)
+        avatar.BackgroundColor3 = Color3.fromRGB(16, 20, 17)
+        avatar.BorderSizePixel = 0
+        avatar.ScaleType = Enum.ScaleType.Crop
+        avatar.Image = ""
+        avatar.Parent = bb
+        local avCorner = Instance.new("UICorner")
+        avCorner.CornerRadius = UDim.new(0, 26)
+        avCorner.Parent = avatar
+        local avStroke = Instance.new("UIStroke")
+        avStroke.Color = Config.PCLD_BoxColor
+        avStroke.Thickness = 1.5
+        avStroke.Parent = avatar
+
+        local thumb = getProfileThumb(player)
+        if thumb then
+            avatar.Image = thumb
+        end
+
+        local displayName = Instance.new("TextLabel")
+        displayName.Name = "DisplayName"
+        displayName.AnchorPoint = Vector2.new(0.5, 0)
+        displayName.Position = UDim2.new(0.5, 0, 0, 54)
+        displayName.Size = UDim2.new(0, 120, 0, 13)
+        displayName.BackgroundTransparency = 1
+        displayName.Font = Enum.Font.GothamBold
+        displayName.TextSize = 12
+        displayName.TextColor3 = Color3.fromRGB(233, 240, 234)
+        displayName.TextStrokeTransparency = 0.4
+        displayName.TextTruncate = Enum.TextTruncate.AtEnd
+        displayName.Text = player.DisplayName or player.Name
+        displayName.Parent = bb
+
+        local userName = Instance.new("TextLabel")
+        userName.Name = "UserName"
+        userName.AnchorPoint = Vector2.new(0.5, 0)
+        userName.Position = UDim2.new(0.5, 0, 0, 67)
+        userName.Size = UDim2.new(0, 120, 0, 11)
+        userName.BackgroundTransparency = 1
+        userName.Font = Enum.Font.Gotham
+        userName.TextSize = 10
+        userName.TextColor3 = Color3.fromRGB(139, 153, 143)
+        userName.TextStrokeTransparency = 0.4
+        userName.TextTruncate = Enum.TextTruncate.AtEnd
+        userName.Text = "@" .. player.Name
+        userName.Parent = bb
+
+        local hpBg = Instance.new("Frame")
+        hpBg.Name = "HealthBg"
+        hpBg.AnchorPoint = Vector2.new(0.5, 0)
+        hpBg.Position = UDim2.new(0.5, 0, 0, 80)
+        hpBg.Size = UDim2.new(0, 52, 0, 4)
+        hpBg.BackgroundColor3 = Color3.fromRGB(11, 14, 12)
+        hpBg.BackgroundTransparency = 0.25
+        hpBg.BorderSizePixel = 0
+        hpBg.Parent = bb
+        local hpCorner = Instance.new("UICorner")
+        hpCorner.CornerRadius = UDim.new(0, 2)
+        hpCorner.Parent = hpBg
+
+        local hpFill = Instance.new("Frame")
+        hpFill.Name = "HealthFill"
+        hpFill.Size = UDim2.new(1, 0, 1, 0)
+        hpFill.BackgroundColor3 = Color3.fromRGB(163, 230, 53)
+        hpFill.BorderSizePixel = 0
+        hpFill.Parent = hpBg
+        local hpFillCorner = Instance.new("UICorner")
+        hpFillCorner.CornerRadius = UDim.new(0, 2)
+        hpFillCorner.Parent = hpFill
+
+        profileESP.records[player] = { gui = bb, fill = hpFill }
+    end)
+end
+
+local function updateProfileESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and not profileESP.records[player] and player.Character then
+            createProfileBillboard(player)
+        end
+    end
+    for player, record in pairs(profileESP.records) do
+        if not player.Parent or not record.gui or not record.gui.Parent then
+            if record.gui then
+                pcall(function() record.gui:Destroy() end)
+            end
+            profileESP.records[player] = nil
+        else
+            local char = player.Character
+            local head = char and (char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart"))
+            if head and record.gui.Adornee ~= head then
+                record.gui.Adornee = head
+            end
+            if not record.gui.Avatar.Image or record.gui.Avatar.Image == "" then
+                local thumb = getProfileThumb(player)
+                if thumb then
+                    record.gui.Avatar.Image = thumb
+                end
+            end
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum and record.fill then
+                local pct = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+                record.fill.Size = UDim2.new(pct, 0, 1, 0)
+                record.fill.BackgroundColor3 = Color3.fromRGB(
+                    math.floor(255 * (1 - pct)),
+                    math.floor(230 * pct),
+                    53
+                )
+            end
+        end
+    end
+end
+
+local function setProfileESP(state)
+    Config.ProfileESPEnabled = state
+    if state then
+        profileESP.loop = task.spawn(function()
+            while Config.ProfileESPEnabled do
+                pcall(updateProfileESP)
+                task.wait(0.5)
+            end
+        end)
+        pcall(updateProfileESP)
+        Notify("Profile ESP", "Enabled - avatars above heads", 2)
+    else
+        if profileESP.loop then
+            task.cancel(profileESP.loop)
+            profileESP.loop = nil
+        end
+        for _, record in pairs(profileESP.records) do
+            if record.gui then
+                pcall(function() record.gui:Destroy() end)
+            end
+        end
+        profileESP.records = {}
+        Notify("Profile ESP", "Disabled", 2)
+    end
+end
+
+-- === SOAP TEXTURES (FPS BOOST) ===
+-- Turns every part into smooth plastic ("soap") and hides all decals /
+-- textures. Originals are remembered and fully restored when disabled.
+local Soap = { enabled = false, saved = setmetatable({}, { __mode = "k" }), connection = nil }
+
+local function soapifyObject(obj)
+    if obj:IsA("BasePart") then
+        if not Soap.saved[obj] then
+            Soap.saved[obj] = { Material = obj.Material, Color = obj.Color }
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Color = Color3.new(obj.Color.R * 0.75, obj.Color.G * 0.75, obj.Color.B * 0.75)
+        end
+    elseif obj:IsA("Texture") or obj:IsA("Decal") then
+        if not Soap.saved[obj] then
+            Soap.saved[obj] = { Transparency = obj.Transparency }
+            obj.Transparency = 1
+        end
+    end
+end
+
+local function setSoapTextures(state)
+    Soap.enabled = state
+    if state then
+        Notify("Optimization", "Applying Soap Textures...", 2)
+        task.spawn(function()
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                soapifyObject(obj)
+            end
+            Notify("Optimization", "Soap Textures Applied! Everything is soap now", 2)
+        end)
+        Soap.connection = Workspace.DescendantAdded:Connect(function(obj)
+            task.defer(function()
+                if Soap.enabled then
+                    pcall(function() soapifyObject(obj) end)
+                end
+            end)
+        end)
+    else
+        if Soap.connection then
+            Soap.connection:Disconnect()
+            Soap.connection = nil
+        end
+        Notify("Optimization", "Restoring original textures...", 2)
+        task.spawn(function()
+            for obj, orig in pairs(Soap.saved) do
+                pcall(function()
+                    if obj and obj.Parent then
+                        if orig.Material then
+                            obj.Material = orig.Material
+                            obj.Color = orig.Color
+                        end
+                        if orig.Transparency then
+                            obj.Transparency = orig.Transparency
+                        end
+                    end
+                end)
+            end
+            Soap.saved = setmetatable({}, { __mode = "k" })
+            Notify("Optimization", "Original textures restored!", 2)
+        end)
+    end
+end
+
+-- === AUTO SPIN SLOTS ===
+-- Auto-spins the slot machine whenever its timer hits 0:00 (XOCU method):
+-- teleport to the handle, take network ownership, spin it, teleport back.
+local SlotsFarm = {
+    enabled = false,
+    thread = nil,
+    slotHandle = nil,
+    timeText = nil,
+    teleportPosition = Vector3.new(-224.941177, 91.364975, 425.75116)
+}
+
+local function resolveSlotsRefs()
+    pcall(function()
+        local slotsFolder = Workspace:FindFirstChild("Slots")
+        local slotsModel = slotsFolder and slotsFolder:FindFirstChild("Slots")
+        if not slotsModel then
+            return
+        end
+        local handleModel = slotsModel:FindFirstChild("SlotHandle")
+        SlotsFarm.slotHandle = handleModel and handleModel:FindFirstChild("Handle")
+        local screen = slotsModel:FindFirstChild("Screen")
+        local slotGui = screen and screen:FindFirstChild("SlotGui")
+        local timeFrame = slotGui and slotGui:FindFirstChild("TimeLeftFrame")
+        SlotsFarm.timeText = timeFrame and timeFrame:FindFirstChild("TimeText")
+    end)
+end
+
+local function getSlotTimeText()
+    if not SlotsFarm.timeText or not SlotsFarm.timeText.Parent then
+        resolveSlotsRefs()
+    end
+    if SlotsFarm.timeText then
+        return SlotsFarm.timeText.Text
+    end
+    return nil
+end
+
+local function checkSlotTime()
+    local timeText = getSlotTimeText()
+    if timeText then
+        Notify("Slot Time", "Time left: " .. tostring(timeText), 3)
+    else
+        Notify("Slot Time", "Slot machine not found on this server!", 3)
+    end
+end
+
+local function teleportToSlots()
+    local root = getRoot(LocalPlayer)
+    if root then
+        root.CFrame = CFrame.new(SlotsFarm.teleportPosition)
+        Notify("Teleport", "Teleported to the Slots machine", 2)
+    end
+end
+
+local function setAutoSpinSlots(state)
+    SlotsFarm.enabled = state
+    if state then
+        resolveSlotsRefs()
+        SlotsFarm.thread = task.spawn(function()
+            while SlotsFarm.enabled do
+                task.wait(1)
+                pcall(function()
+                    local root = getRoot(LocalPlayer)
+                    if not root then
+                        return
+                    end
+                    local timeText = getSlotTimeText()
+                    if timeText == "0:00" and SlotsFarm.slotHandle then
+                        local savedCF = root.CFrame
+                        root.CFrame = CFrame.new(SlotsFarm.teleportPosition)
+                        task.wait(1)
+                        local remote = S.ReplicatedStorage:FindFirstChild("GrabEvents")
+                        remote = remote and remote:FindFirstChild("SetNetworkOwner")
+                        if remote then
+                            remote:FireServer(SlotsFarm.slotHandle, CFrame.new(SlotsFarm.teleportPosition))
+                        end
+                        task.wait(1)
+                        if root and root.Parent then
+                            root.CFrame = savedCF
+                        end
+                    end
+                end)
+            end
+        end)
+        Notify("Slots", "Auto Spin Slots Enabled - spinning when timer hits 0:00", 3)
+        PlayEnableSound()
+    else
+        if SlotsFarm.thread then
+            task.cancel(SlotsFarm.thread)
+            SlotsFarm.thread = nil
+        end
+        Notify("Slots", "Auto Spin Slots Disabled", 2)
+    end
+end
+
 -- === COMBAT TAB ===
 Tabs.Combat:AddSection("Silent Aim & Targeting")
 
@@ -1243,6 +1727,31 @@ Tabs.Player:AddToggle("NoclipToggle", {
     end
 })
 
+-- === PLAYER TAB: THIRD PERSON FIX ===
+Tabs.Player:AddToggle("ThirdPersonFixToggle", {
+    Title = "Third Person View Fix (RenderStepped)",
+    Description = "Unlocks the forced first-person camera every frame",
+    Default = false,
+    Callback = function(Value)
+        setThirdPersonFix(Value)
+    end
+})
+
+Tabs.Player:AddSlider("ThirdPersonDistanceSlider", {
+    Title = "Third Person Camera Distance",
+    Default = 8,
+    Min = 2,
+    Max = 30,
+    Rounding = 0,
+    Suffix = " studs",
+    Callback = function(Value)
+        Config.ThirdPersonDistance = Value
+        if Config.ThirdPersonFix then
+            LocalPlayer.CameraMaxZoomDistance = Value
+        end
+    end
+})
+
 -- === VISUALS TAB ===
 Tabs.Visuals:AddSection("ESP & Shaders")
 
@@ -1264,7 +1773,7 @@ Tabs.Visuals:AddButton({
             Lighting.GlobalShadows = false
             Lighting.FogEnd = 999999
         end)
-        Fluent:Notify({ Title = "Visuals", Content = "Fullbright applied!", Duration = 3 })
+        GemoroiUI:Notify({ Title = "Visuals", Content = "Fullbright applied!", Duration = 3 })
     end
 })
 
@@ -1276,12 +1785,55 @@ Tabs.Visuals:AddToggle("PCLDESPToggle", {
     end
 })
 
+-- === VISUALS TAB: GEMOROI VISUALS & OPTIMIZATION ===
+Tabs.Visuals:AddSection("Gemoroi Visuals & Optimization")
+
+Tabs.Visuals:AddToggle("PCLDBoxESPToggle", {
+    Title = "PCLD Box ESP (BoxHandleAdornments)",
+    Description = "Draws 3D boxes on hidden physics hitboxes",
+    Default = false,
+    Callback = function(Value)
+        setPCLDBoxes(Value)
+    end
+})
+
+Tabs.Visuals:AddColorpicker("PCLDBoxColorPicker", {
+    Title = "PCLD Box Color",
+    Default = Color3.fromRGB(163, 230, 53),
+    Callback = function(Value)
+        Config.PCLD_BoxColor = Value
+        for _, box in pairs(pcldBoxAdornments) do
+            if box then
+                box.Color3 = Value
+            end
+        end
+    end
+})
+
+Tabs.Visuals:AddToggle("ProfileESPToggle", {
+    Title = "Profile ESP (Avatars Above Head)",
+    Description = "Shows player avatars, names and health above heads",
+    Default = false,
+    Callback = function(Value)
+        setProfileESP(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("SoapTexturesToggle", {
+    Title = "Soap Textures (FPS Boost)",
+    Description = "Smooth-plastic everything + hides decals & textures",
+    Default = false,
+    Callback = function(Value)
+        setSoapTextures(Value)
+    end
+})
+
 Tabs.Visuals:AddToggle("ModelHighlightToggle", {
     Title = "Enable Workspace Model Highlights",
     Default = false,
     Callback = function(Value)
         updateModelHighlights(Value)
-        Fluent:Notify({ Title = "Visuals", Content = Value and "Model Highlights Enabled" or "Model Highlights Disabled", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Visuals", Content = Value and "Model Highlights Enabled" or "Model Highlights Disabled", Duration = 2 })
     end
 })
 
@@ -1290,7 +1842,7 @@ Tabs.Visuals:AddToggle("ModelBillboardToggle", {
     Default = false,
     Callback = function(Value)
         updateModelBillboards(Value)
-        Fluent:Notify({ Title = "Visuals", Content = Value and "Model BillboardGui Enabled" or "Model BillboardGui Disabled", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Visuals", Content = Value and "Model BillboardGui Enabled" or "Model BillboardGui Disabled", Duration = 2 })
     end
 })
 
@@ -1685,7 +2237,7 @@ Tabs.Mass:AddButton({
                 end
             end
         end
-        Fluent:Notify({ Title = "Mass Action", Content = "Kill All executed!", Duration = 3 })
+        GemoroiUI:Notify({ Title = "Mass Action", Content = "Kill All executed!", Duration = 3 })
     end
 })
 
@@ -1704,7 +2256,7 @@ Tabs.Mass:AddButton({
     Callback = function()
         refreshPlayers()
         killDropdown:SetValues(playerNames)
-        Fluent:Notify({ Title = "Refreshed", Content = "Player list updated", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Refreshed", Content = "Player list updated", Duration = 2 })
     end
 })
 
@@ -1712,15 +2264,15 @@ Tabs.Mass:AddButton({
     Title = "Kill Selected Player",
     Callback = function()
         if not Config.KillTarget then
-            Fluent:Notify({ Title = "Error", Content = "No player selected!", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Error", Content = "No player selected!", Duration = 2 })
             return
         end
         local humanoid = getHumanoid(Config.KillTarget)
         if humanoid then
             humanoid.Health = 0
-            Fluent:Notify({ Title = "Success", Content = "Killed " .. Config.KillTarget.Name, Duration = 2 })
+            GemoroiUI:Notify({ Title = "Success", Content = "Killed " .. Config.KillTarget.Name, Duration = 2 })
         else
-            Fluent:Notify({ Title = "Error", Content = "Target character not found", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Error", Content = "Target character not found", Duration = 2 })
         end
     end
 })
@@ -1769,7 +2321,7 @@ Tabs.Protection:AddToggle("AnchorGrabToggle", {
     Default = false,
     Callback = function(Value)
         Config.AnchorGrabEnabled = Value
-        Fluent:Notify({ Title = "Anchor Grab", Content = Value and "Enabled (Dropped items freeze in mid-air)" or "Disabled", Duration = 3 })
+        GemoroiUI:Notify({ Title = "Anchor Grab", Content = Value and "Enabled (Dropped items freeze in mid-air)" or "Disabled", Duration = 3 })
     end
 })
 
@@ -1804,7 +2356,7 @@ Tabs.Protection:AddToggle("AntiGucciToggle", {
                     local seat = blob and blob:FindFirstChild("VehicleSeat")
                     if seat and seat:IsA("VehicleSeat") then
                         seat:Sit(hum)
-                        Fluent:Notify({ Title = "Anti-Gucci", Content = "Protected inside Blobman seat!", Duration = 3 })
+                        GemoroiUI:Notify({ Title = "Anti-Gucci", Content = "Protected inside Blobman seat!", Duration = 3 })
                     end
                 end)
             end)
@@ -1836,7 +2388,7 @@ Tabs.Protection:AddButton({
                 humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
                 humanoid.Sit = false
             end)
-            Fluent:Notify({ Title = "Protection", Content = "Ragdoll cleared", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Protection", Content = "Ragdoll cleared", Duration = 2 })
         end
     end
 })
@@ -1847,7 +2399,7 @@ Tabs.Protection:AddButton({
         pcall(function()
             Workspace.FallenPartsDestroyHeight = -50000
         end)
-        Fluent:Notify({ Title = "Protection", Content = "Void height extended", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Protection", Content = "Void height extended", Duration = 2 })
     end
 })
 
@@ -1925,7 +2477,7 @@ for _, house in ipairs(houseTeleports) do
             local root = getRoot(LocalPlayer)
             if root then
                 root.CFrame = house[2]
-                Fluent:Notify({ Title = "Teleport", Content = "Teleported to " .. house[1], Duration = 2 })
+                GemoroiUI:Notify({ Title = "Teleport", Content = "Teleported to " .. house[1], Duration = 2 })
             end
         end
     })
@@ -1967,6 +2519,15 @@ RunService.RenderStepped:Connect(function()
                 part.CanCollide = false
             end
         end
+    end
+
+    -- Third Person View Fix enforcement (game resets the camera every frame)
+    if Config.ThirdPersonFix then
+        pcall(function()
+            LocalPlayer.CameraMode = Enum.CameraMode.Classic
+            LocalPlayer.CameraMinZoomDistance = 0.5
+            LocalPlayer.CameraMaxZoomDistance = Config.ThirdPersonDistance
+        end)
     end
 
     -- ESP highlights update
@@ -2206,7 +2767,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Warm Sunshine",
     Callback = function()
         ApplyShader({CC={Brightness=0.25,Contrast=0.1,Saturation=0.3,TintColor=Color3.fromRGB(255,245,220)},SunRays=0.35,L={Brightness=2.5,FogEnd=2000,Ambient=Color3.fromRGB(255,240,200),OutdoorAmbient=Color3.fromRGB(255,230,180),ClockTime=12}})
-        Fluent:Notify({ Title = "Shaders", Content = "Warm Sunshine applied!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Warm Sunshine applied!", Duration = 2 })
     end
 })
 
@@ -2214,7 +2775,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Sakura Dream",
     Callback = function()
         ApplyShader({CC={Brightness=0.2,Contrast=0.05,Saturation=0.2,TintColor=Color3.fromRGB(255,225,235)},SunRays=0.25,L={Brightness=2.3,FogEnd=1500,Ambient=Color3.fromRGB(255,215,230),OutdoorAmbient=Color3.fromRGB(255,200,220),ClockTime=8}})
-        Fluent:Notify({ Title = "Shaders", Content = "Sakura Dream applied!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Sakura Dream applied!", Duration = 2 })
     end
 })
 
@@ -2222,7 +2783,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Clear Sky",
     Callback = function()
         ApplyShader({CC={Brightness=0.15,Contrast=0.1,Saturation=0.15,TintColor=Color3.fromRGB(220,235,255)},SunRays=0.3,L={Brightness=2.8,FogEnd=5000,Ambient=Color3.fromRGB(200,220,250),OutdoorAmbient=Color3.fromRGB(180,200,240),ClockTime=11}})
-        Fluent:Notify({ Title = "Shaders", Content = "Clear Sky applied!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Clear Sky applied!", Duration = 2 })
     end
 })
 
@@ -2230,7 +2791,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Mint Fresh",
     Callback = function()
         ApplyShader({CC={Brightness=0.2,Contrast=0.08,Saturation=0.1,TintColor=Color3.fromRGB(200,240,220)},SunRays=0.2,L={Brightness=2.4,FogEnd=2000,Ambient=Color3.fromRGB(190,230,210),OutdoorAmbient=Color3.fromRGB(170,210,190),ClockTime=10}})
-        Fluent:Notify({ Title = "Shaders", Content = "Mint Fresh applied!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Mint Fresh applied!", Duration = 2 })
     end
 })
 
@@ -2238,7 +2799,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Peach Smooth",
     Callback = function()
         ApplyShader({CC={Brightness=0.2,Contrast=0.05,Saturation=0.25,TintColor=Color3.fromRGB(255,220,200)},SunRays=0.3,L={Brightness=2.5,FogEnd=1800,Ambient=Color3.fromRGB(255,210,190),OutdoorAmbient=Color3.fromRGB(255,195,175),ClockTime=16}})
-        Fluent:Notify({ Title = "Shaders", Content = "Peach Smooth applied!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Peach Smooth applied!", Duration = 2 })
     end
 })
 
@@ -2246,7 +2807,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Ocean Breeze",
     Callback = function()
         ApplyShader({CC={Brightness=0.15,Contrast=0.1,Saturation=0.1,TintColor=Color3.fromRGB(180,215,240)},Blur=0.3,L={Brightness=2.2,FogEnd=1200,Ambient=Color3.fromRGB(170,210,240),OutdoorAmbient=Color3.fromRGB(150,190,230),ClockTime=13}})
-        Fluent:Notify({ Title = "Shaders", Content = "Ocean Breeze applied!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Ocean Breeze applied!", Duration = 2 })
     end
 })
 
@@ -2254,7 +2815,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Golden Hour",
     Callback = function()
         ApplyShader({CC={Brightness=0.2,Contrast=0.1,Saturation=0.3,TintColor=Color3.fromRGB(255,235,200)},SunRays=0.4,L={Brightness=2.6,FogEnd=2000,Ambient=Color3.fromRGB(255,225,180),OutdoorAmbient=Color3.fromRGB(255,210,160),ClockTime=17}})
-        Fluent:Notify({ Title = "Shaders", Content = "Golden Hour applied!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Golden Hour applied!", Duration = 2 })
     end
 })
 
@@ -2262,7 +2823,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Frost Morning",
     Callback = function()
         ApplyShader({CC={Brightness=0.3,Contrast=0.05,Saturation=-0.2,TintColor=Color3.fromRGB(220,230,255)},Blur=0.5,L={Brightness=3,FogEnd=1000,Ambient=Color3.fromRGB(220,225,250),OutdoorAmbient=Color3.fromRGB(200,210,240),ClockTime=7}})
-        Fluent:Notify({ Title = "Shaders", Content = "Frost Morning applied!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Frost Morning applied!", Duration = 2 })
     end
 })
 
@@ -2270,7 +2831,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Soft Sunset",
     Callback = function()
         ApplyShader({CC={Brightness=0.15,Contrast=0.08,Saturation=0.3,TintColor=Color3.fromRGB(255,210,190)},SunRays=0.5,L={Brightness=2,FogEnd=1500,Ambient=Color3.fromRGB(255,180,140),OutdoorAmbient=Color3.fromRGB(255,160,120),ClockTime=18.5}})
-        Fluent:Notify({ Title = "Shaders", Content = "Soft Sunset applied!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Soft Sunset applied!", Duration = 2 })
     end
 })
 
@@ -2278,7 +2839,7 @@ Tabs.Cosmetics:AddButton({
     Title = "Shader: Reset / Default",
     Callback = function()
         ClearShaders()
-        Fluent:Notify({ Title = "Shaders", Content = "Reset to default!", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Shaders", Content = "Reset to default!", Duration = 2 })
     end
 })
 
@@ -2463,7 +3024,7 @@ Tabs.Player:AddToggle("LoopTPToggle", {
                     end
                 end
             end)
-            Fluent:Notify({ Title = "Loop TP", Content = "Enabled - Looping to selected location", Duration = 3 })
+            GemoroiUI:Notify({ Title = "Loop TP", Content = "Enabled - Looping to selected location", Duration = 3 })
             PlayEnableSound()
         else
             TeleportCfg.loop.enabled = false
@@ -2471,7 +3032,7 @@ Tabs.Player:AddToggle("LoopTPToggle", {
                 task.cancel(TeleportCfg.loop.loopThread)
                 TeleportCfg.loop.loopThread = nil
             end
-            Fluent:Notify({ Title = "Loop TP", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Loop TP", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -2503,7 +3064,7 @@ Tabs.Player:AddButton({
             local root = char:FindFirstChild("HumanoidRootPart")
             if root and TeleportCfg.loop.target then
                 root.CFrame = TeleportCfg.loop.target
-                Fluent:Notify({ Title = "Teleport", Content = "Teleported to selected location", Duration = 2 })
+                GemoroiUI:Notify({ Title = "Teleport", Content = "Teleported to selected location", Duration = 2 })
                 PlayEnableSound()
             end
         end
@@ -2535,11 +3096,11 @@ Tabs.Player:AddToggle("EnableSpeedToggle", {
     Callback = function(state)
         if state then
             EnableSpeed()
-            Fluent:Notify({ Title = "Speed", Content = "Enabled - WalkSpeed: " .. SpeedCfg.value, Duration = 2 })
+            GemoroiUI:Notify({ Title = "Speed", Content = "Enabled - WalkSpeed: " .. SpeedCfg.value, Duration = 2 })
             PlayEnableSound()
         else
             DisableSpeed()
-            Fluent:Notify({ Title = "Speed", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Speed", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -2621,12 +3182,12 @@ Tabs.Defense:AddToggle("AntiGrabAmethystToggle", {
             antiGrab.conns.charAdded = LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
             antiGrab.conns.heldChanged = antiGrab.parts.IsHeld:GetPropertyChangedSignal("Value"):Connect(OnHeldChanged)
             OnHeldChanged()
-            Fluent:Notify({ Title = "Anti Grab", Content = "Enabled - Grab protection active", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Anti Grab", Content = "Enabled - Grab protection active", Duration = 2 })
             PlayEnableSound()
         else
             AntiGrabCfg.enabled = false
             AntiGrabCfg.antiGrabEnabled = false
-            Fluent:Notify({ Title = "Anti Grab", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Anti Grab", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -2637,7 +3198,7 @@ Tabs.Defense:AddDropdown("AntiKickStickItemDropdown", {
     Default = "NinjaShuriken",
     Callback = function(selected)
         AntiKickStickCfg.selectedItem = selected
-        Fluent:Notify({ Title = "Anti Kick", Content = "Selected: " .. selected, Duration = 2 })
+        GemoroiUI:Notify({ Title = "Anti Kick", Content = "Selected: " .. selected, Duration = 2 })
     end
 })
 
@@ -2647,7 +3208,7 @@ Tabs.Defense:AddToggle("AntiKickStickToggle", {
     Callback = function(state)
         if state then
             AntiKickStickCfg.enabled = true
-            Fluent:Notify({ Title = "Anti Kick", Content = "Enabled with " .. AntiKickStickCfg.selectedItem, Duration = 2 })
+            GemoroiUI:Notify({ Title = "Anti Kick", Content = "Enabled with " .. AntiKickStickCfg.selectedItem, Duration = 2 })
             PlayEnableSound()
             AntiKickStickCfg.loopThread = task.spawn(StartAntiKickStickLoop)
         else
@@ -2656,7 +3217,7 @@ Tabs.Defense:AddToggle("AntiKickStickToggle", {
                 task.cancel(AntiKickStickCfg.loopThread)
                 AntiKickStickCfg.loopThread = nil
             end
-            Fluent:Notify({ Title = "Anti Kick", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Anti Kick", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -2675,7 +3236,7 @@ Tabs.Defense:AddToggle("SafePosToggle", {
                 if root then SafePosCfg.target = root.CFrame end
             end
             if not SafePosCfg.target then
-                Fluent:Notify({ Title = "Safe Pos", Content = "Error: Could not save position!", Duration = 2 })
+                GemoroiUI:Notify({ Title = "Safe Pos", Content = "Error: Could not save position!", Duration = 2 })
                 return
             end
             SafePosCfg.loopThread = task.spawn(function()
@@ -2688,7 +3249,7 @@ Tabs.Defense:AddToggle("SafePosToggle", {
                     task.wait()
                 end
             end)
-            Fluent:Notify({ Title = "Safe Pos", Content = "Enabled - Position saved", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Safe Pos", Content = "Enabled - Position saved", Duration = 2 })
             PlayEnableSound()
         else
             SafePosCfg.enabled = false
@@ -2696,7 +3257,7 @@ Tabs.Defense:AddToggle("SafePosToggle", {
                 task.cancel(SafePosCfg.loopThread)
                 SafePosCfg.loopThread = nil
             end
-            Fluent:Notify({ Title = "Safe Pos", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Safe Pos", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -2832,7 +3393,7 @@ Tabs.Defense:AddToggle("NoclipObjPlayersToggle", {
                     task.wait(2)
                 end
             end)
-            Fluent:Notify({ Title = "Noclip", Content = "Enabled - Noclip through players/items", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Noclip", Content = "Enabled - Noclip through players/items", Duration = 2 })
             PlayEnableSound()
         else
             NoclipCfg.enabled = false
@@ -2847,7 +3408,7 @@ Tabs.Defense:AddToggle("NoclipObjPlayersToggle", {
             end
             NoclipCfg.connections = {}
             NoclipCfg.parts = {}
-            Fluent:Notify({ Title = "Noclip", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Noclip", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -2866,12 +3427,12 @@ Tabs.Defense:AddButton({
             return
         end
         if not (char:FindFirstChild("Left Leg")) then
-            Fluent:Notify({ Title = "Delete Legs", Content = "Error: Missing body parts", Duration = 3 })
+            GemoroiUI:Notify({ Title = "Delete Legs", Content = "Error: Missing body parts", Duration = 3 })
             return
         end
         local torso = char:FindFirstChild("Torso")
         S.Workspace.FallenPartsDestroyHeight = -100
-        Fluent:Notify({ Title = "Delete Legs", Content = "Deleting legs...", Duration = 3 })
+        GemoroiUI:Notify({ Title = "Delete Legs", Content = "Deleting legs...", Duration = 3 })
         PlayEnableSound()
         ragdollRemote:FireServer(root, 2)
         task.wait(0.5)
@@ -2889,7 +3450,7 @@ Tabs.Defense:AddButton({
         task.wait(0.5)
         S.Workspace.FallenPartsDestroyHeight = S.Workspace.FallenPartsDestroyHeight
         if not char:FindFirstChild("Left Leg") and not char:FindFirstChild("Right Leg") then
-            Fluent:Notify({ Title = "Delete Legs", Content = "Legs successfully deleted!", Duration = 5 })
+            GemoroiUI:Notify({ Title = "Delete Legs", Content = "Legs successfully deleted!", Duration = 5 })
             PlayEnableSound()
             task.spawn(function()
                 while char.Parent do
@@ -2912,7 +3473,7 @@ Tabs.Defense:AddButton({
                 end
             end)
         else
-            Fluent:Notify({ Title = "Delete Legs", Content = "Warning: Legs not fully deleted", Duration = 3 })
+            GemoroiUI:Notify({ Title = "Delete Legs", Content = "Warning: Legs not fully deleted", Duration = 3 })
         end
     end
 })
@@ -3198,7 +3759,7 @@ targetDropdown = TargetTab:AddDropdown("TargetPlayerDropdown", {
         if player then
             AmethystFeatures.Selected.kickPlayer = player
             AmethystFeatures.Selected.currentPlayer = player
-            Fluent:Notify({ Title = "Target Selected", Content = "Target: " .. PlayerLabel(player), Duration = 2 })
+            GemoroiUI:Notify({ Title = "Target Selected", Content = "Target: " .. PlayerLabel(player), Duration = 2 })
             PlayEnableSound()
         end
     end
@@ -3218,7 +3779,7 @@ S.Players.PlayerRemoving:Connect(function(player)
     if targetDropdown and typeof(targetDropdown.SetValue) == "function" then
         targetDropdown:SetValue("")
     end
-        Fluent:Notify({ Title = "Target", Content = "Selected player left the game", Duration = 2 })
+        GemoroiUI:Notify({ Title = "Target", Content = "Selected player left the game", Duration = 2 })
     end
 end)
 
@@ -3341,11 +3902,11 @@ TargetTab:AddToggle("FastKickToggle", {
     Callback = function(state)
         if state then
             if not AmethystFeatures.Selected.kickPlayer then
-                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
                 return
             end
             if not PermanentPalletCfg.enabled or not PermanentPalletCfg.currentPallet then
-                Fluent:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
                 return
             end
             ClearTargetGroup("ragdollLoopKick")
@@ -3358,7 +3919,7 @@ TargetTab:AddToggle("FastKickToggle", {
             RagdollLoopKickCfg.loopThread = task.spawn(function()
                 if not (pallet and pallet:FindFirstChild("SoundPart")) then
                     RagdollLoopKickCfg.enabled = false
-                    Fluent:Notify({ Title = "Error", Content = "SoundPart not found!", Duration = 3 })
+                    GemoroiUI:Notify({ Title = "Error", Content = "SoundPart not found!", Duration = 3 })
                     return
                 end
                 local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
@@ -3454,7 +4015,7 @@ TargetTab:AddToggle("FastKickToggle", {
                 ClearTargetGroup("ragdollLoopKick")
                 isHeld = false
             end)
-            Fluent:Notify({ Title = "Ragdoll Loop Kick", Content = "Enabled - Target: " .. target.Name, Duration = 3 })
+            GemoroiUI:Notify({ Title = "Ragdoll Loop Kick", Content = "Enabled - Target: " .. target.Name, Duration = 3 })
             PlayEnableSound()
         else
             RagdollLoopKickCfg.enabled = false
@@ -3463,7 +4024,7 @@ TargetTab:AddToggle("FastKickToggle", {
                 RagdollLoopKickCfg.loopThread = nil
             end
             ClearTargetGroup("ragdollLoopKick")
-            Fluent:Notify({ Title = "Ragdoll Loop Kick", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Ragdoll Loop Kick", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -3475,11 +4036,11 @@ TargetTab:AddToggle("ControlKickToggle", {
     Callback = function(state)
         if state then
             if not AmethystFeatures.Selected.kickPlayer then
-                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
                 return
             end
             if not PermanentPalletCfg.enabled or not PermanentPalletCfg.currentPallet then
-                Fluent:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
                 return
             end
             local target = AmethystFeatures.Selected.kickPlayer
@@ -3492,7 +4053,7 @@ TargetTab:AddToggle("ControlKickToggle", {
             RagdollLoopKickCfg.loopThread = task.spawn(function()
                 if not (pallet and pallet:FindFirstChild("SoundPart")) then
                     RagdollLoopKickCfg.enabled = false
-                    Fluent:Notify({ Title = "Error", Content = "SoundPart not found!", Duration = 3 })
+                    GemoroiUI:Notify({ Title = "Error", Content = "SoundPart not found!", Duration = 3 })
                     return
                 end
                 local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
@@ -3534,7 +4095,7 @@ TargetTab:AddToggle("ControlKickToggle", {
                 ClearTargetGroup("ragdollLoopKick")
                 return
             end)
-            Fluent:Notify({ Title = "Ragdoll Loop Kick", Content = "Enabled - Target: " .. target.Name, Duration = 3 })
+            GemoroiUI:Notify({ Title = "Ragdoll Loop Kick", Content = "Enabled - Target: " .. target.Name, Duration = 3 })
             PlayEnableSound()
         else
             RagdollLoopKickCfg.enabled = false
@@ -3543,7 +4104,7 @@ TargetTab:AddToggle("ControlKickToggle", {
                 RagdollLoopKickCfg.loopThread = nil
             end
             ClearTargetGroup("ragdollLoopKick")
-            Fluent:Notify({ Title = "Ragdoll Loop Kick", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Ragdoll Loop Kick", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -3555,11 +4116,11 @@ TargetTab:AddToggle("LoopBringToggle", {
     Callback = function(state)
         if state then
             if not AmethystFeatures.Selected.kickPlayer then
-                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
                 return
             end
             if not PermanentPalletCfg.enabled or not PermanentPalletCfg.currentPallet then
-                Fluent:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
                 return
             end
             local target = AmethystFeatures.Selected.kickPlayer
@@ -3653,7 +4214,7 @@ TargetTab:AddToggle("LoopBringToggle", {
                 end
                 ClearTargetGroup("loopBring")
             end)
-            Fluent:Notify({ Title = "Loop Kick (Hold + Pallet)", Content = "Holding: " .. target.Name, Duration = 3 })
+            GemoroiUI:Notify({ Title = "Loop Kick (Hold + Pallet)", Content = "Holding: " .. target.Name, Duration = 3 })
             PlayEnableSound()
         else
             LoopKickCfg.enabled = false
@@ -3662,7 +4223,7 @@ TargetTab:AddToggle("LoopBringToggle", {
                 LoopKickCfg.loopThread = nil
             end
             ClearTargetGroup("loopBring")
-            Fluent:Notify({ Title = "Loop Kick (Hold + Pallet)", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Loop Kick (Hold + Pallet)", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -3677,12 +4238,12 @@ TargetTab:AddToggle("RemoveAntiKickToggle", {
     Callback = function(state)
         if state then
             if not AmethystFeatures.Selected.kickPlayer then
-                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
                 return
             end
             RemoveAntiKickCfg.enabled = true
             RemoveAntiKickCfg.targetPlayer = AmethystFeatures.Selected.kickPlayer
-            Fluent:Notify({ Title = "Remove Anti Kick", Content = "Enabled - Target: " .. RemoveAntiKickCfg.targetPlayer.Name, Duration = 3 })
+            GemoroiUI:Notify({ Title = "Remove Anti Kick", Content = "Enabled - Target: " .. RemoveAntiKickCfg.targetPlayer.Name, Duration = 3 })
             PlayEnableSound()
             RemoveAntiKickCfg.loopThread = task.spawn(function()
                 local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
@@ -3743,13 +4304,13 @@ TargetTab:AddToggle("RemoveAntiKickToggle", {
                 task.cancel(RemoveAntiKickCfg.loopThread)
                 RemoveAntiKickCfg.loopThread = nil
             end
-            Fluent:Notify({ Title = "Remove Anti Kick", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Remove Anti Kick", Content = "Disabled", Duration = 2 })
         end
     end
 })
 
 Window:SelectTab(1)
-Fluent:Notify({
+GemoroiUI:Notify({
     Title = "FTAP-Gemoroi",
     Content = "Fully Operational Core loaded successfully!",
     Duration = 5
@@ -3856,7 +4417,7 @@ TargetTab:AddToggle("AutoSitBlobTargetToggle", {
                 end
                 AutoSitCfg.currentBlob = nil
             end)
-            Fluent:Notify({ Title = "Auto Sit Blob", Content = "Enabled - Auto sitting on blob", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Auto Sit Blob", Content = "Enabled - Auto sitting on blob", Duration = 2 })
             PlayEnableSound()
         else
             AutoSitCfg.enabled = false
@@ -3865,7 +4426,7 @@ TargetTab:AddToggle("AutoSitBlobTargetToggle", {
                 AutoSitCfg.loopThread = nil
             end
             AutoSitCfg.currentBlob = nil
-            Fluent:Notify({ Title = "Auto Sit Blob", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Auto Sit Blob", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -3877,7 +4438,7 @@ TargetTab:AddToggle("BlobKillToggle", {
     Callback = function(state)
         if state then
             if not AmethystFeatures.Selected.kickPlayer then
-                Fluent:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Select a target player first!", Duration = 3 })
                 return
             end
             BlobKillCfg.enabled = true
@@ -3924,7 +4485,7 @@ TargetTab:AddToggle("BlobKillToggle", {
                 end
                 BlobKillCfg.currentBlob = nil
             end)
-            Fluent:Notify({ Title = "Blob Kill", Content = "Enabled - Target: " .. AmethystFeatures.Selected.kickPlayer.Name, Duration = 3 })
+            GemoroiUI:Notify({ Title = "Blob Kill", Content = "Enabled - Target: " .. AmethystFeatures.Selected.kickPlayer.Name, Duration = 3 })
             PlayEnableSound()
         else
             BlobKillCfg.enabled = false
@@ -3934,7 +4495,7 @@ TargetTab:AddToggle("BlobKillToggle", {
             end
             BlobKillCfg.currentBlob = nil
             BlobKillCfg.selectedPlayers = {}
-            Fluent:Notify({ Title = "Blob Kill", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Blob Kill", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -3946,7 +4507,7 @@ TargetTab:AddToggle("BlobSimpleTeleportSpamToggle", {
     Callback = function(state)
         if state then
             if not AmethystFeatures.Selected.kickPlayer then
-                Fluent:Notify({ Title = "Error", Content = "Select target!", Duration = 2 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Select target!", Duration = 2 })
                 return
             end
             local target = AmethystFeatures.Selected.kickPlayer
@@ -3968,7 +4529,7 @@ TargetTab:AddToggle("BlobSimpleTeleportSpamToggle", {
                     end
                 end
             end)
-            Fluent:Notify({ Title = "Simple Teleport Spam", Content = "Enabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Simple Teleport Spam", Content = "Enabled", Duration = 2 })
         else
             if TargetTab.SimpleSpamData then
                 TargetTab.SimpleSpamData.active = false
@@ -3977,7 +4538,7 @@ TargetTab:AddToggle("BlobSimpleTeleportSpamToggle", {
                 end
                 TargetTab.SimpleSpamData = nil
             end
-            Fluent:Notify({ Title = "Simple Teleport Spam", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Simple Teleport Spam", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -3994,22 +4555,22 @@ AurasTab:AddToggle("RagdollAuraToggle", {
     Callback = function(state)
         if state then
             if not PermanentPalletCfg.enabled then
-                Fluent:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Enable Permanent Pallet first!", Duration = 3 })
                 return
             end
             local pallet = PermanentPalletCfg.currentPallet
             if not pallet or not pallet.Parent then
-                Fluent:Notify({ Title = "Error", Content = "Permanent Pallet not found!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Permanent Pallet not found!", Duration = 3 })
                 return
             end
             local soundPart = pallet:FindFirstChild("SoundPart")
             if not soundPart then
-                Fluent:Notify({ Title = "Error", Content = "Pallet has no SoundPart!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "Pallet has no SoundPart!", Duration = 3 })
                 return
             end
             local owner = soundPart:FindFirstChild("PartOwner")
             if not owner or owner.Value ~= LocalPlayer.Name then
-                Fluent:Notify({ Title = "Error", Content = "No ownership on pallet!", Duration = 3 })
+                GemoroiUI:Notify({ Title = "Error", Content = "No ownership on pallet!", Duration = 3 })
                 return
             end
             RagdollAuraCfg.enabled = true
@@ -4134,7 +4695,7 @@ AurasTab:AddToggle("RagdollAuraToggle", {
                     end
                 end
             end)
-            Fluent:Notify({ Title = "Ragdoll Aura", Content = "Enabled", Duration = 3 })
+            GemoroiUI:Notify({ Title = "Ragdoll Aura", Content = "Enabled", Duration = 3 })
             PlayEnableSound()
         else
             RagdollAuraCfg.enabled = false
@@ -4144,7 +4705,7 @@ AurasTab:AddToggle("RagdollAuraToggle", {
             end
             RagdollAuraCfg.ragdolledPlayers = {}
             RagdollAuraCfg.isTeleportingPallet = false
-            Fluent:Notify({ Title = "Ragdoll Aura", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Ragdoll Aura", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -4252,7 +4813,7 @@ AurasTab:AddToggle("AutoSitBlobAuraToggle", {
                 end
                 AutoSitCfg.currentBlob = nil
             end)
-            Fluent:Notify({ Title = "Auto Sit Blob", Content = "Enabled - Auto sitting on blob", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Auto Sit Blob", Content = "Enabled - Auto sitting on blob", Duration = 2 })
             PlayEnableSound()
         else
             AutoSitCfg.enabled = false
@@ -4261,7 +4822,7 @@ AurasTab:AddToggle("AutoSitBlobAuraToggle", {
                 AutoSitCfg.loopThread = nil
             end
             AutoSitCfg.currentBlob = nil
-            Fluent:Notify({ Title = "Auto Sit Blob", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Auto Sit Blob", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -4423,7 +4984,7 @@ AurasTab:AddToggle("KillAuraBlobToggle", {
                 KillAuraCfg.lastKillTime = 0
                 print("[Kill Aura] Ð¦Ð¸ÐºÐ» Ð¾ÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½")
             end)
-            Fluent:Notify({ Title = "Kill Aura", Content = "Enabled", Duration = 3 })
+            GemoroiUI:Notify({ Title = "Kill Aura", Content = "Enabled", Duration = 3 })
             PlayEnableSound()
         else
             KillAuraCfg.enabled = false
@@ -4436,7 +4997,7 @@ AurasTab:AddToggle("KillAuraBlobToggle", {
             KillAuraCfg.killCooldown = {}
             KillAuraCfg.targetPlayers = {}
             KillAuraCfg.lastKillTime = 0
-            Fluent:Notify({ Title = "Kill Aura", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Kill Aura", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -4472,7 +5033,7 @@ AurasTab:AddToggle("DualLockAuraToggle", {
                     task.wait()
                 end
             end)
-            Fluent:Notify({ Title = "Dual Lock Aura", Content = "Enabled", Duration = 3 })
+            GemoroiUI:Notify({ Title = "Dual Lock Aura", Content = "Enabled", Duration = 3 })
             PlayEnableSound()
         else
             AdvancedDuallockCfg.enabled = false
@@ -4488,7 +5049,7 @@ AurasTab:AddToggle("DualLockAuraToggle", {
             AdvancedDuallockCfg.originalBarrierState = {}
             AdvancedDuallockCfg.currentBlob = nil
             AdvancedDuallockCfg.processedPlayers = {}
-            Fluent:Notify({ Title = "Dual Lock Aura", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Dual Lock Aura", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -4655,7 +5216,7 @@ AurasTab:AddToggle("DestroyKickAuraToggle", {
                 DestroyKickAuraCfg.isSpawning = false
                 print("[Destroy Kick Aura] Ð¦Ð¸ÐºÐ» Ð¾ÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½")
             end)
-            Fluent:Notify({ Title = "Destroy Kick Aura", Content = "Enabled", Duration = 3 })
+            GemoroiUI:Notify({ Title = "Destroy Kick Aura", Content = "Enabled", Duration = 3 })
             PlayEnableSound()
         else
             DestroyKickAuraCfg.enabled = false
@@ -4666,7 +5227,7 @@ AurasTab:AddToggle("DestroyKickAuraToggle", {
             DestroyKickAuraCfg.currentBlob = nil
             DestroyKickAuraCfg.processedPlayers = {}
             DestroyKickAuraCfg.isSpawning = false
-            Fluent:Notify({ Title = "Destroy Kick Aura", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Destroy Kick Aura", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -4700,7 +5261,7 @@ AurasTab:AddToggle("KickAuraFixedToggle", {
                     task.wait()
                 end
             end)
-            Fluent:Notify({ Title = "Kick Aura (Fixed)", Content = "Enabled", Duration = 3 })
+            GemoroiUI:Notify({ Title = "Kick Aura (Fixed)", Content = "Enabled", Duration = 3 })
             PlayEnableSound()
         else
             KickAuraFixedCfg.enabled = false
@@ -4717,7 +5278,7 @@ AurasTab:AddToggle("KickAuraFixedToggle", {
                 end
             end
             KickAuraFixedCfg.fixedPlayers = {}
-            Fluent:Notify({ Title = "Kick Aura (Fixed)", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Kick Aura (Fixed)", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -4741,7 +5302,7 @@ AurasTab:AddToggle("JumpKickAuraToggle", {
                     task.wait()
                 end
             end)
-            Fluent:Notify({ Title = "Jump Kick Aura", Content = "Enabled", Duration = 3 })
+            GemoroiUI:Notify({ Title = "Jump Kick Aura", Content = "Enabled", Duration = 3 })
             PlayEnableSound()
         else
             JumpKickAuraCfg.enabled = false
@@ -4750,7 +5311,7 @@ AurasTab:AddToggle("JumpKickAuraToggle", {
                 JumpKickAuraCfg.loopThread = nil
             end
             JumpKickAuraCfg.processedPlayers = {}
-            Fluent:Notify({ Title = "Jump Kick Aura", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Jump Kick Aura", Content = "Disabled", Duration = 2 })
         end
     end
 })
@@ -4808,7 +5369,7 @@ local function StopPacketLag()
         lagRiskLabel.Text = "Stopped"
         lagRiskLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
     end
-    Fluent:Notify({ Title = "Packet Lag", Content = "Disabled", Duration = 2 })
+    GemoroiUI:Notify({ Title = "Packet Lag", Content = "Disabled", Duration = 2 })
     task.delay(2, function()
         if lagRiskLabel then
             UpdateLagLabels()
@@ -4835,7 +5396,7 @@ local function StartPacketLag()
             lagRiskLabel.Text = "LAGGING SERVER..."
             lagRiskLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
         end
-        Fluent:Notify({ Title = "Packet Lag", Content = "Enabled - Spawning lag objects", Duration = 3 })
+        GemoroiUI:Notify({ Title = "Packet Lag", Content = "Enabled - Spawning lag objects", Duration = 3 })
         PlayEnableSound()
         while Features.PacketLag.enabled do
             SpawnLagToy()
@@ -4902,7 +5463,7 @@ ServerTab:AddToggle("LineLagServerLagToggle", {
                     if not createGrabLine then
                         warn("[Server Lag] CreateGrabLine RemoteEvent not found!")
                         ServerLagCfg.enabled = false
-                        Fluent:Notify({ Title = "Server Lag", Content = "Error: CreateGrabLine not found!", Duration = 3 })
+                        GemoroiUI:Notify({ Title = "Server Lag", Content = "Error: CreateGrabLine not found!", Duration = 3 })
                         return
                     end
                     print("[Server Lag] Started!")
@@ -4921,7 +5482,7 @@ ServerTab:AddToggle("LineLagServerLagToggle", {
                             task.wait(.1)
                         end
                     end)
-                    Fluent:Notify({ Title = "Server Lag", Content = "Enabled - Lagging server with lines", Duration = 3 })
+                    GemoroiUI:Notify({ Title = "Server Lag", Content = "Enabled - Lagging server with lines", Duration = 3 })
                     PlayEnableSound()
                 end
             end)
@@ -4931,8 +5492,40 @@ ServerTab:AddToggle("LineLagServerLagToggle", {
                 task.cancel(ServerLagCfg.loopThread)
                 ServerLagCfg.loopThread = nil
             end
-            Fluent:Notify({ Title = "Server Lag", Content = "Disabled", Duration = 2 })
+            GemoroiUI:Notify({ Title = "Server Lag", Content = "Disabled", Duration = 2 })
             print("[Server Lag] Stopped")
         end
     end
+})
+
+-- === SERVER TAB: SLOTS FARM ===
+ServerTab:AddSection("Slots Farm")
+
+ServerTab:AddToggle("AutoSpinSlotsToggle", {
+    Title = "Auto Spin Slots",
+    Description = "Auto-spins the slot machine when its timer hits 0:00",
+    Default = false,
+    Callback = function(Value)
+        setAutoSpinSlots(Value)
+    end
+})
+
+ServerTab:AddButton({
+    Title = "Check Slot Time",
+    Callback = function()
+        checkSlotTime()
+    end
+})
+
+ServerTab:AddButton({
+    Title = "Teleport to Slots",
+    Callback = function()
+        teleportToSlots()
+    end
+})
+
+GemoroiUI:Notify({
+    Title = "FTAP-Gemoroi v3.5",
+    Content = "Lime Dark Edition loaded - GemoroiUI, Profile ESP, Soap Textures, Auto Slots ready!",
+    Duration = 5
 })

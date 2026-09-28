@@ -1,5 +1,5 @@
 -- FTAP-Gemoroi Loader
--- Modularized Edition v3.0 (XOCU Enhanced)
+-- Modularized Edition v3.5 (Lime Dark / GemoroiUI)
 
 local baseUrl = "https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/modules/"
 
@@ -35,16 +35,27 @@ local Misc = loadModule("Misc")
 local Protection = loadModule("Protection")
 local Keybinds = loadModule("Keybinds")
 
-local success, Fluent = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/Fluent.luau"))()
+local success, GemoroiUI = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/GemoroiUI.luau"))()
 end)
 
-if not success or not Fluent then
-    warn("[FTAP-Gemoroi] Failed to load Fluent UI")
+if not success or not GemoroiUI then
+    -- fallback: load the synced module copy from /modules/GemoroiUI.luau
+    local ok2, modUI = pcall(function()
+        return loadModule("GemoroiUI")
+    end)
+    if ok2 and modUI then
+        GemoroiUI = modUI
+    end
+end
+
+if not GemoroiUI then
+    warn("[FTAP-Gemoroi] Failed to load GemoroiUI (Lime Dark)")
     return
 end
 
-Shared.Fluent = Fluent
+Shared.GemoroiUI = GemoroiUI
+Shared.Fluent = GemoroiUI -- backward compatibility alias
 
 local UI = loadModule("UI")
 local Window, Tabs = UI.CreateWindow()
@@ -264,7 +275,8 @@ Tabs.Player:AddButton({
 Tabs.Player:AddSection("Camera & View Modes")
 
 Tabs.Player:AddToggle("ThirdPersonToggle", {
-    Title = "Force 3rd Person View",
+    Title = "Third Person View Fix (RenderStepped)",
+    Description = "Unlocks the forced first-person camera every frame",
     Default = false,
     Callback = function(Value)
         Player.ToggleThirdPerson(Value, Player.ThirdPerson.distance)
@@ -332,6 +344,45 @@ Tabs.Visuals:AddToggle("PCLDESPToggle", {
     Callback = function(Value)
         Visuals.Config.PCLD_ESPEnabled = Value
         Visuals.UpdatePCLDESP()
+    end
+})
+
+-- ==================== GEMOROI VISUALS & OPTIMIZATION ====================
+Tabs.Visuals:AddSection("Gemoroi Visuals & Optimization")
+
+Tabs.Visuals:AddToggle("PCLDBoxESPToggle", {
+    Title = "PCLD Box ESP (BoxHandleAdornments)",
+    Description = "Draws 3D boxes on hidden physics hitboxes",
+    Default = false,
+    Callback = function(Value)
+        Visuals.Config.PCLD_BoxesEnabled = Value
+        Visuals.UpdatePCLDBoxes()
+    end
+})
+
+Tabs.Visuals:AddColorpicker("PCLDBoxColorPicker", {
+    Title = "PCLD Box Color",
+    Default = Color3.fromRGB(163, 230, 53),
+    Callback = function(Value)
+        Visuals.SetPCLDBoxColor(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("ProfileESPToggle", {
+    Title = "Profile ESP (Avatars Above Head)",
+    Description = "Shows player avatars, names and health above heads",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleProfileESP(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("SoapTexturesToggle", {
+    Title = "Soap Textures (FPS Boost)",
+    Description = "Smooth-plastic everything + hides decals & textures",
+    Default = false,
+    Callback = function(Value)
+        Visuals.ToggleSoapTextures(Value)
     end
 })
 
@@ -932,6 +983,32 @@ for poseName, _ in pairs(Misc.FigurePresets) do
     })
 end
 
+-- ==================== SLOTS FARM ====================
+Tabs.Misc:AddSection("Slots Farm")
+
+Tabs.Misc:AddToggle("AutoSpinSlotsToggle", {
+    Title = "Auto Spin Slots",
+    Description = "Auto-spins the slot machine when its timer hits 0:00",
+    Default = false,
+    Callback = function(Value)
+        Misc.ToggleAutoSpinSlots(Value)
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Check Slot Time",
+    Callback = function()
+        Misc.CheckSlotTime()
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Teleport to Slots",
+    Callback = function()
+        Misc.TeleportToSlots()
+    end
+})
+
 -- ==================== MAIN RUNTIME STEPPED LOOP ====================
 Shared.RunService.RenderStepped:Connect(function()
     -- Combat Silent Aim & FOV
@@ -946,6 +1023,11 @@ Shared.RunService.RenderStepped:Connect(function()
     if Visuals.Config.PCLD_ESPEnabled then
         Visuals.UpdatePCLDESP()
     end
+
+    -- PCLD BoxHandleAdornments update
+    if Visuals.Config.PCLD_BoxesEnabled then
+        Visuals.UpdatePCLDBoxes()
+    end
 end)
 
 -- Auto refresh player list on player join/leave
@@ -959,5 +1041,5 @@ Shared.Players.PlayerRemoving:Connect(function()
     Target.RefreshPlayerList()
 end)
 
-Shared.Notify("FTAP-Gemoroi", "Successfully loaded XOCU Enhanced Edition v3.0! ⚡", 3)
+Shared.Notify("FTAP-Gemoroi", "Successfully loaded Lime Dark Edition v3.5 (GemoroiUI)! ⚡", 3)
 Shared.PlayEnableSound()

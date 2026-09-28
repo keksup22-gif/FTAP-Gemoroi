@@ -15,7 +15,10 @@ Visuals.Config = {
     HealthBar = true,
     PCLD_ESPEnabled = false,
     ModelHighlightEnabled = false,
-    ModelBillboardEnabled = false
+    ModelBillboardEnabled = false,
+    PCLD_BoxesEnabled = false,
+    PCLD_BoxColor = Color3.fromRGB(163, 230, 53),
+    ProfileESPEnabled = false
 }
 
 Visuals.RainbowConnection = nil
@@ -430,6 +433,339 @@ function Visuals.ResetNeonDreamConfig()
     Visuals.NeonDreamConfig.CustomB = 255
     if Visuals.NeonDreamConfig.Enabled then
         Visuals.ToggleNeonDream(false)
+    end
+end
+
+-- ============================================================================
+-- GemoroiUI v3.5 FEATURES: PCLD BoxHandleAdornments, Profile ESP (Avatars),
+-- Soap Textures (FPS Boost)
+-- ============================================================================
+
+Visuals.PCLDBoxAdornments = {}
+Visuals.PCLDBoxWatchers = {}
+Visuals.ProfileESP = { records = {}, loop = nil, thumbCache = {} }
+Visuals.Soap = { enabled = false, saved = setmetatable({}, { __mode = "k" }), connection = nil }
+
+-- === PCLD BOXHANDLEADORNMENTS ===
+local function isPCLDPart(obj)
+    return obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector")
+end
+
+local function addPCLDBox(obj)
+    if Visuals.PCLDBoxAdornments[obj] then
+        return
+    end
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "PCLD_BoxAdornment"
+    box.Adornee = obj
+    box.AlwaysOnTop = true
+    box.ZIndex = 5
+    box.Color3 = Visuals.Config.PCLD_BoxColor
+    box.Transparency = 0.3
+    box.Size = obj.Size
+    box.Parent = Shared.CoreGui
+    Visuals.PCLDBoxAdornments[obj] = box
+
+    local conn = obj.AncestryChanged:Connect(function(_, parent)
+        if not parent and Visuals.PCLDBoxAdornments[obj] then
+            pcall(function() Visuals.PCLDBoxAdornments[obj]:Destroy() end)
+            Visuals.PCLDBoxAdornments[obj] = nil
+        end
+    end)
+    table.insert(Visuals.PCLDBoxWatchers, conn)
+end
+
+function Visuals.UpdatePCLDBoxes()
+    if not Visuals.Config.PCLD_BoxesEnabled then
+        for _, box in pairs(Visuals.PCLDBoxAdornments) do
+            if box then
+                pcall(function() box:Destroy() end)
+            end
+        end
+        Visuals.PCLDBoxAdornments = {}
+        for _, c in ipairs(Visuals.PCLDBoxWatchers) do
+            pcall(function() c:Disconnect() end)
+        end
+        Visuals.PCLDBoxWatchers = {}
+        return
+    end
+
+    for _, obj in ipairs(Shared.Workspace:GetDescendants()) do
+        if isPCLDPart(obj) and obj.Parent then
+            addPCLDBox(obj)
+        end
+    end
+
+    for obj, box in pairs(Visuals.PCLDBoxAdornments) do
+        if not box or not box.Parent or not obj or not obj.Parent then
+            if box then
+                pcall(function() box:Destroy() end)
+            end
+            Visuals.PCLDBoxAdornments[obj] = nil
+        end
+    end
+end
+
+function Visuals.SetPCLDBoxColor(color)
+    Visuals.Config.PCLD_BoxColor = color
+    for _, box in pairs(Visuals.PCLDBoxAdornments) do
+        if box then
+            box.Color3 = color
+        end
+    end
+end
+
+-- === PROFILE ESP (AVATARS ABOVE HEAD) ===
+local function getProfileThumb(player)
+    local cached = Visuals.ProfileESP.thumbCache[player.UserId]
+    if cached then
+        if cached.content then
+            return cached.content
+        end
+        if cached.retryAt and tick() < cached.retryAt then
+            return nil
+        end
+    end
+    local ok, content = pcall(function()
+        return Shared.Players:GetUserThumbnailAsync(
+            player.UserId,
+            Enum.ThumbnailType.HeadShot,
+            Enum.ThumbnailSize.Size420x420
+        )
+    end)
+    if ok and type(content) == "string" and content ~= "" then
+        Visuals.ProfileESP.thumbCache[player.UserId] = { content = content }
+        return content
+    end
+    -- retry a failed fetch at most once every 15 seconds
+    Visuals.ProfileESP.thumbCache[player.UserId] = { retryAt = tick() + 15 }
+    return nil
+end
+
+local function createProfileBillboard(player)
+    task.spawn(function()
+        if not Visuals.Config.ProfileESPEnabled then
+            return
+        end
+        if Visuals.ProfileESP.records[player] then
+            return
+        end
+        local char = player.Character
+        if not char then
+            return
+        end
+        local head = char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart")
+        if not head then
+            return
+        end
+
+        local bb = Instance.new("BillboardGui")
+        bb.Name = "Gemoroi_ProfileESP"
+        bb.Adornee = head
+        bb.Size = UDim2.new(0, 64, 0, 84)
+        bb.StudsOffset = Vector3.new(0, 2.8, 0)
+        bb.AlwaysOnTop = true
+        bb.MaxDistance = 1500
+        bb.Parent = Shared.CoreGui
+
+        local avatar = Instance.new("ImageLabel")
+        avatar.Name = "Avatar"
+        avatar.AnchorPoint = Vector2.new(0.5, 0)
+        avatar.Position = UDim2.new(0.5, 0, 0, 0)
+        avatar.Size = UDim2.new(0, 52, 0, 52)
+        avatar.BackgroundColor3 = Color3.fromRGB(16, 20, 17)
+        avatar.BorderSizePixel = 0
+        avatar.ScaleType = Enum.ScaleType.Crop
+        avatar.Image = ""
+        avatar.Parent = bb
+        local avCorner = Instance.new("UICorner")
+        avCorner.CornerRadius = UDim.new(0, 26)
+        avCorner.Parent = avatar
+        local avStroke = Instance.new("UIStroke")
+        avStroke.Color = Visuals.Config.PCLD_BoxColor
+        avStroke.Thickness = 1.5
+        avStroke.Parent = avatar
+
+        local thumb = getProfileThumb(player)
+        if thumb then
+            avatar.Image = thumb
+        end
+
+        local displayName = Instance.new("TextLabel")
+        displayName.Name = "DisplayName"
+        displayName.AnchorPoint = Vector2.new(0.5, 0)
+        displayName.Position = UDim2.new(0.5, 0, 0, 54)
+        displayName.Size = UDim2.new(0, 120, 0, 13)
+        displayName.BackgroundTransparency = 1
+        displayName.Font = Enum.Font.GothamBold
+        displayName.TextSize = 12
+        displayName.TextColor3 = Color3.fromRGB(233, 240, 234)
+        displayName.TextStrokeTransparency = 0.4
+        displayName.TextTruncate = Enum.TextTruncate.AtEnd
+        displayName.Text = player.DisplayName or player.Name
+        displayName.Parent = bb
+
+        local userName = Instance.new("TextLabel")
+        userName.Name = "UserName"
+        userName.AnchorPoint = Vector2.new(0.5, 0)
+        userName.Position = UDim2.new(0.5, 0, 0, 67)
+        userName.Size = UDim2.new(0, 120, 0, 11)
+        userName.BackgroundTransparency = 1
+        userName.Font = Enum.Font.Gotham
+        userName.TextSize = 10
+        userName.TextColor3 = Color3.fromRGB(139, 153, 143)
+        userName.TextStrokeTransparency = 0.4
+        userName.TextTruncate = Enum.TextTruncate.AtEnd
+        userName.Text = "@" .. player.Name
+        userName.Parent = bb
+
+        local hpBg = Instance.new("Frame")
+        hpBg.Name = "HealthBg"
+        hpBg.AnchorPoint = Vector2.new(0.5, 0)
+        hpBg.Position = UDim2.new(0.5, 0, 0, 80)
+        hpBg.Size = UDim2.new(0, 52, 0, 4)
+        hpBg.BackgroundColor3 = Color3.fromRGB(11, 14, 12)
+        hpBg.BackgroundTransparency = 0.25
+        hpBg.BorderSizePixel = 0
+        hpBg.Parent = bb
+        local hpCorner = Instance.new("UICorner")
+        hpCorner.CornerRadius = UDim.new(0, 2)
+        hpCorner.Parent = hpBg
+
+        local hpFill = Instance.new("Frame")
+        hpFill.Name = "HealthFill"
+        hpFill.Size = UDim2.new(1, 0, 1, 0)
+        hpFill.BackgroundColor3 = Color3.fromRGB(163, 230, 53)
+        hpFill.BorderSizePixel = 0
+        hpFill.Parent = hpBg
+        local hpFillCorner = Instance.new("UICorner")
+        hpFillCorner.CornerRadius = UDim.new(0, 2)
+        hpFillCorner.Parent = hpFill
+
+        Visuals.ProfileESP.records[player] = { gui = bb, fill = hpFill }
+    end)
+end
+
+function Visuals.UpdateProfileESP()
+    for _, player in ipairs(Shared.Players:GetPlayers()) do
+        if player ~= Shared.LocalPlayer and not Visuals.ProfileESP.records[player] and player.Character then
+            createProfileBillboard(player)
+        end
+    end
+    for player, record in pairs(Visuals.ProfileESP.records) do
+        if not player.Parent or not record.gui or not record.gui.Parent then
+            if record.gui then
+                pcall(function() record.gui:Destroy() end)
+            end
+            Visuals.ProfileESP.records[player] = nil
+        else
+            local char = player.Character
+            local head = char and (char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart"))
+            if head and record.gui.Adornee ~= head then
+                record.gui.Adornee = head
+            end
+            if not record.gui.Avatar.Image or record.gui.Avatar.Image == "" then
+                local thumb = getProfileThumb(player)
+                if thumb then
+                    record.gui.Avatar.Image = thumb
+                end
+            end
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum and record.fill then
+                local pct = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+                record.fill.Size = UDim2.new(pct, 0, 1, 0)
+                record.fill.BackgroundColor3 = Color3.fromRGB(
+                    math.floor(255 * (1 - pct)),
+                    math.floor(230 * pct),
+                    53
+                )
+            end
+        end
+    end
+end
+
+function Visuals.ToggleProfileESP(state)
+    Visuals.Config.ProfileESPEnabled = state
+    if state then
+        Visuals.ProfileESP.loop = task.spawn(function()
+            while Visuals.Config.ProfileESPEnabled do
+                pcall(Visuals.UpdateProfileESP)
+                task.wait(0.5)
+            end
+        end)
+        pcall(Visuals.UpdateProfileESP)
+        Shared.Notify("Profile ESP", "Enabled - avatars above heads", 2)
+    else
+        if Visuals.ProfileESP.loop then
+            task.cancel(Visuals.ProfileESP.loop)
+            Visuals.ProfileESP.loop = nil
+        end
+        for _, record in pairs(Visuals.ProfileESP.records) do
+            if record.gui then
+                pcall(function() record.gui:Destroy() end)
+            end
+        end
+        Visuals.ProfileESP.records = {}
+        Shared.Notify("Profile ESP", "Disabled", 2)
+    end
+end
+
+-- === SOAP TEXTURES (FPS BOOST) ===
+local function soapifyObject(obj)
+    if obj:IsA("BasePart") then
+        if not Visuals.Soap.saved[obj] then
+            Visuals.Soap.saved[obj] = { Material = obj.Material, Color = obj.Color }
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Color = Color3.new(obj.Color.R * 0.75, obj.Color.G * 0.75, obj.Color.B * 0.75)
+        end
+    elseif obj:IsA("Texture") or obj:IsA("Decal") then
+        if not Visuals.Soap.saved[obj] then
+            Visuals.Soap.saved[obj] = { Transparency = obj.Transparency }
+            obj.Transparency = 1
+        end
+    end
+end
+
+function Visuals.ToggleSoapTextures(state)
+    Visuals.Soap.enabled = state
+    if state then
+        Shared.Notify("Optimization", "Applying Soap Textures...", 2)
+        task.spawn(function()
+            for _, obj in ipairs(Shared.Workspace:GetDescendants()) do
+                soapifyObject(obj)
+            end
+            Shared.Notify("Optimization", "Soap Textures Applied! Everything is soap now", 2)
+        end)
+        Visuals.Soap.connection = Shared.Workspace.DescendantAdded:Connect(function(obj)
+            task.defer(function()
+                if Visuals.Soap.enabled then
+                    pcall(function() soapifyObject(obj) end)
+                end
+            end)
+        end)
+    else
+        if Visuals.Soap.connection then
+            Visuals.Soap.connection:Disconnect()
+            Visuals.Soap.connection = nil
+        end
+        Shared.Notify("Optimization", "Restoring original textures...", 2)
+        task.spawn(function()
+            for obj, orig in pairs(Visuals.Soap.saved) do
+                pcall(function()
+                    if obj and obj.Parent then
+                        if orig.Material then
+                            obj.Material = orig.Material
+                            obj.Color = orig.Color
+                        end
+                        if orig.Transparency then
+                            obj.Transparency = orig.Transparency
+                        end
+                    end
+                end)
+            end
+            Visuals.Soap.saved = setmetatable({}, { __mode = "k" })
+            Shared.Notify("Optimization", "Original textures restored!", 2)
+        end)
     end
 end
 

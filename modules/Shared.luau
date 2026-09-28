@@ -20,7 +20,9 @@ Shared.LocalPlayer = Shared.Players.LocalPlayer
 Shared.Camera = Shared.Workspace.CurrentCamera
 Shared.Mouse = Shared.LocalPlayer:GetMouse()
 
--- Fluent Reference (set by main loader)
+-- GemoroiUI Reference (set by main loader)
+Shared.GemoroiUI = nil
+-- Legacy Fluent reference (aliased to GemoroiUI for backward compatibility)
 Shared.Fluent = nil
 
 -- Core FTAP Remotes Cache
@@ -203,8 +205,9 @@ end
 
 function Shared.Notify(title, content, duration)
     pcall(function()
-        if Shared.Fluent and typeof(Shared.Fluent.Notify) == "function" then
-            Shared.Fluent:Notify({
+        local ui = Shared.GemoroiUI or Shared.Fluent
+        if ui and typeof(ui.Notify) == "function" then
+            ui:Notify({
                 Title = tostring(title or "FTAP-Gemoroi"),
                 Content = tostring(content or ""),
                 Duration = duration or 3
