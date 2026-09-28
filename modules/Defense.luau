@@ -11,7 +11,8 @@ Defense.AntiSticky = { enabled = false }
 Defense.AntiLineLag = { enabled = false }
 Defense.AntiInputLag = { enabled = false, loopThread = nil }
 Defense.AntiBlobman = { enabled = false, loopThread = nil }
-Defense.AutoReset = { enabled = false, connection = nil }
+Defense.PCLDBreaker = { enabled = false, loopThread = nil }
+Defense.CounterAttack = { enabled = false, mode = "Hell", connection = nil }
 
 Defense.AntiKickStick.items = {
     "NinjaShuriken",
@@ -61,7 +62,7 @@ function Defense.ToggleAntiGrab(state)
                 end
             else
                 local root = Shared.GetRoot(lp)
-                if root and not Defense.AntiGrab.forceAnchor then
+                if root then
                     root.Anchored = false
                 end
             end
@@ -103,6 +104,88 @@ function Defense.ToggleAntiGrab(state)
         if root then root.Anchored = false end
         Shared.Notify("Anti-Grab", "Anti-Grab Disabled", 2)
     end
+end
+
+-- XOCU Counter Attack on Grab
+function Defense.ToggleCounterAttack(state, mode)
+    Defense.CounterAttack.enabled = state
+    Defense.CounterAttack.mode = mode or Defense.CounterAttack.mode or "Hell"
+
+    if state then
+        if Defense.CounterAttack.connection then Defense.CounterAttack.connection:Disconnect() end
+        Defense.CounterAttack.connection = Shared.RunService.Heartbeat:Connect(function()
+            local isHeld = Shared.LocalPlayer:FindFirstChild("IsHeld")
+            if isHeld and isHeld.Value then
+                local myRoot = Shared.GetRoot(Shared.LocalPlayer)
+                if myRoot then
+                    for _, player in ipairs(Shared.Players:GetPlayers()) do
+                        if player ~= Shared.LocalPlayer and player.Character then
+                            local pRoot = Shared.GetRoot(player)
+                            if pRoot and (pRoot.Position - myRoot.Position).Magnitude <= 20 then
+                                Shared.SetNetworkOwner(pRoot, pRoot.CFrame)
+                                if Defense.CounterAttack.mode == "Hell" then
+                                    pRoot.AssemblyLinearVelocity = Vector3.new(0, -1e8, 0)
+                                    pRoot.CFrame = CFrame.new(pRoot.Position.X, -3000, pRoot.Position.Z)
+                                elseif Defense.CounterAttack.mode == "Kill" then
+                                    pRoot.AssemblyLinearVelocity = Vector3.new(0, 1e9, 0)
+                                elseif Defense.CounterAttack.mode == "Fling" then
+                                    pRoot.AssemblyLinearVelocity = Vector3.new(math.random(-1e5, 1e5), 90000, math.random(-1e5, 1e5))
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        Shared.Notify("Counter Attack", "XOCU Auto-Counter Attack Active ⚔️", 2)
+    else
+        if Defense.CounterAttack.connection then
+            Defense.CounterAttack.connection:Disconnect()
+            Defense.CounterAttack.connection = nil
+        end
+        Shared.Notify("Counter Attack", "Counter Attack Disabled", 2)
+    end
+end
+
+-- XOCU Auto PCLD Breaker (Destroys enemy tracking hitboxes)
+function Defense.TogglePCLDBreaker(state)
+    Defense.PCLDBreaker.enabled = state
+    if state then
+        if Defense.PCLDBreaker.loopThread then task.cancel(Defense.PCLDBreaker.loopThread) end
+        Defense.PCLDBreaker.loopThread = task.spawn(function()
+            while Defense.PCLDBreaker.enabled do
+                pcall(function()
+                    for _, obj in ipairs(Shared.Workspace:GetDescendants()) do
+                        if obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector") then
+                            obj:Destroy()
+                        end
+                    end
+                end)
+                task.wait(1)
+            end
+        end)
+        Shared.Notify("PCLD Breaker", "Auto PCLD Breaker Active (Invisible to enemy aimbots) 👁️‍🗨️", 2)
+    else
+        if Defense.PCLDBreaker.loopThread then
+            task.cancel(Defense.PCLDBreaker.loopThread)
+            Defense.PCLDBreaker.loopThread = nil
+        end
+        Shared.Notify("PCLD Breaker", "PCLD Breaker Disabled", 2)
+    end
+end
+
+-- XOCU Purge GrabParts (Anti-Lag)
+function Defense.PurgeGrabParts()
+    local count = 0
+    pcall(function()
+        for _, v in ipairs(Shared.Workspace:GetChildren()) do
+            if v.Name == "GrabParts" and not v:FindFirstChildOfClass("Humanoid") then
+                v:Destroy()
+                count = count + 1
+            end
+        end
+    end)
+    Shared.Notify("Anti-Lag", "Purged " .. count .. " orphaned GrabParts!", 2)
 end
 
 -- Anti-Void (Auto Void Rescue)
@@ -266,7 +349,6 @@ function Defense.ToggleAntiBlobman(state)
                         for _, obj in ipairs(Shared.Workspace:GetChildren()) do
                             if obj.Name == "CreatureBlobman" and not obj:IsDescendantOf(Shared.GetToyFolder(Shared.LocalPlayer)) then
                                 local seat = obj:FindFirstChildOfClass("Seat") or obj:FindFirstChild("SeatPart")
-                                local bRoot = obj.PrimaryPart or (seat and seat.Position and obj)
                                 if seat and (seat.Position - myRoot.Position).Magnitude <= 30 then
                                     Shared.SetNetworkOwner(seat, seat.CFrame)
                                     Shared.DestroyToy(obj)

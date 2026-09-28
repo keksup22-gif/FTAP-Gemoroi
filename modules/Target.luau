@@ -4,6 +4,7 @@ local Target = {}
 Target.SelectedPlayer = nil
 Target.PlayerNames = { "None" }
 Target.PlayerDropDown = nil
+Target.SelectedKickMode = "Kill"
 
 -- Loop Kill
 Target.LoopKill = {
@@ -19,6 +20,60 @@ Target.DualHandKick = {
     loopThread = nil,
     target = nil
 }
+
+-- XOCU Kick Engine
+Target.XOCUKickModes = { "Fling", "Kill", "Heaven", "Hell", "Kick", "Ragdoll" }
+
+function Target.ApplyXOCUForce(target, velocity, name)
+    if not target or not target.Character then return end
+    local root = Shared.GetRoot(target)
+    if not root then return end
+
+    pcall(function()
+        Shared.SetNetworkOwner(root, root.CFrame)
+        Shared.DestroyGrabLine(root)
+
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = name or "XOCUForce"
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Velocity = velocity
+        bv.P = 12500
+        bv.Parent = root
+        Shared.Debris:AddItem(bv, 0.15)
+    end)
+end
+
+function Target.ExecuteXOCUKick(target, mode)
+    if not target or not target.Character then return end
+    local kickMode = mode or Target.SelectedKickMode or "Kill"
+    local root = Shared.GetRoot(target)
+    if not root then return end
+
+    if kickMode == "Fling" then
+        Target.ApplyXOCUForce(target, Vector3.new(0, 90000, 0), "XOCUFling")
+    elseif kickMode == "Kill" then
+        Target.ApplyXOCUForce(target, Vector3.new(0, 99999999999999, 0), "XOCUKill")
+    elseif kickMode == "Heaven" then
+        root.CFrame = CFrame.new(root.Position.X, 200, root.Position.Z)
+        Target.ApplyXOCUForce(target, Vector3.new(0, 200, 0), "XOCUHeaven")
+    elseif kickMode == "Kick" then
+        root.CFrame = CFrame.new(root.Position.X, 999999999999, root.Position.Z)
+        Target.ApplyXOCUForce(target, Vector3.new(0, 99999999999999, 0), "XOCUKick")
+    elseif kickMode == "Ragdoll" then
+        Target.ApplyXOCUForce(target, Vector3.new(0, -50, 0), "XOCURagdoll")
+        Shared.Ragdoll(root, 2)
+    elseif kickMode == "Hell" then
+        pcall(function()
+            for _, part in ipairs(target.Character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+        end)
+        root.CFrame = CFrame.new(root.Position.X, -3000, root.Position.Z)
+        Target.ApplyXOCUForce(target, Vector3.new(0, -100000000, 0), "XOCUHell")
+    end
+
+    Shared.Notify("XOCU Kick", "Applied " .. kickMode .. " to " .. target.Name .. " 💥", 2)
+end
 
 function Target.RefreshPlayerList()
     Target.PlayerNames = { "None" }

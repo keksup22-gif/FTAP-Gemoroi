@@ -1,5 +1,5 @@
 -- FTAP-Gemoroi Loader
--- Modularized Edition v3.0
+-- Modularized Edition v3.0 (XOCU Enhanced)
 
 local baseUrl = "https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/modules/"
 
@@ -520,6 +520,29 @@ Tabs.Target:AddButton({
     end
 })
 
+Tabs.Target:AddSection("XOCU Kick Execution Matrix")
+
+Tabs.Target:AddDropdown("XOCUKickModeDropdown", {
+    Title = "XOCU Kick Mode",
+    Values = Target.XOCUKickModes,
+    Default = "Kill",
+    Callback = function(Value)
+        Target.SelectedKickMode = Value
+    end
+})
+
+Tabs.Target:AddButton({
+    Title = "Execute XOCU Kick 💥",
+    Callback = function()
+        local target = Target.GetTarget()
+        if target then
+            Target.ExecuteXOCUKick(target, Target.SelectedKickMode)
+        else
+            Shared.Notify("Target", "Select a target first!", 2)
+        end
+    end
+})
+
 Tabs.Target:AddSection("Target Actions")
 
 Tabs.Target:AddButton({
@@ -637,6 +660,31 @@ Tabs.Protection:AddToggle("AntiGrabToggle", {
     end
 })
 
+Tabs.Protection:AddToggle("XOCUCounterAttackToggle", {
+    Title = "XOCU Auto-Counter Attack on Grab",
+    Default = false,
+    Callback = function(Value)
+        Defense.ToggleCounterAttack(Value, Defense.CounterAttack.mode)
+    end
+})
+
+Tabs.Protection:AddDropdown("CounterModeDropdown", {
+    Title = "Counter Attack Mode",
+    Values = { "Hell", "Kill", "Fling" },
+    Default = "Hell",
+    Callback = function(Value)
+        Defense.CounterAttack.mode = Value
+    end
+})
+
+Tabs.Protection:AddToggle("AutoPCLDBreakerToggle", {
+    Title = "Auto PCLD Breaker (Break Enemy Aimbots)",
+    Default = false,
+    Callback = function(Value)
+        Defense.TogglePCLDBreaker(Value)
+    end
+})
+
 Tabs.Protection:AddToggle("AntiVoidToggle", {
     Title = "Anti Void (Auto Void Rescue)",
     Default = false,
@@ -710,6 +758,13 @@ Tabs.Defense:AddToggle("AntiInputLagToggle", {
     Default = false,
     Callback = function(Value)
         Defense.ToggleAntiInputLag(Value)
+    end
+})
+
+Tabs.Defense:AddButton({
+    Title = "Purge Orphaned GrabParts (Anti-Lag) 🧹",
+    Callback = function()
+        Defense.PurgeGrabParts()
     end
 })
 
@@ -826,6 +881,22 @@ for _, house in ipairs(Teleports.Houses) do
     })
 end
 
+Tabs.Teleports:AddSection("Safe Platform TP")
+
+Tabs.Teleports:AddButton({
+    Title = "Create & Teleport to Safe Sky Base ☁️",
+    Callback = function()
+        Teleports.SpawnSafeSkyPlatform()
+    end
+})
+
+Tabs.Teleports:AddButton({
+    Title = "Remove Safe Sky Base",
+    Callback = function()
+        Teleports.RemoveSafeSkyPlatform()
+    end
+})
+
 -- ==================== MISC TAB ====================
 Tabs.Misc:AddSection("Map & Utilities")
 
@@ -888,5 +959,5 @@ Shared.Players.PlayerRemoving:Connect(function()
     Target.RefreshPlayerList()
 end)
 
-Shared.Notify("FTAP-Gemoroi", "Successfully loaded modular edition v3.0! 🚀", 3)
+Shared.Notify("FTAP-Gemoroi", "Successfully loaded XOCU Enhanced Edition v3.0! ⚡", 3)
 Shared.PlayEnableSound()
