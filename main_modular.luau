@@ -1,5 +1,5 @@
 -- FTAP-Gemoroi Loader
--- Modularized Version
+-- Modularized Edition v3.0
 
 local baseUrl = "https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/modules/"
 
@@ -116,6 +116,56 @@ Tabs.Combat:AddDropdown("HitboxDropdown", {
     end
 })
 
+Tabs.Combat:AddSection("TriggerBot (Auto-Grab on Aim)")
+
+Tabs.Combat:AddToggle("TriggerBotToggle", {
+    Title = "Enable TriggerBot",
+    Default = false,
+    Callback = function(Value)
+        Combat.ToggleTriggerBot(Value)
+    end
+})
+
+Tabs.Combat:AddSlider("TriggerBotDistance", {
+    Title = "TriggerBot Max Distance",
+    Default = 60,
+    Min = 10,
+    Max = 300,
+    Rounding = 0,
+    Callback = function(Value)
+        Combat.TriggerBot.maxDistance = Value
+    end
+})
+
+Tabs.Combat:AddSection("Grab Modifiers & Physics")
+
+Tabs.Combat:AddToggle("SuperStrengthToggle", {
+    Title = "Super Strength Throw",
+    Default = false,
+    Callback = function(Value)
+        Combat.GrabMods.SuperStrength = Value
+    end
+})
+
+Tabs.Combat:AddSlider("ThrowPowerSlider", {
+    Title = "Throw Power Multiplier",
+    Default = 1,
+    Min = 1,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(Value)
+        Combat.GrabMods.ThrowPower = Value
+    end
+})
+
+Tabs.Combat:AddToggle("KillGrabToggle", {
+    Title = "Kill Grab (Instant Void Throw on Grab)",
+    Default = false,
+    Callback = function(Value)
+        Combat.GrabMods.KillGrab = Value
+    end
+})
+
 Tabs.Combat:AddSection("Fling Utilities")
 
 Tabs.Combat:AddSlider("FlingPowerSlider", {
@@ -136,6 +186,13 @@ Tabs.Combat:AddButton({
     end
 })
 
+Tabs.Combat:AddButton({
+    Title = "Fling All Players",
+    Callback = function()
+        Combat.FlingAllPlayers()
+    end
+})
+
 -- ==================== PLAYER TAB ====================
 Tabs.Player:AddSection("Movement & Physics")
 
@@ -143,11 +200,7 @@ Tabs.Player:AddToggle("SpeedToggle", {
     Title = "Enable Speed Multiplier",
     Default = false,
     Callback = function(Value)
-        if Value then
-            Player.EnableSpeed()
-        else
-            Player.DisableSpeed()
-        end
+        if Value then Player.EnableSpeed() else Player.DisableSpeed() end
     end
 })
 
@@ -163,6 +216,33 @@ Tabs.Player:AddSlider("SpeedSlider", {
             local hum = Shared.GetCharHumanoid()
             if hum then hum.WalkSpeed = Value end
         end
+    end
+})
+
+Tabs.Player:AddToggle("InfJumpToggle", {
+    Title = "Infinite Jump",
+    Default = false,
+    Callback = function(Value)
+        Player.ToggleInfiniteJump(Value)
+    end
+})
+
+Tabs.Player:AddToggle("FlyToggle", {
+    Title = "Fly Mode (WASD + Space/Shift)",
+    Default = false,
+    Callback = function(Value)
+        Player.ToggleFly(Value, Player.Fly.speed)
+    end
+})
+
+Tabs.Player:AddSlider("FlySpeedSlider", {
+    Title = "Fly Speed",
+    Default = 50,
+    Min = 10,
+    Max = 300,
+    Rounding = 0,
+    Callback = function(Value)
+        Player.Fly.speed = Value
     end
 })
 
@@ -199,6 +279,14 @@ Tabs.Player:AddSlider("ThirdPersonDistanceSlider", {
     Rounding = 0,
     Callback = function(Value)
         Player.SetThirdPersonDistance(Value)
+    end
+})
+
+Tabs.Player:AddToggle("SpinBotToggle", {
+    Title = "Spin Bot",
+    Default = false,
+    Callback = function(Value)
+        Player.ToggleSpin(Value, Player.Spin.speed)
     end
 })
 
@@ -391,146 +479,26 @@ Tabs.Cosmetics:AddToggle("AngelWingsToggle", {
 
 Tabs.Cosmetics:AddSection("Lighting & Atmosphere Shaders")
 
-Tabs.Cosmetics:AddButton({
-    Title = "Warm Sunshine",
-    Callback = function()
-        Cosmetics.ApplyWarmSunshine()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Sakura Dream",
-    Callback = function()
-        Cosmetics.ApplySakuraDream()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Clear Sky",
-    Callback = function()
-        Cosmetics.ApplyClearSky()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Mint Fresh",
-    Callback = function()
-        Cosmetics.ApplyMintFresh()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Peach Smooth",
-    Callback = function()
-        Cosmetics.ApplyPeachSmooth()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Ocean Breeze",
-    Callback = function()
-        Cosmetics.ApplyOceanBreeze()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Golden Hour",
-    Callback = function()
-        Cosmetics.ApplyGoldenHour()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Frost Morning",
-    Callback = function()
-        Cosmetics.ApplyFrostMorning()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Soft Sunset",
-    Callback = function()
-        Cosmetics.ApplySoftSunset()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Bright Environment",
-    Callback = function()
-        Cosmetics.ApplyBrightPreset()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Desert Wasteland",
-    Callback = function()
-        Cosmetics.ApplyDesertPreset()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Dreamy Atmosphere",
-    Callback = function()
-        Cosmetics.ApplyDreamyPreset()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Rainy Mood",
-    Callback = function()
-        Cosmetics.ApplyRainyPreset()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Sunset Glow",
-    Callback = function()
-        Cosmetics.ApplySunsetPreset()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Cyberpunk",
-    Callback = function()
-        Cosmetics.ApplyCyberpunk()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Night Vision",
-    Callback = function()
-        Cosmetics.ApplyNightVision()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Synthwave",
-    Callback = function()
-        Cosmetics.ApplySynthwave()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Matrix",
-    Callback = function()
-        Cosmetics.ApplyMatrix()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Purple Vibe",
-    Callback = function()
-        Cosmetics.ApplyPurpleVibe()
-    end
-})
-
-Tabs.Cosmetics:AddButton({
-    Title = "Reset Shaders to Default",
-    Callback = function()
-        Cosmetics.ClearShaders()
-        Shared.Notify("Shaders", "Reset to default!", 2)
-    end
-})
+Tabs.Cosmetics:AddButton({ Title = "Warm Sunshine", Callback = function() Cosmetics.ApplyWarmSunshine() end })
+Tabs.Cosmetics:AddButton({ Title = "Sakura Dream", Callback = function() Cosmetics.ApplySakuraDream() end })
+Tabs.Cosmetics:AddButton({ Title = "Clear Sky", Callback = function() Cosmetics.ApplyClearSky() end })
+Tabs.Cosmetics:AddButton({ Title = "Mint Fresh", Callback = function() Cosmetics.ApplyMintFresh() end })
+Tabs.Cosmetics:AddButton({ Title = "Peach Smooth", Callback = function() Cosmetics.ApplyPeachSmooth() end })
+Tabs.Cosmetics:AddButton({ Title = "Ocean Breeze", Callback = function() Cosmetics.ApplyOceanBreeze() end })
+Tabs.Cosmetics:AddButton({ Title = "Golden Hour", Callback = function() Cosmetics.ApplyGoldenHour() end })
+Tabs.Cosmetics:AddButton({ Title = "Frost Morning", Callback = function() Cosmetics.ApplyFrostMorning() end })
+Tabs.Cosmetics:AddButton({ Title = "Soft Sunset", Callback = function() Cosmetics.ApplySoftSunset() end })
+Tabs.Cosmetics:AddButton({ Title = "Bright Environment", Callback = function() Cosmetics.ApplyBrightPreset() end })
+Tabs.Cosmetics:AddButton({ Title = "Desert Wasteland", Callback = function() Cosmetics.ApplyDesertPreset() end })
+Tabs.Cosmetics:AddButton({ Title = "Dreamy Atmosphere", Callback = function() Cosmetics.ApplyDreamyPreset() end })
+Tabs.Cosmetics:AddButton({ Title = "Rainy Mood", Callback = function() Cosmetics.ApplyRainyPreset() end })
+Tabs.Cosmetics:AddButton({ Title = "Sunset Glow", Callback = function() Cosmetics.ApplySunsetPreset() end })
+Tabs.Cosmetics:AddButton({ Title = "Cyberpunk", Callback = function() Cosmetics.ApplyCyberpunk() end })
+Tabs.Cosmetics:AddButton({ Title = "Night Vision", Callback = function() Cosmetics.ApplyNightVision() end })
+Tabs.Cosmetics:AddButton({ Title = "Synthwave", Callback = function() Cosmetics.ApplySynthwave() end })
+Tabs.Cosmetics:AddButton({ Title = "Matrix", Callback = function() Cosmetics.ApplyMatrix() end })
+Tabs.Cosmetics:AddButton({ Title = "Purple Vibe", Callback = function() Cosmetics.ApplyPurpleVibe() end })
+Tabs.Cosmetics:AddButton({ Title = "Reset Shaders to Default", Callback = function() Cosmetics.ClearShaders(); Shared.Notify("Shaders", "Reset to default!", 2) end })
 
 -- ==================== TARGET TAB ====================
 Tabs.Target:AddSection("Select Target Player")
@@ -584,7 +552,7 @@ Tabs.Target:AddButton({
 })
 
 Tabs.Target:AddToggle("LoopKillTargetToggle", {
-    Title = "Loop Kill Target",
+    Title = "Loop Kill Target (Void Drop)",
     Default = false,
     Callback = function(Value)
         local target = Target.GetTarget()
@@ -600,6 +568,35 @@ Tabs.Target:AddToggle("LoopKillTargetToggle", {
     end
 })
 
+Tabs.Target:AddToggle("DualHandLoopKickToggle", {
+    Title = "Dual Hand Loop Kick (Blobman Engine)",
+    Default = false,
+    Callback = function(Value)
+        local target = Target.GetTarget()
+        if Value then
+            if target then
+                Target.StartDualHandLoopKick(target)
+            else
+                Shared.Notify("Target", "Select a target first!", 2)
+            end
+        else
+            Target.StopDualHandLoopKick()
+        end
+    end
+})
+
+Tabs.Target:AddButton({
+    Title = "Strip Anti-Kick from Target",
+    Callback = function()
+        local target = Target.GetTarget()
+        if target then
+            Target.StripAntiKick(target)
+        else
+            Shared.Notify("Target", "Select a target first!", 2)
+        end
+    end
+})
+
 Target.RefreshPlayerList()
 
 -- ==================== MASS / TROLL TAB ====================
@@ -608,17 +605,13 @@ Tabs.Mass:AddSection("Server Interaction & Mass Actions")
 Tabs.Mass:AddButton({
     Title = "Kill All Players (Void Drop)",
     Callback = function()
-        local grabEvents = Shared.ReplicatedStorage:FindFirstChild("GrabEvents")
-        local setOwner = grabEvents and grabEvents:FindFirstChild("SetNetworkOwner")
         for _, player in ipairs(Shared.Players:GetPlayers()) do
             if player ~= Shared.LocalPlayer and player.Character then
                 local root = Shared.GetRoot(player)
                 if root then
-                    pcall(function()
-                        if setOwner then setOwner:FireServer(root, root.CFrame) end
-                        root.AssemblyLinearVelocity = Vector3.new(0, -1e6, 0)
-                        root.CFrame = CFrame.new(root.Position.X, -3000, root.Position.Z)
-                    end)
+                    Shared.SetNetworkOwner(root, root.CFrame)
+                    root.AssemblyLinearVelocity = Vector3.new(0, -1e6, 0)
+                    root.CFrame = CFrame.new(root.Position.X, -3000, root.Position.Z)
                 end
             end
         end
@@ -629,14 +622,7 @@ Tabs.Mass:AddButton({
 Tabs.Mass:AddButton({
     Title = "Fling All Players",
     Callback = function()
-        local count = 0
-        for _, player in ipairs(Shared.Players:GetPlayers()) do
-            if player ~= Shared.LocalPlayer and player.Character then
-                Combat.FlingTarget(player, Combat.Config.FlingPower)
-                count = count + 1
-            end
-        end
-        Shared.Notify("Mass", "Flinged " .. count .. " players!", 2)
+        Combat.FlingAllPlayers()
     end
 })
 
@@ -644,7 +630,7 @@ Tabs.Mass:AddButton({
 Tabs.Protection:AddSection("Safety & Anti-Troll Measures")
 
 Tabs.Protection:AddToggle("AntiGrabToggle", {
-    Title = "Anti Grab",
+    Title = "Anti Grab (Anchor & Struggle)",
     Default = false,
     Callback = function(Value)
         Defense.ToggleAntiGrab(Value)
@@ -676,32 +662,43 @@ Tabs.Protection:AddToggle("AntiPaintToggle", {
 })
 
 Tabs.Protection:AddToggle("AntiStickyToggle", {
-    Title = "Anti Sticky (Disable Sticky Detection)",
+    Title = "Anti Sticky (Immunity to Shurikens & Glue)",
     Default = false,
     Callback = function(Value)
         Defense.ToggleAntiSticky(Value)
     end
 })
 
+Tabs.Protection:AddToggle("AntiLineLagToggle", {
+    Title = "Anti Line Lag (Disable Beam Lag)",
+    Default = false,
+    Callback = function(Value)
+        Defense.ToggleAntiLineLag(Value)
+    end
+})
+
+Tabs.Protection:AddToggle("AntiBlobmanToggle", {
+    Title = "Anti Blobman (Destroy Enemy Blobmans)",
+    Default = false,
+    Callback = function(Value)
+        Defense.ToggleAntiBlobman(Value)
+    end
+})
+
 -- ==================== DEFENSE TAB ====================
-Tabs.Defense:AddSection("Anti-Function & Protection")
+Tabs.Defense:AddSection("Weapon & Item Protections")
 
 Tabs.Defense:AddToggle("AntiKickStickToggle", {
     Title = "Anti-Kick Stick (Hold Weapon)",
     Default = false,
     Callback = function(Value)
-        Defense.AntiKickStick.enabled = Value
-        if Value then
-            Defense.StartAntiKickStick()
-        else
-            Defense.StopAntiKickStick()
-        end
+        if Value then Defense.StartAntiKickStick() else Defense.StopAntiKickStick() end
     end
 })
 
 Tabs.Defense:AddDropdown("KickStickItemDropdown", {
     Title = "Anti-Kick Item",
-    Values = Defense.AntiKickStick.items or { "NinjaShuriken", "NinjaKunai", "ToolPencil", "ToolPickaxe", "NinjaKatana" },
+    Values = Defense.AntiKickStick.items,
     Default = "NinjaShuriken",
     Callback = function(Value)
         Defense.AntiKickStick.selectedItem = Value
@@ -712,12 +709,7 @@ Tabs.Defense:AddToggle("AntiInputLagToggle", {
     Title = "Anti Input Lag (Delete Spam Toys)",
     Default = false,
     Callback = function(Value)
-        Defense.AntiInputLag.enabled = Value
-        if Value then
-            Defense.StartAntiInputLag()
-        else
-            Defense.StopAntiInputLag()
-        end
+        Defense.ToggleAntiInputLag(Value)
     end
 })
 
@@ -734,6 +726,7 @@ Tabs.Auras:AddSlider("AuraRadiusSlider", {
         Auras.TelekinesisAura.radius = Value
         Auras.DeathAura.radius = Value
         Auras.LaunchAura.radius = Value
+        Auras.DualKickAura.radius = Value
         Auras.RemoveAntiKickAura.radius = Value
     end
 })
@@ -762,6 +755,14 @@ Tabs.Auras:AddToggle("DeathAuraToggle", {
     end
 })
 
+Tabs.Auras:AddToggle("DualKickAuraToggle", {
+    Title = "Dual Hand Kick Aura (Blobman Engine)",
+    Default = false,
+    Callback = function(Value)
+        Auras.ToggleDualKickAura(Value, Auras.DualKickAura.radius)
+    end
+})
+
 Tabs.Auras:AddToggle("RemoveAntiKickAuraToggle", {
     Title = "Remove Anti-Kick Aura",
     Default = false,
@@ -777,11 +778,7 @@ Tabs.Server:AddToggle("PacketLagToggle", {
     Title = "Packet Lag (Spam Extend Grab Line)",
     Default = false,
     Callback = function(Value)
-        if Value then
-            Server.StartPacketLag()
-        else
-            Server.StopPacketLag()
-        end
+        if Value then Server.StartPacketLag() else Server.StopPacketLag() end
     end
 })
 
@@ -789,11 +786,7 @@ Tabs.Server:AddToggle("LineLagToggle", {
     Title = "Line Lag (Spam Create Grab Line)",
     Default = false,
     Callback = function(Value)
-        if Value then
-            Server.StartLineLag()
-        else
-            Server.StopLineLag()
-        end
+        if Value then Server.StartLineLag() else Server.StopLineLag() end
     end
 })
 
@@ -845,6 +838,13 @@ Tabs.Misc:AddToggle("BreakBarriersToggle", {
     end
 })
 
+Tabs.Misc:AddButton({
+    Title = "Spawn Creature Blobman 👾",
+    Callback = function()
+        Misc.SpawnGucciBlobman()
+    end
+})
+
 Tabs.Misc:AddSection("Figure Poses (Target Grab)")
 
 for poseName, _ in pairs(Misc.FigurePresets) do
@@ -888,5 +888,5 @@ Shared.Players.PlayerRemoving:Connect(function()
     Target.RefreshPlayerList()
 end)
 
-Shared.Notify("FTAP-Gemoroi", "Successfully loaded modular edition!", 3)
+Shared.Notify("FTAP-Gemoroi", "Successfully loaded modular edition v3.0! 🚀", 3)
 Shared.PlayEnableSound()

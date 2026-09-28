@@ -1,253 +1,18 @@
 local Shared = (getgenv and getgenv().FTAP_Shared) or require(script.Parent.Shared)
 local Defense = {}
 
-function Defense.ApplyHighlight(model)
-    if not model or not model.Parent then
-        return
-    end
-    local existing = model:FindFirstChild("Amethyst_FullHighlight")
-    if existing then
-        existing:Destroy()
-    end
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "Amethyst_FullHighlight"
-    highlight.FillColor = Color3.fromRGB(170, 100, 255)
-    highlight.OutlineColor = Color3.fromRGB(140, 90, 220)
-    highlight.OutlineTransparency = .1
-    highlight.FillTransparency = .2
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Adornee = model
-    highlight.Parent = model
-    for _, part in ipairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Transparency = .95
-            if part:FindFirstChildOfClass("Texture") then
-                part.Material = Enum.Material.ForceField
-            end
-        end
-    end
-    return highlight
-end
-
-function Defense.GiveNetworkOwner(model, ownerName)
-    if not model or not model:FindFirstChild("StickyPart") then
-        return
-    end
-    local root = Shared.GetRoot()
-    if not root then
-        return
-    end
-    local setOwner = Shared.ReplicatedStorage.GrabEvents:WaitForChild("SetNetworkOwner")
-    if model:FindFirstChild("SoundPart") then
-        local soundPart = model.SoundPart
-        if not soundPart:FindFirstChild("PartOwner") or soundPart.PartOwner.Value ~= ownerName then
-            setOwner:FireServer(soundPart, soundPart.CFrame)
-        end
-    end
-end
-
-function Defense.MakeAntiKick(model, player)
-    local lp = player.Character
-    if not lp or not lp:FindFirstChild("HumanoidRootPart") then
-        return
-    end
-    if not model or not model:FindFirstChild("StickyPart") then
-        return
-    end
-    local root = lp.HumanoidRootPart
-    local firePart = root:FindFirstChild("FirePlayerPart")
-    if not firePart then
-        firePart = Instance.new("Part")
-        firePart.Name = "FirePlayerPart"
-        firePart.Size = Vector3.new(1, 1, 1)
-        firePart.Transparency = 1
-        firePart.CanCollide = false
-        firePart.CanQuery = false
-        firePart.Anchored = true
-        firePart.Parent = root
-        local weld = Instance.new("Weld")
-        weld.Part0 = root
-        weld.Part1 = firePart
-        weld.C0 = CFrame.new(0, 0, 0)
-        weld.Parent = firePart
-    end
-    local grabEvents = Shared.ReplicatedStorage:WaitForChild("GrabEvents")
-    local setOwner = grabEvents:WaitForChild("SetNetworkOwner")
-    if model:FindFirstChild("SoundPart") then
-        local soundPart = model.SoundPart
-        if not soundPart:FindFirstChild("PartOwner") or soundPart.PartOwner.Value ~= player.Name then
-            pcall(function()
-                setOwner:FireServer(soundPart, soundPart.CFrame)
-            end)
-        end
-    end
-    local playerEvents = Shared.ReplicatedStorage:WaitForChild("PlayerEvents")
-    local stickyEvent = playerEvents:WaitForChild("StickyPartEvent")
-    pcall(function()
-        stickyEvent:FireServer(model.StickyPart, firePart, CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(90), math.rad(90)))
-    end)
-    local sticky = model:FindFirstChild("StickyPart")
-    if sticky then
-        sticky.Transparency = 1
-        sticky.CanCollide = false
-        sticky.CanQuery = false
-    end
-    local soundPart = model:FindFirstChild("SoundPart")
-    if soundPart then
-        soundPart.Transparency = 1
-        soundPart.CanCollide = false
-        soundPart.CanQuery = false
-    end
-    Defense.ApplyHighlight(model)
-    if not model:FindFirstChild("Amethyst_Atmosphere") then
-        local atmosphere = Instance.new("Atmosphere", model)
-        atmosphere.Name = "Amethyst_Atmosphere"
-        atmosphere.Color = Color3.fromRGB(170, 100, 255)
-        atmosphere.Decay = Color3.fromRGB(50, 30, 80)
-        atmosphere.Glare = .2
-        atmosphere.Haze = .1
-        atmosphere.Density = .3
-    end
-    if not model:FindFirstChild("Amethyst_PointLight") then
-        local light = Instance.new("PointLight", model)
-        light.Name = "Amethyst_PointLight"
-        light.Color = Color3.fromRGB(170, 100, 255)
-        light.Range = 15
-        light.Brightness = 0.5
-        light.Shadows = true
-    end
-    if model.PrimaryPart then
-        model:SetPrimaryPartCFrame(root.CFrame)
-    end
-    model.Name = "AntiKick"
-    task.delay(.1, function()
-        if model and model.Parent then
-            for _, part in ipairs(model:GetDescendants()) do
-                if part:IsA("BasePart") and part.Name ~= "StickyPart" and part.Name ~= "SoundPart" then
-                    part.Transparency = 0.5
-                end
-            end
-        end
-    end)
-end
-
--- State holders for defense features
-Defense.AntiGrab = { enabled = false, connection = nil, antiGrabProc = false, agWalk = false }
+Defense.AntiGrab = { enabled = false, connection = nil, isHeldConn = nil, charConn = nil }
 Defense.AntiKickStick = { enabled = false, loopThread = nil, currentItem = nil, selectedItem = "NinjaShuriken" }
-Defense.SafePos = { enabled = false, target = nil, loopThread = nil }
-Defense.Noclip = { enabled = false, connection = nil, parts = {} }
-Defense.AntiInputLag = { enabled = false, loopThread = nil, currentItem = nil, selectedItem = "FoodHamburger" }
-Defense.AntiRagdoll = { enabled = false, connections = {}, ragdolledSit = false }
 Defense.AntiVoid = { enabled = false, loopThread = nil, originalDestroyHeight = -100 }
-Defense.AntiBurn = { enabled = false, connection1 = nil, connection2 = nil, currentBarrier = nil }
+Defense.AntiExplode = { enabled = false, connections = {} }
+Defense.AntiBurn = { enabled = false, connection = nil }
 Defense.AntiPaint = { enabled = false, connection = nil }
-Defense.AntiExplode = { enabled = false, connection = nil, bombEvent = nil }
-Defense.AntiBanana = { enabled = false, connection = nil }
-Defense.AntiBlob = { enabled = false, loopThread = nil, processedPlayers = {} }
-Defense.AutoGucci = { enabled = false, monitoringThread = nil, connection = nil, safePosition = nil, restoreFrames = 0 }
+Defense.AntiSticky = { enabled = false }
+Defense.AntiLineLag = { enabled = false }
+Defense.AntiInputLag = { enabled = false, loopThread = nil }
+Defense.AntiBlobman = { enabled = false, loopThread = nil }
+Defense.AutoReset = { enabled = false, connection = nil }
 
--- Helpers for remote lookup
-function Defense.GetRemote(name)
-    for _, desc in ipairs(Shared.ReplicatedStorage:GetDescendants()) do
-        if desc.Name == name and desc:IsA("RemoteEvent") then
-            return desc
-        end
-    end
-    return nil
-end
-
--- Anti-Grab
-Defense.antiGrabState = { remotes = {}, parts = {}, conns = {} }
-
-function Defense.ToggleAntiGrab(state)
-    Defense.AntiGrab.enabled = state
-    Defense.AntiGrab.antiGrabEnabled = state
-    local antiGrab = Defense.antiGrabState
-
-    if state then
-        local function OnHeartbeat()
-            if not antiGrab.parts.IsHeld or not antiGrab.parts.IsHeld.Value then return end
-            if not antiGrab.parts.Root or not antiGrab.parts.Humanoid then return end
-            antiGrab.parts.Root.Anchored = true
-            local grabEvents = Shared.ReplicatedStorage:FindFirstChild("GrabEvents")
-            local setOwner = grabEvents and grabEvents:FindFirstChild("SetNetworkOwner")
-            if setOwner then
-                setOwner:FireServer(antiGrab.parts.Root, antiGrab.parts.Root.CFrame)
-            end
-            antiGrab.parts.Root.Massless = true
-            antiGrab.parts.Root.CanCollide = false
-            antiGrab.parts.Root.CanQuery = false
-            antiGrab.parts.Root.AssemblyLinearVelocity = Vector3.zero
-            antiGrab.parts.Root.AssemblyAngularVelocity = Vector3.zero
-            local struggle = Defense.GetRemote("Struggle")
-            local ragdoll = Defense.GetRemote("RagdollRemote")
-            if struggle then struggle:FireServer() end
-            if ragdoll then ragdoll:FireServer(antiGrab.parts.Root, 0) end
-            if antiGrab.parts.originalGrabPosition then
-                antiGrab.parts.Root.CFrame = antiGrab.parts.originalGrabPosition
-            end
-            antiGrab.parts.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-            antiGrab.parts.Humanoid.Sit = false
-            antiGrab.parts.Humanoid.PlatformStand = false
-        end
-
-        local function OnHeldChanged()
-            if not antiGrab.parts.IsHeld then return end
-            if antiGrab.parts.IsHeld.Value then
-                antiGrab.parts.grabStartTime = os.clock()
-                if antiGrab.parts.Root then
-                    antiGrab.parts.originalGrabPosition = antiGrab.parts.Root.CFrame
-                    antiGrab.parts.Root.Anchored = true
-                end
-                if not antiGrab.conns.heartbeat then
-                    antiGrab.conns.heartbeat = Shared.RunService.Heartbeat:Connect(OnHeartbeat)
-                end
-            else
-                if antiGrab.conns.heartbeat then
-                    antiGrab.conns.heartbeat:Disconnect()
-                    antiGrab.conns.heartbeat = nil
-                end
-                if antiGrab.parts.Root then
-                    antiGrab.parts.Root.Anchored = false
-                    antiGrab.parts.Root.Massless = false
-                    antiGrab.parts.Root.CanCollide = true
-                    antiGrab.parts.Root.CanQuery = true
-                end
-            end
-        end
-
-        local function OnCharacterAdded(character)
-            if not character then return end
-            antiGrab.parts.Character = character
-            antiGrab.parts.Root = character:WaitForChild("HumanoidRootPart")
-            antiGrab.parts.Humanoid = character:WaitForChild("Humanoid")
-        end
-
-        local isHeld = Shared.LocalPlayer:FindFirstChild("IsHeld")
-        if isHeld then antiGrab.parts.IsHeld = isHeld end
-        if Shared.LocalPlayer.Character then OnCharacterAdded(Shared.LocalPlayer.Character) end
-        antiGrab.conns.charAdded = Shared.LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
-        if antiGrab.parts.IsHeld then
-            antiGrab.conns.heldChanged = antiGrab.parts.IsHeld:GetPropertyChangedSignal("Value"):Connect(OnHeldChanged)
-        end
-        OnHeldChanged()
-        Shared.Notify("Anti Grab", "Enabled - Grab protection active", 2)
-    else
-        if antiGrab.conns.heartbeat then antiGrab.conns.heartbeat:Disconnect() end
-        if antiGrab.conns.charAdded then antiGrab.conns.charAdded:Disconnect() end
-        if antiGrab.conns.heldChanged then antiGrab.conns.heldChanged:Disconnect() end
-        antiGrab.conns = {}
-        if antiGrab.parts.Root then
-            antiGrab.parts.Root.Anchored = false
-            antiGrab.parts.Root.Massless = false
-            antiGrab.parts.Root.CanCollide = true
-            antiGrab.parts.Root.CanQuery = true
-        end
-        Shared.Notify("Anti Grab", "Disabled", 2)
-    end
-end
-
--- Anti-Kick Stick loop
 Defense.AntiKickStick.items = {
     "NinjaShuriken",
     "NinjaKunai",
@@ -258,38 +23,6 @@ Defense.AntiKickStick.items = {
     "NinjaKatana"
 }
 
-function Defense.StartAntiKickStickLoop()
-    while Defense.AntiKickStick.enabled do
-        pcall(function()
-            local char = Shared.LocalPlayer.Character
-            if not char then task.wait(1); return end
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if not root then task.wait(1); return end
-            local folder = Shared.Workspace:FindFirstChild(Shared.LocalPlayer.Name .. "SpawnedInToys")
-            local found = false
-            if folder then
-                for _, toy in ipairs(folder:GetChildren()) do
-                    if toy.Name == Defense.AntiKickStick.selectedItem then
-                        found = true
-                        Defense.MakeAntiKick(toy, Shared.LocalPlayer)
-                    end
-                end
-            end
-            if not found then
-                local spawnToy = Shared.ReplicatedStorage.MenuToys.SpawnToyRemoteFunction
-                local success, toy = pcall(function()
-                    return spawnToy:InvokeServer(Defense.AntiKickStick.selectedItem, root.CFrame * CFrame.new(0, 10, 0), Vector3.zero)
-                end)
-                if success and toy then
-                    Defense.MakeAntiKick(toy, Shared.LocalPlayer)
-                end
-            end
-        end)
-        task.wait(2)
-    end
-end
-
--- Anti-Input Lag removal helper
 Defense.AntiInputLag.items = {
     "FoodHamburger",
     "InstrumentDrumBongos",
@@ -303,32 +36,95 @@ Defense.AntiInputLag.items = {
     "InstrumentGuitarAcoustic"
 }
 
-function Defense.IsInputLagItem(name)
-    return table.find(Defense.AntiInputLag.items, name) ~= nil
+-- Anti-Grab (Obsidian / Anchor Grab Engine)
+function Defense.ToggleAntiGrab(state)
+    Defense.AntiGrab.enabled = state
+    local lp = Shared.LocalPlayer
+
+    if state then
+        local function onHeldChanged()
+            local isHeld = lp:FindFirstChild("IsHeld")
+            if isHeld and isHeld.Value then
+                local root = Shared.GetRoot(lp)
+                local hum = Shared.GetCharHumanoid(lp)
+                if root then
+                    root.Anchored = true
+                    root.AssemblyLinearVelocity = Vector3.zero
+                    root.AssemblyAngularVelocity = Vector3.zero
+                    Shared.SetNetworkOwner(root, root.CFrame)
+                    Shared.Struggle()
+                    Shared.Ragdoll(root, 0)
+                    if hum then
+                        hum:ChangeState(Enum.HumanoidStateType.Physics)
+                        hum.Sit = false
+                    end
+                end
+            else
+                local root = Shared.GetRoot(lp)
+                if root and not Defense.AntiGrab.forceAnchor then
+                    root.Anchored = false
+                end
+            end
+        end
+
+        local isHeld = lp:FindFirstChild("IsHeld")
+        if isHeld then
+            Defense.AntiGrab.isHeldConn = isHeld:GetPropertyChangedSignal("Value"):Connect(onHeldChanged)
+        end
+
+        Defense.AntiGrab.charConn = lp.CharacterAdded:Connect(function(char)
+            task.wait(0.5)
+            local newHeld = lp:FindFirstChild("IsHeld")
+            if newHeld and Defense.AntiGrab.enabled then
+                if Defense.AntiGrab.isHeldConn then Defense.AntiGrab.isHeldConn:Disconnect() end
+                Defense.AntiGrab.isHeldConn = newHeld:GetPropertyChangedSignal("Value"):Connect(onHeldChanged)
+            end
+        end)
+
+        Defense.AntiGrab.connection = Shared.RunService.Heartbeat:Connect(function()
+            local curHeld = lp:FindFirstChild("IsHeld")
+            if curHeld and curHeld.Value then
+                local root = Shared.GetRoot(lp)
+                if root then
+                    root.Anchored = true
+                    Shared.Struggle()
+                    Shared.SetNetworkOwner(root, root.CFrame)
+                end
+            end
+        end)
+
+        Shared.Notify("Anti-Grab", "Anti-Grab Protection Active 🛡️", 2)
+        Shared.PlayEnableSound()
+    else
+        if Defense.AntiGrab.connection then Defense.AntiGrab.connection:Disconnect(); Defense.AntiGrab.connection = nil end
+        if Defense.AntiGrab.isHeldConn then Defense.AntiGrab.isHeldConn:Disconnect(); Defense.AntiGrab.isHeldConn = nil end
+        if Defense.AntiGrab.charConn then Defense.AntiGrab.charConn:Disconnect(); Defense.AntiGrab.charConn = nil end
+        local root = Shared.GetRoot(lp)
+        if root then root.Anchored = false end
+        Shared.Notify("Anti-Grab", "Anti-Grab Disabled", 2)
+    end
 end
 
--- Anti-Void
--- Anti-Void (Amethyst Defense Upgrade)
+-- Anti-Void (Auto Void Rescue)
 function Defense.ToggleAntiVoid(state)
     Defense.AntiVoid.enabled = state
     if state then
         Defense.AntiVoid.originalDestroyHeight = Shared.Workspace.FallenPartsDestroyHeight
-        Shared.Workspace.FallenPartsDestroyHeight = -2000
+        Shared.Workspace.FallenPartsDestroyHeight = -3000
         if Defense.AntiVoid.loopThread then task.cancel(Defense.AntiVoid.loopThread) end
         Defense.AntiVoid.loopThread = task.spawn(function()
             while Defense.AntiVoid.enabled do
-                local root = Shared.GetRoot()
-                if root and root.Position.Y < -500 then
-                    root.CFrame = CFrame.new(0, 10, 0)
-                    root.AssemblyLinearVelocity = Vector3.zero
-                    Shared.Notify("Anti Void", "Saved player from void!", 2)
+                local root = Shared.GetRoot(Shared.LocalPlayer)
+                if root and root.Position.Y < -100 then
+                    root.CFrame = CFrame.new(root.Position.X, 15, root.Position.Z)
+                    Shared.StopAllVelocity()
+                    Shared.Notify("Anti-Void", "Rescued from void!", 2)
                 end
                 task.wait(0.1)
             end
         end)
-        Shared.Notify("Anti Void", "Enabled - Void protection active", 2)
+        Shared.Notify("Anti-Void", "Anti-Void Rescue Active 🪂", 2)
     else
-        Defense.AntiVoid.enabled = false
         if Defense.AntiVoid.loopThread then
             task.cancel(Defense.AntiVoid.loopThread)
             Defense.AntiVoid.loopThread = nil
@@ -336,35 +132,11 @@ function Defense.ToggleAntiVoid(state)
         pcall(function()
             Shared.Workspace.FallenPartsDestroyHeight = Defense.AntiVoid.originalDestroyHeight or -500
         end)
-        Shared.Notify("Anti Void", "Disabled", 2)
+        Shared.Notify("Anti-Void", "Anti-Void Disabled", 2)
     end
 end
 
--- Anti-Explode (Amethyst Defense Engine)
-Defense.AntiExplode = Defense.AntiExplode or { enabled = false, connections = {} }
-
-function Defense.FindBombRemote()
-    local searchFolders = {
-        Shared.ReplicatedStorage,
-        Shared.ReplicatedStorage:FindFirstChild("GameEvents"),
-        Shared.ReplicatedStorage:FindFirstChild("CharacterEvents"),
-        Shared.ReplicatedStorage:FindFirstChild("PlayerEvents"),
-        Shared.Workspace
-    }
-    local names = { "BombEvent", "ExplosionEvent", "BombExplosion", "ExplodeRemote" }
-    for _, folder in ipairs(searchFolders) do
-        if folder then
-            for _, name in ipairs(names) do
-                local ev = folder:FindFirstChild(name)
-                if ev and ev:IsA("RemoteEvent") then
-                    return ev
-                end
-            end
-        end
-    end
-    return nil
-end
-
+-- Anti-Explosion
 function Defense.ToggleAntiExplode(state)
     Defense.AntiExplode.enabled = state
     if state then
@@ -373,70 +145,27 @@ function Defense.ToggleAntiExplode(state)
         end
         Defense.AntiExplode.connections = {}
 
-        local limbs = { "Left Leg", "Right Leg", "Left Arm", "Right Arm", "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg" }
-
         local function handleExplosion(pos, radius)
-            local char = Shared.LocalPlayer.Character
-            local root = Shared.GetRoot()
-            local hum = Shared.GetCharHumanoid()
-            if not char or not root or not hum then return end
+            local root = Shared.GetRoot(Shared.LocalPlayer)
+            local hum = Shared.GetCharHumanoid(Shared.LocalPlayer)
+            if not root or not hum then return end
 
             local explosionRadius = radius or 25
             local dist = (pos - root.Position).Magnitude
 
-            if dist <= explosionRadius + 15 then
+            if dist <= explosionRadius + 20 then
                 pcall(function()
                     root.Anchored = true
                     root.AssemblyLinearVelocity = Vector3.zero
                     root.AssemblyAngularVelocity = Vector3.zero
                     hum:ChangeState(Enum.HumanoidStateType.Running)
-
-                    for _, limbName in ipairs(limbs) do
-                        local limb = char:FindFirstChild(limbName)
-                        local rag = limb and limb:FindFirstChild("RagdollLimbPart")
-                        if rag then rag.CanCollide = false end
-                    end
                 end)
-
-                task.wait(0.05)
-
+                task.wait(0.1)
                 pcall(function()
                     root.Anchored = false
-                    root.AssemblyLinearVelocity = Vector3.zero
-                    root.AssemblyAngularVelocity = Vector3.zero
                     hum:ChangeState(Enum.HumanoidStateType.Running)
                 end)
-
-                task.delay(1.5, function()
-                    if char and char.Parent then
-                        for _, limbName in ipairs(limbs) do
-                            local limb = char:FindFirstChild(limbName)
-                            local rag = limb and limb:FindFirstChild("RagdollLimbPart")
-                            if rag then rag.CanCollide = true end
-                        end
-                    end
-                end)
             end
-        end
-
-        local bombEv = Defense.FindBombRemote()
-        if bombEv then
-            Defense.AntiExplode.connections.remote = bombEv.OnClientEvent:Connect(function(info, pos)
-                if not Defense.AntiExplode.enabled then return end
-                local targetPos = nil
-                local radius = 25
-                if typeof(pos) == "Vector3" then
-                    targetPos = pos
-                elseif typeof(info) == "Vector3" then
-                    targetPos = info
-                elseif typeof(info) == "table" and typeof(info.Position) == "Vector3" then
-                    targetPos = info.Position
-                    radius = info.Radius or 25
-                end
-                if targetPos then
-                    handleExplosion(targetPos, radius)
-                end
-            end)
         end
 
         Defense.AntiExplode.connections.workspace = Shared.Workspace.DescendantAdded:Connect(function(desc)
@@ -446,20 +175,14 @@ function Defense.ToggleAntiExplode(state)
             end
         end)
 
-        for _, desc in ipairs(Shared.Workspace:GetDescendants()) do
-            if desc:IsA("Explosion") then
-                handleExplosion(desc.Position, desc.BlastRadius or 25)
-            end
-        end
-
-        Shared.Notify("Anti Explode", "Enabled - Amethyst Explosion Defense active", 2)
+        Shared.Notify("Anti-Explode", "Explosion & Mine Defense Enabled 💣", 2)
     else
         Defense.AntiExplode.enabled = false
         for _, conn in pairs(Defense.AntiExplode.connections or {}) do
             if conn then pcall(function() conn:Disconnect() end) end
         end
         Defense.AntiExplode.connections = {}
-        Shared.Notify("Anti Explode", "Disabled", 2)
+        Shared.Notify("Anti-Explode", "Anti-Explode Disabled", 2)
     end
 end
 
@@ -477,44 +200,43 @@ function Defense.ToggleAntiPaint(state)
                 pcall(function() desc:Destroy() end)
             end
         end
-        Shared.Notify("Anti Paint", "Enabled", 2)
+        Shared.Notify("Anti-Paint", "Anti-Paint Enabled 🎨", 2)
     else
         Defense.AntiPaint.enabled = false
         if Defense.AntiPaint.connection then
             Defense.AntiPaint.connection:Disconnect()
             Defense.AntiPaint.connection = nil
         end
-        Shared.Notify("Anti Paint", "Disabled", 2)
+        Shared.Notify("Anti-Paint", "Anti-Paint Disabled", 2)
     end
 end
 
--- Anti-Sticky (disable StickyPartsTouchDetection)
+-- Anti-Sticky (Anti-Shuriken Lag)
 function Defense.ToggleAntiSticky(state)
-    Defense.AntiSticky = Defense.AntiSticky or { enabled = false, connection = nil }
     Defense.AntiSticky.enabled = state
-    local scripts = Shared.LocalPlayer:FindFirstChild("PlayerScripts")
-    if scripts then
-        local sticky = scripts:FindFirstChild("StickyPartsTouchDetection")
-        if sticky then
-            sticky.Disabled = not state
-            pcall(function() sticky.Disabled = not state end)
-        end
-    end
-    Shared.Notify("Anti Sticky", state and "Enabled" or "Disabled", 2)
+    Shared.ToggleAntiShuriLag(state)
+    Shared.Notify("Anti-Sticky", state and "Immunity to Sticky items Active" or "Anti-Sticky Disabled", 2)
 end
 
--- Anti-Input Lag
+-- Anti-Line Lag
+function Defense.ToggleAntiLineLag(state)
+    Defense.AntiLineLag.enabled = state
+    Shared.ToggleAntiLineLag(state)
+    Shared.Notify("Anti-Line Lag", state and "Line Lag Protection Active" or "Line Lag Protection Disabled", 2)
+end
+
+-- Anti-Input Lag (Spam Toy Destroyer)
 function Defense.ToggleAntiInputLag(state)
     Defense.AntiInputLag.enabled = state
     if state then
         Defense.AntiInputLag.loopThread = task.spawn(function()
             while Defense.AntiInputLag.enabled do
                 pcall(function()
-                    local myToys = Shared.Workspace:FindFirstChild(Shared.LocalPlayer.Name .. "SpawnedInToys")
+                    local myToys = Shared.GetToyFolder(Shared.LocalPlayer)
                     if myToys then
                         for _, item in ipairs(myToys:GetChildren()) do
-                            if Defense.IsInputLagItem(item.Name) then
-                                item:Destroy()
+                            if table.find(Defense.AntiInputLag.items, item.Name) then
+                                Shared.DestroyToy(item)
                             end
                         end
                     end
@@ -522,26 +244,119 @@ function Defense.ToggleAntiInputLag(state)
                 task.wait(1)
             end
         end)
-        Shared.Notify("Anti Input Lag", "Enabled", 2)
+        Shared.Notify("Anti-Input Lag", "Input Lag Item Purge Active", 2)
     else
         if Defense.AntiInputLag.loopThread then
             task.cancel(Defense.AntiInputLag.loopThread)
             Defense.AntiInputLag.loopThread = nil
         end
-        Shared.Notify("Anti Input Lag", "Disabled", 2)
+        Shared.Notify("Anti-Input Lag", "Anti-Input Lag Disabled", 2)
     end
 end
 
--- Helper aliases for UI compatibility
-function Defense.StartAntiGrab() Defense.ToggleAntiGrab(true) end
-function Defense.StopAntiGrab() Defense.ToggleAntiGrab(false) end
+-- Anti-Blobman (Auto destroy nearby enemy blobmans)
+function Defense.ToggleAntiBlobman(state)
+    Defense.AntiBlobman.enabled = state
+    if state then
+        Defense.AntiBlobman.loopThread = task.spawn(function()
+            while Defense.AntiBlobman.enabled do
+                pcall(function()
+                    local myRoot = Shared.GetRoot(Shared.LocalPlayer)
+                    if myRoot then
+                        for _, obj in ipairs(Shared.Workspace:GetChildren()) do
+                            if obj.Name == "CreatureBlobman" and not obj:IsDescendantOf(Shared.GetToyFolder(Shared.LocalPlayer)) then
+                                local seat = obj:FindFirstChildOfClass("Seat") or obj:FindFirstChild("SeatPart")
+                                local bRoot = obj.PrimaryPart or (seat and seat.Position and obj)
+                                if seat and (seat.Position - myRoot.Position).Magnitude <= 30 then
+                                    Shared.SetNetworkOwner(seat, seat.CFrame)
+                                    Shared.DestroyToy(obj)
+                                end
+                            end
+                        end
+                    end
+                end)
+                task.wait(0.5)
+            end
+        end)
+        Shared.Notify("Anti-Blobman", "Anti-Blobman Defense Active 👾", 2)
+    else
+        if Defense.AntiBlobman.loopThread then
+            task.cancel(Defense.AntiBlobman.loopThread)
+            Defense.AntiBlobman.loopThread = nil
+        end
+        Shared.Notify("Anti-Blobman", "Anti-Blobman Disabled", 2)
+    end
+end
+
+-- Anti-Kick Stick Engine
+function Defense.MakeAntiKick(model)
+    local char = Shared.LocalPlayer.Character
+    local root = Shared.GetRoot(Shared.LocalPlayer)
+    if not char or not root or not model then return end
+
+    local stickyPart = model:FindFirstChild("StickyPart") or model:FindFirstChildWhichIsA("BasePart")
+    local soundPart = model:FindFirstChild("SoundPart") or stickyPart
+
+    local firePart = root:FindFirstChild("FirePlayerPart")
+    if not firePart then
+        firePart = Instance.new("Part")
+        firePart.Name = "FirePlayerPart"
+        firePart.Size = Vector3.new(1, 1, 1)
+        firePart.Transparency = 1
+        firePart.CanCollide = false
+        firePart.CanQuery = false
+        firePart.Anchored = false
+        firePart.Parent = root
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = root
+        weld.Part1 = firePart
+        weld.Parent = firePart
+    end
+
+    if soundPart then
+        Shared.SetNetworkOwner(soundPart, soundPart.CFrame)
+    end
+
+    if stickyPart then
+        Shared.StickyAttach(stickyPart, firePart, CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(90), math.rad(90)))
+        stickyPart.Transparency = 1
+        stickyPart.CanCollide = false
+    end
+    if soundPart then
+        soundPart.Transparency = 1
+        soundPart.CanCollide = false
+    end
+end
 
 function Defense.StartAntiKickStick()
     Defense.AntiKickStick.enabled = true
-    if not Defense.AntiKickStick.loopThread then
-        Defense.AntiKickStick.loopThread = task.spawn(Defense.StartAntiKickStickLoop)
-    end
-    Shared.Notify("Anti Kick Stick", "Enabled", 2)
+    if Defense.AntiKickStick.loopThread then task.cancel(Defense.AntiKickStick.loopThread) end
+    Defense.AntiKickStick.loopThread = task.spawn(function()
+        while Defense.AntiKickStick.enabled do
+            pcall(function()
+                local root = Shared.GetRoot(Shared.LocalPlayer)
+                if not root then task.wait(1); return end
+                local myToys = Shared.GetToyFolder(Shared.LocalPlayer)
+                local found = false
+                if myToys then
+                    for _, toy in ipairs(myToys:GetChildren()) do
+                        if toy.Name == Defense.AntiKickStick.selectedItem then
+                            found = true
+                            Defense.MakeAntiKick(toy)
+                        end
+                    end
+                end
+                if not found then
+                    local toy = Shared.SpawnToy(Defense.AntiKickStick.selectedItem, root.CFrame * CFrame.new(0, 5, 0), Vector3.zero)
+                    if toy then
+                        Defense.MakeAntiKick(toy)
+                    end
+                end
+            end)
+            task.wait(2)
+        end
+    end)
+    Shared.Notify("Anti-Kick", "Anti-Kick Stick Active 🛡️", 2)
 end
 
 function Defense.StopAntiKickStick()
@@ -550,22 +365,7 @@ function Defense.StopAntiKickStick()
         task.cancel(Defense.AntiKickStick.loopThread)
         Defense.AntiKickStick.loopThread = nil
     end
-    Shared.Notify("Anti Kick Stick", "Disabled", 2)
+    Shared.Notify("Anti-Kick", "Anti-Kick Stick Disabled", 2)
 end
-
-function Defense.StartAntiInputLag() Defense.ToggleAntiInputLag(true) end
-function Defense.StopAntiInputLag() Defense.ToggleAntiInputLag(false) end
-
-function Defense.StartAntiVoid() Defense.ToggleAntiVoid(true) end
-function Defense.StopAntiVoid() Defense.ToggleAntiVoid(false) end
-
-function Defense.StartAntiExplode() Defense.ToggleAntiExplode(true) end
-function Defense.StopAntiExplode() Defense.ToggleAntiExplode(false) end
-
-function Defense.StartAntiPaint() Defense.ToggleAntiPaint(true) end
-function Defense.StopAntiPaint() Defense.ToggleAntiPaint(false) end
-
-function Defense.StartAntiSticky() Defense.ToggleAntiSticky(true) end
-function Defense.StopAntiSticky() Defense.ToggleAntiSticky(false) end
 
 return Defense

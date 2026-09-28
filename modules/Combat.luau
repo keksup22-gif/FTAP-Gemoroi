@@ -11,6 +11,28 @@ Combat.Config = {
     FlingPower = 1,
 }
 
+-- TriggerBot
+Combat.TriggerBot = {
+    enabled = false,
+    maxDistance = 60,
+    preGrabDelay = 0.02,
+    postGrabDelay = 0.05,
+    cooldown = 0.2,
+    lastGrabTime = 0,
+    connection = nil
+}
+
+-- Grab Modifiers
+Combat.GrabMods = {
+    SuperStrength = false,
+    ThrowPower = 1,
+    KillGrab = false,
+    FreezeGrab = false,
+    SpinGrab = false,
+    MasslessGrab = false,
+    InfiniteLine = false
+}
+
 Combat.FovCircle = nil
 
 local function initFovCircle()
@@ -113,13 +135,7 @@ function Combat.FlingTarget(player, powerOverride)
     local root = Shared.GetRoot(player)
     if not root then return end
 
-    pcall(function()
-        local grabEvents = Shared.ReplicatedStorage:FindFirstChild("GrabEvents")
-        local setNetOwner = grabEvents and grabEvents:FindFirstChild("SetNetworkOwner")
-        if setNetOwner then
-            setNetOwner:FireServer(root, root.CFrame)
-        end
-    end)
+    Shared.SetNetworkOwner(root, root.CFrame)
     task.wait(0.05)
     local power = math.clamp(math.floor(powerOverride or Combat.Config.FlingPower or 1), 1, 6)
     pcall(function()
@@ -154,9 +170,20 @@ function Combat.FlingClosestTarget()
     end
 end
 
+function Combat.FlingAllPlayers()
+    local count = 0
+    for _, player in ipairs(Shared.Players:GetPlayers()) do
+        if player ~= Shared.LocalPlayer and player.Character then
+            Combat.FlingTarget(player, Combat.Config.FlingPower)
+            count = count + 1
+        end
+    end
+    Shared.Notify("Combat", "Flinged " .. count .. " players!", 2)
+end
+
 function Combat.GetClosestPlayerToMouse()
     local myChar = Shared.LocalPlayer.Character
-    local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso"))
+    local myRoot = Shared.GetRoot(Shared.LocalPlayer)
     local cam = Shared.GetCamera()
     if not myRoot or not cam then return nil end
 
@@ -196,6 +223,61 @@ function Combat.GetClosestPlayerToMouse()
     end
 
     return closestPlayer
+end
+
+-- TriggerBot Implementation
+function Combat.ToggleTriggerBot(state)
+    Combat.TriggerBot.enabled = state
+    if state then
+        if Combat.TriggerBot.connection then Combat.TriggerBot.connection:Disconnect() end
+        Combat.TriggerBot.connection = Shared.RunService.RenderStepped:Connect(function()
+            if not Combat.TriggerBot.enabled then return end
+            if tick() - Combat.TriggerBot.lastGrabTime < Combat.TriggerBot.cooldown then return end
+
+            local myRoot = Shared.GetRoot(Shared.LocalPlayer)
+            local cam = Shared.GetCamera()
+            if not myRoot or not cam then return end
+
+            local mousePos = Shared.UserInputService:GetMouseLocation()
+            local mouseRay = cam:ViewportPointToRay(mousePos.X, mousePos.Y)
+
+            local rayParams = RaycastParams.new()
+            rayParams.FilterDescendantsInstances = { Shared.LocalPlayer.Character }
+            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+            local hit = Shared.Workspace:Raycast(mouseRay.Origin, mouseRay.Direction * Combat.TriggerBot.maxDistance, rayParams)
+            if hit and hit.Instance then
+                local hitModel = hit.Instance:FindFirstAncestorOfClass("Model")
+                local targetPlayer = hitModel and Shared.Players:GetPlayerFromCharacter(hitModel)
+                if targetPlayer and targetPlayer ~= Shared.LocalPlayer then
+                    local targetRoot = Shared.GetRoot(targetPlayer)
+                    if targetRoot then
+                        Combat.TriggerBot.lastGrabTime = tick()
+                        task.spawn(function()
+                            task.wait(Combat.TriggerBot.preGrabDelay)
+                            Shared.CreateGrabLine(targetRoot, targetRoot.Position)
+                            Shared.SetNetworkOwner(targetRoot, targetRoot.CFrame)
+                            task.wait(Combat.TriggerBot.postGrabDelay)
+                            if Combat.GrabMods.SuperStrength then
+                                targetRoot.AssemblyLinearVelocity = mouseRay.Direction * (Combat.GrabMods.ThrowPower * 500)
+                            end
+                            if Combat.GrabMods.KillGrab then
+                                targetRoot.AssemblyLinearVelocity = Vector3.new(0, -1e6, 0)
+                                targetRoot.CFrame = CFrame.new(targetRoot.Position.X, -3000, targetRoot.Position.Z)
+                            end
+                        end)
+                    end
+                end
+            end
+        end)
+        Shared.Notify("TriggerBot", "TriggerBot Enabled", 2)
+    else
+        if Combat.TriggerBot.connection then
+            Combat.TriggerBot.connection:Disconnect()
+            Combat.TriggerBot.connection = nil
+        end
+        Shared.Notify("TriggerBot", "TriggerBot Disabled", 2)
+    end
 end
 
 function Combat.Update()
