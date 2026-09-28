@@ -278,32 +278,68 @@ local function getTargetChar()
     return nil
 end
 
+local TARGET_LIMB_NAMES = {
+    "Left Arm", "Right Arm", "Left Leg", "Right Leg",
+    "LeftLowerArm", "RightLowerArm", "LeftUpperArm", "RightUpperArm",
+    "LeftLowerLeg", "RightLowerLeg", "LeftUpperLeg", "RightUpperLeg",
+}
+
+local function getCharacterRootPart(character)
+    return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso"))
+end
+
+local function getCharacterTorsoPart(character)
+    return character and (character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("HumanoidRootPart"))
+end
+
+Misc.FrozenLimbs = { connection = nil, parts = {} }
+
 function Misc.FreezeLimbs(targetCharacter)
     targetCharacter = targetCharacter or getTargetChar()
     if not targetCharacter then Shared.Notify("Limbs", "Select a target first!", 2) return end
+
+    if Misc.FrozenLimbs.connection then
+        Misc.FrozenLimbs.connection:Disconnect()
+        Misc.FrozenLimbs.connection = nil
+    end
+    Misc.FrozenLimbs.parts = {}
+
     pcall(function()
-        for _, name in ipairs({ "Left Arm", "Right Arm", "Left Leg", "Right Leg",
-            "LeftLowerArm", "RightLowerArm", "LeftUpperArm", "RightUpperArm",
-            "LeftLowerLeg", "RightLowerLeg", "LeftUpperLeg", "RightUpperLeg" }) do
+        for _, name in ipairs(TARGET_LIMB_NAMES) do
             local limb = targetCharacter:FindFirstChild(name)
-            if limb then
-                limb.Anchored = true
+            if limb and limb:IsA("BasePart") then
+                Misc.FrozenLimbs.parts[limb] = limb.CFrame
             end
         end
     end)
+
+    if next(Misc.FrozenLimbs.parts) then
+        Misc.FrozenLimbs.connection = Shared.RunService.RenderStepped:Connect(function()
+            pcall(function()
+                for limb, lockedCFrame in pairs(Misc.FrozenLimbs.parts) do
+                    if not limb or not limb.Parent or not limb:IsDescendantOf(targetCharacter) then
+                        Misc.FrozenLimbs.parts[limb] = nil
+                    else
+                        Shared.SetNetworkOwner(limb, lockedCFrame)
+                        limb.CFrame = lockedCFrame
+                        limb.AssemblyLinearVelocity = Vector3.zero
+                        limb.AssemblyAngularVelocity = Vector3.zero
+                    end
+                end
+            end)
+        end)
+    end
+
     Shared.Notify("Limbs", "Target limbs frozen", 2)
 end
 
 function Misc.UnfreezeLimbs(targetCharacter)
-    targetCharacter = targetCharacter or getTargetChar()
-    if not targetCharacter then Shared.Notify("Limbs", "Select a target first!", 2) return end
-    pcall(function()
-        for _, part in ipairs(targetCharacter:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Anchored = false
-            end
-        end
-    end)
+    if Misc.FrozenLimbs.connection then
+        Misc.FrozenLimbs.connection:Disconnect()
+        Misc.FrozenLimbs.connection = nil
+    end
+    Misc.FrozenLimbs.parts = {}
+
     Shared.Notify("Limbs", "Target limbs unfrozen", 2)
 end
 
@@ -311,6 +347,11 @@ function Misc.RemoveLimbs(targetCharacter, mode)
     targetCharacter = targetCharacter or getTargetChar()
     if not targetCharacter then Shared.Notify("Limbs", "Select a target first!", 2) return end
     pcall(function()
+        local root = getCharacterRootPart(targetCharacter)
+        if root then
+            Shared.SetNetworkOwner(root, root.CFrame)
+        end
+
         local names
         if mode == "Arms" then
             names = { "Left Arm", "Right Arm", "LeftLowerArm", "RightLowerArm", "LeftUpperArm", "RightUpperArm" }
@@ -346,6 +387,10 @@ function Misc.ToggleMirrorAnimations(state, targetCharacter)
                 if not targetCharacter or not targetCharacter.Parent or not myChar or not myChar.Parent then
                     return
                 end
+                local targetRoot = getCharacterRootPart(targetCharacter)
+                if targetRoot then
+                    Shared.SetNetworkOwner(targetRoot, targetRoot.CFrame)
+                end
                 for _, myMotor in ipairs(myChar:GetDescendants()) do
                     if myMotor:IsA("Motor6D") then
                         local theirMotor = targetCharacter:FindFirstChild(myMotor.Name, true)
@@ -353,11 +398,6 @@ function Misc.ToggleMirrorAnimations(state, targetCharacter)
                             theirMotor.Transform = myMotor.Transform
                         end
                     end
-                end
-                local theirTorso = targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso")
-                local myRoot = Shared.GetRoot(Shared.LocalPlayer)
-                if theirTorso and myRoot then
-                    Shared.SetNetworkOwner(theirTorso, theirTorso.CFrame)
                 end
             end)
         end)
@@ -404,8 +444,8 @@ function Misc.ToggleFaceTowardMe(state, targetCharacter)
     end
 end
 
--- Lock Torso Rotation: anchors the target torso orientation
-Misc.LockTorso = { enabled = false, lockedCFrame = nil }
+-- Lock Torso Rotation: keeps the target torso at a captured CFrame via ownership
+Misc.LockTorso = { enabled = false, lockedCFrame = nil, connection = nil, torso = nil }
 
 function Misc.ToggleLockTorso(state, targetCharacter)
     Misc.LockTorso.enabled = state
@@ -415,19 +455,34 @@ function Misc.ToggleLockTorso(state, targetCharacter)
             Shared.Notify("Torso", "Select a target first!", 2)
             return
         end
-        local torso = targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso")
+        local torso = getCharacterTorsoPart(targetCharacter)
         if torso then
+            if Misc.LockTorso.connection then
+                Misc.LockTorso.connection:Disconnect()
+                Misc.LockTorso.connection = nil
+            end
+            Misc.LockTorso.torso = torso
             Misc.LockTorso.lockedCFrame = torso.CFrame
-            torso.Anchored = true
+            Misc.LockTorso.connection = Shared.RunService.RenderStepped:Connect(function()
+                pcall(function()
+                    if not Misc.LockTorso.enabled or not targetCharacter or not targetCharacter.Parent or not torso or not torso.Parent then
+                        return
+                    end
+                    Shared.SetNetworkOwner(torso, Misc.LockTorso.lockedCFrame)
+                    torso.CFrame = Misc.LockTorso.lockedCFrame
+                    torso.AssemblyLinearVelocity = Vector3.zero
+                    torso.AssemblyAngularVelocity = Vector3.zero
+                end)
+            end)
             Shared.Notify("Torso", "Target torso rotation locked", 2)
         end
     else
-        if targetCharacter then
-            local torso = targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso")
-            if torso then
-                torso.Anchored = false
-            end
+        if Misc.LockTorso.connection then
+            Misc.LockTorso.connection:Disconnect()
+            Misc.LockTorso.connection = nil
         end
+        Misc.LockTorso.torso = nil
+        Misc.LockTorso.lockedCFrame = nil
         Shared.Notify("Torso", "Torso lock released", 2)
     end
 end
@@ -516,9 +571,12 @@ function Misc.ToggleShurikenDesync(state, targetCharacter)
                                 pcall(function()
                                     local basePart = toy:IsA("Model") and (toy.PrimaryPart or toy:FindFirstChildWhichIsA("BasePart")) or toy
                                     if basePart then
-                                        Shared.SetNetworkOwner(basePart, basePart.CFrame)
-                                        basePart.AssemblyLinearVelocity = Vector3.new(0, -500, 0)
-                                        basePart.AssemblyAngularVelocity = Vector3.new(500, 500, 500)
+                                        task.wait(0.15)
+                                        if basePart and basePart.Parent then
+                                            Shared.SetNetworkOwner(basePart, basePart.CFrame)
+                                            basePart.AssemblyLinearVelocity = Vector3.new(0, -500, 0)
+                                            basePart.AssemblyAngularVelocity = Vector3.new(500, 500, 500)
+                                        end
                                     end
                                 end)
                             end)

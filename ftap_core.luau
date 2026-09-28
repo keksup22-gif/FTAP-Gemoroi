@@ -3782,13 +3782,16 @@ local function setShurikenDesync(state)
                                 pcall(function()
                                     local basePart = toy:IsA("Model") and (toy.PrimaryPart or toy:FindFirstChildWhichIsA("BasePart")) or toy
                                     if basePart then
-                                        local ge = S.ReplicatedStorage:FindFirstChild("GrabEvents")
-                                        local sno = ge and ge:FindFirstChild("SetNetworkOwner")
-                                        if sno then
-                                            sno:FireServer(basePart, basePart.CFrame)
+                                        task.wait(0.15)
+                                        if basePart and basePart.Parent then
+                                            local ge = S.ReplicatedStorage:FindFirstChild("GrabEvents")
+                                            local sno = ge and ge:FindFirstChild("SetNetworkOwner")
+                                            if sno then
+                                                sno:FireServer(basePart, basePart.CFrame)
+                                            end
+                                            basePart.AssemblyLinearVelocity = Vector3.new(0, -500, 0)
+                                            basePart.AssemblyAngularVelocity = Vector3.new(500, 500, 500)
                                         end
-                                        basePart.AssemblyLinearVelocity = Vector3.new(0, -500, 0)
-                                        basePart.AssemblyAngularVelocity = Vector3.new(500, 500, 500)
                                     end
                                 end)
                             end)
@@ -4000,32 +4003,79 @@ local function resetCorePose()
 end
 
 -- === TARGET LIMB CONTROLS ===
+local TARGET_LIMB_NAMES = {
+    "Left Arm", "Right Arm", "Left Leg", "Right Leg",
+    "LeftLowerArm", "RightLowerArm", "LeftUpperArm", "RightUpperArm",
+    "LeftLowerLeg", "RightLowerLeg", "LeftUpperLeg", "RightUpperLeg",
+}
+
+local frozenLimbs = { connection = nil, parts = {} }
+
+local function getCharacterRootPart(character)
+    return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso"))
+end
+
+local function getCharacterTorsoPart(character)
+    return character and (character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("HumanoidRootPart"))
+end
+
+local function claimNetworkOwner(part, cframe)
+    if not part then return end
+    local ge = S.ReplicatedStorage:FindFirstChild("GrabEvents")
+    local sno = ge and ge:FindFirstChild("SetNetworkOwner")
+    if sno then
+        pcall(function()
+            sno:FireServer(part, cframe or part.CFrame)
+        end)
+    end
+end
+
 local function freezeLimbs()
     local targetChar = getTargetChar()
     if not targetChar then Notify("Limbs", "Select a target player first!", 2) return end
+
+    if frozenLimbs.connection then
+        frozenLimbs.connection:Disconnect()
+        frozenLimbs.connection = nil
+    end
+    frozenLimbs.parts = {}
+
     pcall(function()
-        for _, name in ipairs({ "Left Arm", "Right Arm", "Left Leg", "Right Leg",
-            "LeftLowerArm", "RightLowerArm", "LeftUpperArm", "RightUpperArm",
-            "LeftLowerLeg", "RightLowerLeg", "LeftUpperLeg", "RightUpperLeg" }) do
+        for _, name in ipairs(TARGET_LIMB_NAMES) do
             local limb = targetChar:FindFirstChild(name)
-            if limb then
-                limb.Anchored = true
+            if limb and limb:IsA("BasePart") then
+                frozenLimbs.parts[limb] = limb.CFrame
             end
         end
     end)
+
+    if next(frozenLimbs.parts) then
+        frozenLimbs.connection = RunService.RenderStepped:Connect(function()
+            pcall(function()
+                for limb, lockedCFrame in pairs(frozenLimbs.parts) do
+                    if not limb or not limb.Parent or not limb:IsDescendantOf(targetChar) then
+                        frozenLimbs.parts[limb] = nil
+                    else
+                        claimNetworkOwner(limb, lockedCFrame)
+                        limb.CFrame = lockedCFrame
+                        limb.AssemblyLinearVelocity = Vector3.zero
+                        limb.AssemblyAngularVelocity = Vector3.zero
+                    end
+                end
+            end)
+        end)
+    end
+
     Notify("Limbs", "Target limbs frozen", 2)
 end
 
 local function unfreezeLimbs()
-    local targetChar = getTargetChar()
-    if not targetChar then Notify("Limbs", "Select a target player first!", 2) return end
-    pcall(function()
-        for _, part in ipairs(targetChar:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Anchored = false
-            end
-        end
-    end)
+    if frozenLimbs.connection then
+        frozenLimbs.connection:Disconnect()
+        frozenLimbs.connection = nil
+    end
+    frozenLimbs.parts = {}
+
     Notify("Limbs", "Target limbs unfrozen", 2)
 end
 
@@ -4033,6 +4083,11 @@ local function removeLimbs(mode)
     local targetChar = getTargetChar()
     if not targetChar then Notify("Limbs", "Select a target player first!", 2) return end
     pcall(function()
+        local root = getCharacterRootPart(targetChar)
+        if root then
+            claimNetworkOwner(root, root.CFrame)
+        end
+
         local names
         if mode == "Arms" then
             names = { "Left Arm", "Right Arm", "LeftLowerArm", "RightLowerArm", "LeftUpperArm", "RightUpperArm" }
@@ -4052,6 +4107,7 @@ end
 -- === MIRROR MY ANIMATIONS / FACE TOWARD ME / LOCK TORSO ===
 local mirrorAnims = { connection = nil }
 local faceTowardMe = { connection = nil }
+local lockTorso = { connection = nil, torso = nil, lockedCFrame = nil }
 
 local function setMirrorAnimations(state)
     if state then
@@ -4066,6 +4122,10 @@ local function setMirrorAnimations(state)
             pcall(function()
                 if not targetChar or not targetChar.Parent or not myChar or not myChar.Parent then
                     return
+                end
+                local targetRoot = getCharacterRootPart(targetChar)
+                if targetRoot then
+                    claimNetworkOwner(targetRoot, targetRoot.CFrame)
                 end
                 for _, myMotor in ipairs(myChar:GetDescendants()) do
                     if myMotor:IsA("Motor6D") then
@@ -4127,18 +4187,34 @@ local function setLockTorso(state)
             Notify("Torso", "Select a target player first!", 2)
             return
         end
-        local torso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+        local torso = getCharacterTorsoPart(targetChar)
         if torso then
-            torso.Anchored = true
+            if lockTorso.connection then
+                lockTorso.connection:Disconnect()
+                lockTorso.connection = nil
+            end
+            lockTorso.torso = torso
+            lockTorso.lockedCFrame = torso.CFrame
+            lockTorso.connection = RunService.RenderStepped:Connect(function()
+                pcall(function()
+                    if not targetChar or not targetChar.Parent or not torso or not torso.Parent then
+                        return
+                    end
+                    claimNetworkOwner(torso, lockTorso.lockedCFrame)
+                    torso.CFrame = lockTorso.lockedCFrame
+                    torso.AssemblyLinearVelocity = Vector3.zero
+                    torso.AssemblyAngularVelocity = Vector3.zero
+                end)
+            end)
             Notify("Torso", "Target torso rotation locked", 2)
         end
     else
-        if targetChar then
-            local torso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
-            if torso then
-                torso.Anchored = false
-            end
+        if lockTorso.connection then
+            lockTorso.connection:Disconnect()
+            lockTorso.connection = nil
         end
+        lockTorso.torso = nil
+        lockTorso.lockedCFrame = nil
         Notify("Torso", "Torso lock released", 2)
     end
 end
@@ -5250,8 +5326,10 @@ Tabs.Protection:AddToggle("AntiGucciToggle", {
                             local seatRoot = blob.PrimaryPart or seat
                             local ge = ReplicatedStorage:FindFirstChild("GrabEvents")
                             local sno = ge and ge:FindFirstChild("SetNetworkOwner")
+                            local lastOwnershipFire = 0
                             if sno then
                                 sno:FireServer(seatRoot, seatRoot.CFrame)
+                                lastOwnershipFire = os.clock()
                             end
                             seat.Anchored = false
                             AmethystFeatures.Gucci.active = true
@@ -5262,6 +5340,10 @@ Tabs.Protection:AddToggle("AntiGucciToggle", {
                             AmethystFeatures.Gucci.connection = RunService.RenderStepped:Connect(function()
                                 if not AmethystFeatures.Gucci.active then return end
                                 pcall(function()
+                                    if sno and seatRoot and seatRoot.Parent and os.clock() - lastOwnershipFire >= 0.25 then
+                                        sno:FireServer(seatRoot, seatRoot.CFrame)
+                                        lastOwnershipFire = os.clock()
+                                    end
                                     local move = hum.MoveDirection
                                     local dir = Vector3.new(move.X, 0, move.Z)
                                     if dir.Magnitude > 0 then
