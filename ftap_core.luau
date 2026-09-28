@@ -2110,6 +2110,7 @@ local SafePosCfg = AmethystFeatures.SafePos
 local AutoSitCfg = AmethystFeatures.AutoSitBlob
 local AntiKickResetCfg = AmethystFeatures.AntiKickReset
 local AntiKickStickCfg = AmethystFeatures.AntiKickStick
+local RemoveAntiKickCfg = AmethystFeatures.RemoveAntiKick
 local LoopKickCfg = AmethystFeatures.LoopKick
 local PermanentPalletCfg = AmethystFeatures.PermanentPallet
 local RagdollAuraCfg = AmethystFeatures.RagdollAura
@@ -2308,8 +2309,9 @@ end
 
 local function SpawnSelectedItem()
     local item = AntiKickStickCfg.selectedItem
+    local waitStart = tick()
     while not LocalPlayer.CanSpawnToy.Value do
-        if not AntiKickStickCfg.enabled or tick() - tick() > 5 then
+        if not AntiKickStickCfg.enabled or tick() - waitStart > 5 then
             return nil
         end
         task.wait()
@@ -2442,6 +2444,87 @@ local function MakeAntiKick(model, player)
             end
         end
     end)
+end
+
+local function StartAntiKickStickLoop()
+    local lp = LocalPlayer
+    local grabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+    local setOwner = grabEvents:WaitForChild("SetNetworkOwner")
+
+    local function GetPlayerRoot()
+        local char = lp.Character
+        if char then
+            return char:FindFirstChild("HumanoidRootPart")
+        end
+        local newChar = lp.CharacterAdded:Wait()
+        return newChar:WaitForChild("HumanoidRootPart")
+    end
+
+    local function IsInOwnPlot(plotName)
+        local playersInPlots = S.Workspace.PlotItems.PlayersInPlots
+        if not playersInPlots:FindFirstChild(lp.Name) then
+            return false
+        end
+        for _, plot in pairs(S.Workspace.Plots:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            if sign then
+                local owners = sign:FindFirstChild("ThisPlotsOwners")
+                if owners then
+                    for _, ownerData in pairs(sign:GetChildren()) do
+                        if ownerData.Name == "Value" and ownerData.Value == lp.Name then
+                            return true, S.Workspace.PlotItems:FindFirstChild(plotName or plot.Name)
+                        end
+                    end
+                end
+            end
+        end
+        return false
+    end
+
+    local function ClaimSoundPart(model)
+        if not model or not model:FindFirstChild("StickyPart") then
+            return
+        end
+        if not GetPlayerRoot() then
+            return
+        end
+        if model:FindFirstChild("SoundPart") then
+            local soundPart = model.SoundPart
+            if not soundPart:FindFirstChild("PartOwner") or soundPart.PartOwner.Value ~= lp.Name then
+                setOwner:FireServer(soundPart, soundPart.CFrame)
+            end
+        end
+    end
+
+    while AntiKickStickCfg.enabled do
+        task.wait()
+        local char = lp.Character
+        if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+            local folder = S.Workspace:FindFirstChild(lp.Name .. "SpawnedInToys")
+            local current = folder and folder:FindFirstChild(AntiKickStickCfg.selectedItem)
+            local inPlot = IsInOwnPlot()
+            if inPlot then
+                current = SpawnSelectedItem()
+            end
+            if current == nil then
+                if IsInOwnPlot() then
+                elseif S.Workspace.PlotItems.PlayersInPlots:FindFirstChild(lp.Name) then
+                else
+                    local item = SpawnSelectedItem()
+                    if item then
+                        ClaimSoundPart(item)
+                        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+                        if rootPart and item.PrimaryPart then
+                            item:SetPrimaryPartCFrame(rootPart.CFrame)
+                        end
+                        MakeAntiKick(item, lp)
+                    end
+                end
+            elseif not current:FindFirstChild("Amethyst_FullHighlight") then
+                ApplyHighlight(current)
+            end
+        end
+    end
 end
 
 if not GemoroiUI then
@@ -5462,9 +5545,9 @@ Tabs.Auras:AddSlider("AuraRadiusSlider", {
     end
 })
 
-AurasTab:AddSection("Fling Aura")
+Tabs.Auras:AddSection("Fling Aura")
 
-AurasTab:AddToggle("FlingAuraToggle", {
+Tabs.Auras:AddToggle("FlingAuraToggle", {
     Title = "Fling Aura",
     Description = "Randomly flings nearby enemies at extreme speed",
     Default = false,
@@ -5473,7 +5556,7 @@ AurasTab:AddToggle("FlingAuraToggle", {
     end
 })
 
-AurasTab:AddSlider("FlingAuraRadiusSlider", {
+Tabs.Auras:AddSlider("FlingAuraRadiusSlider", {
     Title = "Fling Aura Radius",
     Default = 30,
     Min = 5,
@@ -5917,6 +6000,8 @@ Tabs.Cosmetics:AddToggle("RainbowForceFieldToggle", {
 
 Tabs.Cosmetics:AddSection("Gemoroi Lighting Presets")
 
+local ApplyShader -- forward declaration (defined below, after ClearShaders)
+
 for _, preset in ipairs({
     { Name = "Cyberpunk City",
       Shader = {CC={Brightness=0.05,Contrast=0.25,Saturation=0.35,TintColor=Color3.fromRGB(120,200,255)},Bloom={Intensity=0.8,Size=40,Threshold=0.9},SunRays=0.15,L={Brightness=1.6,ClockTime=0,FogEnd=450,FogColor=Color3.fromRGB(10,20,40),Ambient=Color3.fromRGB(30,60,120),OutdoorAmbient=Color3.fromRGB(40,80,140)}} },
@@ -5989,6 +6074,502 @@ Tabs.Cosmetics:AddToggle("AngelWingsToggle", {
     end
 })
 
+-- ================== GEMOROI HATS ==================
+Tabs.Cosmetics:AddSection("Gemoroi Hats")
+
+local GemoroiHat = { model = nil, threads = {}, selected = "Neon Halo", enabled = false }
+
+local function GemoroiHatCleanup()
+    for _, t in ipairs(GemoroiHat.threads) do
+        pcall(task.cancel, t)
+    end
+    GemoroiHat.threads = {}
+    if GemoroiHat.model then
+        pcall(function() GemoroiHat.model:Destroy() end)
+        GemoroiHat.model = nil
+    end
+end
+
+local function GemoroiHatPart(className, props, parent)
+    local p = Instance.new(className or "Part")
+    p.Anchored = false
+    p.CanCollide = false
+    p.CanQuery = false
+    p.Massless = true
+    p.CastShadow = false
+    for k, v in pairs(props) do p[k] = v end
+    p.Parent = parent
+    return p
+end
+
+local function GemoroiHatWeld(part, head, offset)
+    part.CFrame = head.CFrame * offset
+    local w = Instance.new("Weld")
+    w.Part0 = head
+    w.Part1 = part
+    w.C0 = offset
+    w.Parent = part
+    return w
+end
+
+local GemoroiHatBuilders = {}
+
+GemoroiHatBuilders["Neon Halo"] = function(model, head)
+    local welds = {}
+    for i = 1, 8 do
+        local orb = GemoroiHatPart("Part", { Shape = Enum.PartType.Ball, Size = Vector3.new(0.3, 0.3, 0.3), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 225, 120) }, model)
+        local ang = (i / 8) * math.pi * 2
+        welds[i] = GemoroiHatWeld(orb, head, CFrame.new(math.cos(ang) * 1.1, 1.5, math.sin(ang) * 1.1))
+    end
+    return function()
+        local t = 0
+        while model.Parent do
+            t = t + 0.045
+            for i, w in ipairs(welds) do
+                local ang = (i / 8) * math.pi * 2 + t
+                w.C0 = CFrame.new(math.cos(ang) * 1.1, 1.5 + math.sin(t * 2 + i) * 0.08, math.sin(ang) * 1.1)
+            end
+            task.wait(0.03)
+        end
+    end
+end
+
+GemoroiHatBuilders["Rainbow Halo"] = function(model, head)
+    local welds, orbs = {}, {}
+    for i = 1, 10 do
+        local orb = GemoroiHatPart("Part", { Shape = Enum.PartType.Ball, Size = Vector3.new(0.28, 0.28, 0.28), Material = Enum.Material.Neon, Color = Color3.fromHSV(i / 10, 1, 1) }, model)
+        local ang = (i / 10) * math.pi * 2
+        welds[i] = GemoroiHatWeld(orb, head, CFrame.new(math.cos(ang) * 1.15, 1.55, math.sin(ang) * 1.15))
+        orbs[i] = orb
+    end
+    return function()
+        local t = 0
+        while model.Parent do
+            t = t + 0.04
+            for i, w in ipairs(welds) do
+                local ang = (i / 10) * math.pi * 2 + t
+                w.C0 = CFrame.new(math.cos(ang) * 1.15, 1.55, math.sin(ang) * 1.15)
+                orbs[i].Color = Color3.fromHSV((i / 10 + t * 0.1) % 1, 1, 1)
+            end
+            task.wait(0.03)
+        end
+    end
+end
+
+GemoroiHatBuilders["Golden Crown"] = function(model, head)
+    local base = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.45, 1.7, 1.7), Material = Enum.Material.Metal, Color = Color3.fromRGB(255, 200, 60), Reflectance = 0.35 }, model)
+    GemoroiHatWeld(base, head, CFrame.new(0, 0.95, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    local gemColors = { Color3.fromRGB(230, 40, 60), Color3.fromRGB(40, 120, 255), Color3.fromRGB(60, 220, 90), Color3.fromRGB(200, 60, 255), Color3.fromRGB(255, 140, 40), Color3.fromRGB(60, 230, 230) }
+    local gems = {}
+    for i = 1, 6 do
+        local ang = (i / 6) * math.pi * 2
+        local spike = GemoroiHatPart("Part", { Size = Vector3.new(0.22, 0.55, 0.22), Material = Enum.Material.Metal, Color = Color3.fromRGB(255, 210, 80), Reflectance = 0.3 }, model)
+        GemoroiHatWeld(spike, head, CFrame.new(math.cos(ang) * 0.72, 1.4, math.sin(ang) * 0.72))
+        local gem = GemoroiHatPart("Part", { Shape = Enum.PartType.Ball, Size = Vector3.new(0.18, 0.18, 0.18), Material = Enum.Material.Neon, Color = gemColors[i] }, model)
+        GemoroiHatWeld(gem, head, CFrame.new(math.cos(ang) * 0.72, 1.72, math.sin(ang) * 0.72))
+        gems[i] = gem
+    end
+    return function()
+        local t = 0
+        while model.Parent do
+            t = t + 0.05
+            for i, gem in ipairs(gems) do
+                gem.Transparency = 0.15 + 0.15 * math.sin(t * 3 + i)
+            end
+            task.wait(0.05)
+        end
+    end
+end
+
+GemoroiHatBuilders["Top Hat"] = function(model, head)
+    local brim = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, 2.1, 2.1), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(20, 20, 22) }, model)
+    GemoroiHatWeld(brim, head, CFrame.new(0, 0.62, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    local crownPart = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.35, 1.35, 1.35), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(20, 20, 22) }, model)
+    GemoroiHatWeld(crownPart, head, CFrame.new(0, 1.35, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    local band = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 1.42, 1.42), Material = Enum.Material.Fabric, Color = Color3.fromRGB(170, 30, 40) }, model)
+    GemoroiHatWeld(band, head, CFrame.new(0, 0.85, 0) * CFrame.Angles(0, 0, math.rad(90)))
+end
+
+GemoroiHatBuilders["Fedora"] = function(model, head)
+    local brim = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.1, 1.95, 1.95), Material = Enum.Material.Fabric, Color = Color3.fromRGB(90, 70, 50) }, model)
+    GemoroiHatWeld(brim, head, CFrame.new(0, 0.6, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    local crownPart = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.75, 1.25, 1.25), Material = Enum.Material.Fabric, Color = Color3.fromRGB(100, 78, 56) }, model)
+    GemoroiHatWeld(crownPart, head, CFrame.new(0, 1.0, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    local band = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.22, 1.32, 1.32), Material = Enum.Material.Fabric, Color = Color3.fromRGB(35, 28, 22) }, model)
+    GemoroiHatWeld(band, head, CFrame.new(0, 0.78, 0) * CFrame.Angles(0, 0, math.rad(90)))
+end
+
+GemoroiHatBuilders["Wizard Hat"] = function(model, head)
+    local brim = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, 2.2, 2.2), Material = Enum.Material.Fabric, Color = Color3.fromRGB(70, 40, 130) }, model)
+    GemoroiHatWeld(brim, head, CFrame.new(0, 0.62, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    local sizes = { 1.5, 1.15, 0.8, 0.45, 0.2 }
+    for i, d in ipairs(sizes) do
+        local seg = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.42, d, d), Material = Enum.Material.Fabric, Color = Color3.fromRGB(80 - i * 4, 45 - i * 2, 140 + i * 6) }, model)
+        GemoroiHatWeld(seg, head, CFrame.new(0, 0.68 + i * 0.4, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    end
+    local star = GemoroiHatPart("Part", { Shape = Enum.PartType.Ball, Size = Vector3.new(0.28, 0.28, 0.28), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 230, 120) }, model)
+    GemoroiHatWeld(star, head, CFrame.new(0, 0.68 + (#sizes + 1) * 0.4, 0))
+    local star2 = GemoroiHatPart("Part", { Shape = Enum.PartType.Ball, Size = Vector3.new(0.16, 0.16, 0.16), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 240, 170) }, model)
+    GemoroiHatWeld(star2, head, CFrame.new(0.7, 1.1, 0.4))
+    return function()
+        local t = 0
+        while model.Parent do
+            t = t + 0.06
+            star.Transparency = 0.1 + 0.25 * math.sin(t * 2)
+            task.wait(0.05)
+        end
+    end
+end
+
+GemoroiHatBuilders["Cat Ears"] = function(model, head)
+    for _, side in ipairs({ -1, 1 }) do
+        local outer = GemoroiHatPart("WedgePart", { Size = Vector3.new(0.35, 0.7, 0.55), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(40, 40, 45) }, model)
+        GemoroiHatWeld(outer, head, CFrame.new(side * 0.5, 0.85, 0) * CFrame.Angles(math.rad(15), 0, math.rad(-side * 12)))
+        local inner = GemoroiHatPart("WedgePart", { Size = Vector3.new(0.15, 0.42, 0.33), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(255, 150, 180) }, model)
+        GemoroiHatWeld(inner, head, CFrame.new(side * 0.5, 0.82, -0.05) * CFrame.Angles(math.rad(15), 0, math.rad(-side * 12)))
+    end
+end
+
+GemoroiHatBuilders["Devil Horns"] = function(model, head)
+    for _, side in ipairs({ -1, 1 }) do
+        local base = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.55, 0.32, 0.32), Material = Enum.Material.Neon, Color = Color3.fromRGB(210, 30, 30) }, model)
+        GemoroiHatWeld(base, head, CFrame.new(side * 0.45, 0.75, 0) * CFrame.Angles(0, 0, math.rad(90 - side * 25)))
+        local tip = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 0.16, 0.16), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 60, 40) }, model)
+        GemoroiHatWeld(tip, head, CFrame.new(side * 0.62, 1.08, 0) * CFrame.Angles(0, 0, math.rad(90 - side * 40)))
+    end
+    return function()
+        local t = 0
+        while model.Parent do
+            t = t + 0.05
+            for _, p in ipairs(model:GetChildren()) do
+                if p:IsA("BasePart") then
+                    p.Color = Color3.fromRGB(210 + math.floor(40 * math.sin(t * 3)), 30, 30)
+                end
+            end
+            task.wait(0.05)
+        end
+    end
+end
+
+GemoroiHatBuilders["Propeller Cap"] = function(model, head)
+    local cap = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.45, 1.45, 1.45), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(220, 50, 50) }, model)
+    GemoroiHatWeld(cap, head, CFrame.new(0, 0.78, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    local pole = GemoroiHatPart("Part", { Size = Vector3.new(0.1, 0.35, 0.1), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(230, 230, 230) }, model)
+    GemoroiHatWeld(pole, head, CFrame.new(0, 1.15, 0))
+    local bladeWelds = {}
+    for i = 0, 1 do
+        local blade = GemoroiHatPart("Part", { Size = Vector3.new(1.6, 0.06, 0.28), Material = Enum.Material.SmoothPlastic, Color = i == 0 and Color3.fromRGB(255, 200, 40) or Color3.fromRGB(60, 130, 255) }, model)
+        bladeWelds[i + 1] = GemoroiHatWeld(blade, head, CFrame.new(0, 1.35, 0) * CFrame.Angles(0, math.rad(i * 90), 0))
+    end
+    return function()
+        local ang = 0
+        while model.Parent do
+            ang = ang + 0.25
+            for i, w in ipairs(bladeWelds) do
+                w.C0 = CFrame.new(0, 1.35, 0) * CFrame.Angles(0, ang + math.rad((i - 1) * 90), 0)
+            end
+            task.wait(0.03)
+        end
+    end
+end
+
+GemoroiHatBuilders["Party Cone"] = function(model, head)
+    local colors = { Color3.fromRGB(255, 80, 120), Color3.fromRGB(80, 180, 255), Color3.fromRGB(255, 210, 60), Color3.fromRGB(120, 230, 120) }
+    local sizes = { 1.3, 1.0, 0.7, 0.4 }
+    for i, d in ipairs(sizes) do
+        local seg = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, d, d), Material = Enum.Material.SmoothPlastic, Color = colors[i] }, model)
+        GemoroiHatWeld(seg, head, CFrame.new(0, 0.7 + (i - 1) * 0.38, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    end
+    local pompom = GemoroiHatPart("Part", { Shape = Enum.PartType.Ball, Size = Vector3.new(0.32, 0.32, 0.32), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 255, 255) }, model)
+    GemoroiHatWeld(pompom, head, CFrame.new(0, 0.7 + #sizes * 0.38, 0))
+    return function()
+        local t = 0
+        while model.Parent do
+            t = t + 0.05
+            pompom.Color = Color3.fromHSV((t * 0.15) % 1, 0.6, 1)
+            task.wait(0.05)
+        end
+    end
+end
+
+GemoroiHatBuilders["UFO"] = function(model, head)
+    local disc = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.35, 2.4, 2.4), Material = Enum.Material.Metal, Color = Color3.fromRGB(140, 145, 155), Reflectance = 0.4 }, model)
+    local discWeld = GemoroiHatWeld(disc, head, CFrame.new(0, 2.2, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    local dome = GemoroiHatPart("Part", { Shape = Enum.PartType.Ball, Size = Vector3.new(1.1, 1.1, 1.1), Material = Enum.Material.Glass, Color = Color3.fromRGB(120, 220, 160), Transparency = 0.35 }, model)
+    local domeWeld = GemoroiHatWeld(dome, head, CFrame.new(0, 2.55, 0))
+    local lights, lightWelds = {}, {}
+    for i = 1, 6 do
+        local ang = (i / 6) * math.pi * 2
+        local l = GemoroiHatPart("Part", { Shape = Enum.PartType.Ball, Size = Vector3.new(0.22, 0.22, 0.22), Material = Enum.Material.Neon, Color = Color3.fromRGB(120, 255, 140) }, model)
+        lightWelds[i] = GemoroiHatWeld(l, head, CFrame.new(math.cos(ang) * 1.05, 2.2, math.sin(ang) * 1.05))
+        lights[i] = l
+    end
+    return function()
+        local t = 0
+        while model.Parent do
+            t = t + 0.04
+            local bob = math.sin(t * 1.5) * 0.18
+            discWeld.C0 = CFrame.new(0, 2.2 + bob, 0) * CFrame.Angles(0, 0, math.rad(90))
+            domeWeld.C0 = CFrame.new(0, 2.55 + bob, 0)
+            for i, w in ipairs(lightWelds) do
+                local ang = (i / 6) * math.pi * 2 + t * 2
+                w.C0 = CFrame.new(math.cos(ang) * 1.05, 2.2 + bob, math.sin(ang) * 1.05)
+                lights[i].Transparency = (math.floor(t * 4 + i) % 3 == 0) and 0.6 or 0
+            end
+            task.wait(0.03)
+        end
+    end
+end
+
+GemoroiHatBuilders["Frozen Crown"] = function(model, head)
+    local base = GemoroiHatPart("Part", { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 1.65, 1.65), Material = Enum.Material.Ice, Color = Color3.fromRGB(170, 220, 255), Transparency = 0.2 }, model)
+    GemoroiHatWeld(base, head, CFrame.new(0, 0.9, 0) * CFrame.Angles(0, 0, math.rad(90)))
+    local shards = {}
+    for i = 1, 8 do
+        local ang = (i / 8) * math.pi * 2
+        local h = (i % 2 == 0) and 0.75 or 0.45
+        local shard = GemoroiHatPart("Part", { Size = Vector3.new(0.16, h, 0.16), Material = Enum.Material.Neon, Color = Color3.fromRGB(190, 235, 255), Transparency = 0.15 }, model)
+        GemoroiHatWeld(shard, head, CFrame.new(math.cos(ang) * 0.7, 1.15 + h / 2, math.sin(ang) * 0.7) * CFrame.Angles(math.rad(math.sin(ang) * 10), 0, math.rad(-math.cos(ang) * 10)))
+        shards[i] = shard
+    end
+    return function()
+        local t = 0
+        while model.Parent do
+            t = t + 0.04
+            for i, s in ipairs(shards) do
+                s.Transparency = 0.1 + 0.25 * (0.5 + 0.5 * math.sin(t * 2 + i * 0.8))
+            end
+            task.wait(0.05)
+        end
+    end
+end
+
+local GemoroiHatNames = { "Neon Halo", "Rainbow Halo", "Golden Crown", "Frozen Crown", "Top Hat", "Fedora", "Wizard Hat", "Cat Ears", "Devil Horns", "Propeller Cap", "Party Cone", "UFO" }
+
+local function GemoroiHatApply()
+    GemoroiHatCleanup()
+    if not GemoroiHat.enabled then return end
+    pcall(function()
+        local char = LocalPlayer.Character
+        local head = char and (char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart"))
+        if not head then return end
+        local builder = GemoroiHatBuilders[GemoroiHat.selected]
+        if not builder then return end
+        local model = Instance.new("Model")
+        model.Name = "Gemoroi_Hat"
+        model.Parent = char
+        GemoroiHat.model = model
+        local anim = builder(model, head)
+        if anim then
+            table.insert(GemoroiHat.threads, task.spawn(anim))
+        end
+    end)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if GemoroiHat.enabled then
+        task.spawn(function()
+            char:WaitForChild("Head", 10)
+            task.wait(0.3)
+            GemoroiHatApply()
+        end)
+    end
+end)
+
+Tabs.Cosmetics:AddDropdown("GemoroiHatDropdown", {
+    Title = "Hat Style",
+    Description = "12 animated hats, auto-reapply on respawn",
+    Values = GemoroiHatNames,
+    Default = "Neon Halo",
+    Callback = function(v)
+        GemoroiHat.selected = v
+        if GemoroiHat.enabled then
+            GemoroiHatApply()
+            GemoroiUI:Notify({ Title = "Hats", Content = v .. " equipped!", Duration = 2 })
+        end
+    end
+})
+
+Tabs.Cosmetics:AddToggle("GemoroiHatToggle", {
+    Title = "Enable Hat",
+    Default = false,
+    Callback = function(Value)
+        GemoroiHat.enabled = Value
+        GemoroiHatApply()
+        if Value then
+            GemoroiUI:Notify({ Title = "Hats", Content = GemoroiHat.selected .. " equipped!", Duration = 2 })
+        end
+    end
+})
+
+-- ================== EXTRA VISUAL EFFECTS ==================
+Tabs.Cosmetics:AddSection("Extra Visual Effects")
+
+local rainbowTrailState = { trail = nil, thread = nil, a0 = nil, a1 = nil }
+
+Tabs.Cosmetics:AddToggle("RainbowTrailToggle", {
+    Title = "Rainbow Trail",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+                local a0 = Instance.new("Attachment", root)
+                a0.Position = Vector3.new(0, 1, 0)
+                local a1 = Instance.new("Attachment", root)
+                a1.Position = Vector3.new(0, -1, 0)
+                local trail = Instance.new("Trail")
+                trail.Attachment0 = a0
+                trail.Attachment1 = a1
+                trail.Lifetime = 0.7
+                trail.MinLength = 0.05
+                trail.FaceCamera = true
+                trail.LightEmission = 1
+                trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+                trail.WidthScale = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.2) })
+                trail.Parent = root
+                rainbowTrailState.trail = trail
+                rainbowTrailState.a0 = a0
+                rainbowTrailState.a1 = a1
+                rainbowTrailState.thread = task.spawn(function()
+                    local hue = 0
+                    while trail.Parent do
+                        hue = (hue + 0.008) % 1
+                        trail.Color = ColorSequence.new(Color3.fromHSV(hue, 1, 1), Color3.fromHSV((hue + 0.25) % 1, 1, 1))
+                        task.wait(0.03)
+                    end
+                end)
+            end)
+        else
+            if rainbowTrailState.thread then pcall(task.cancel, rainbowTrailState.thread) rainbowTrailState.thread = nil end
+            for _, k in ipairs({ "trail", "a0", "a1" }) do
+                if rainbowTrailState[k] then pcall(function() rainbowTrailState[k]:Destroy() end) rainbowTrailState[k] = nil end
+            end
+        end
+    end
+})
+
+local sparkleAuraState = { emitter = nil }
+
+Tabs.Cosmetics:AddToggle("SparkleAuraToggle", {
+    Title = "Sparkle Aura",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+                local pe = Instance.new("ParticleEmitter")
+                pe.Name = "Gemoroi_Sparkles"
+                pe.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+                pe.Rate = 30
+                pe.Speed = NumberRange.new(1.5, 3)
+                pe.Lifetime = NumberRange.new(0.8, 1.4)
+                pe.SpreadAngle = Vector2.new(180, 180)
+                pe.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 0) })
+                pe.Color = ColorSequence.new(Color3.fromRGB(255, 230, 140), Color3.fromRGB(163, 230, 53))
+                pe.LightEmission = 1
+                pe.Parent = root
+                sparkleAuraState.emitter = pe
+            end)
+        else
+            if sparkleAuraState.emitter then
+                pcall(function() sparkleAuraState.emitter:Destroy() end)
+                sparkleAuraState.emitter = nil
+            end
+        end
+    end
+})
+
+local orbitOrbsState = { orbs = {}, thread = nil }
+
+Tabs.Cosmetics:AddToggle("OrbitingOrbsToggle", {
+    Title = "Orbiting Orbs",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+                local colors = { Color3.fromRGB(163, 230, 53), Color3.fromRGB(80, 180, 255), Color3.fromRGB(255, 120, 200) }
+                for i = 1, 3 do
+                    local orb = Instance.new("Part")
+                    orb.Name = "Gemoroi_Orb" .. i
+                    orb.Shape = Enum.PartType.Ball
+                    orb.Size = Vector3.new(0.5, 0.5, 0.5)
+                    orb.Material = Enum.Material.Neon
+                    orb.Color = colors[i]
+                    orb.Anchored = true
+                    orb.CanCollide = false
+                    orb.CanQuery = false
+                    orb.CastShadow = false
+                    orb.Parent = char
+                    orbitOrbsState.orbs[i] = orb
+                end
+                orbitOrbsState.thread = task.spawn(function()
+                    local t = 0
+                    while true do
+                        local c = LocalPlayer.Character
+                        local r = c and c:FindFirstChild("HumanoidRootPart")
+                        if not r then break end
+                        t = t + 0.045
+                        for i, orb in ipairs(orbitOrbsState.orbs) do
+                            if orb.Parent then
+                                local ang = t * 1.6 + (i / 3) * math.pi * 2
+                                orb.CFrame = CFrame.new(r.Position + Vector3.new(math.cos(ang) * 3, math.sin(t * 2 + i) * 0.8, math.sin(ang) * 3))
+                            end
+                        end
+                        task.wait(0.03)
+                    end
+                end)
+            end)
+        else
+            if orbitOrbsState.thread then pcall(task.cancel, orbitOrbsState.thread) orbitOrbsState.thread = nil end
+            for i, orb in ipairs(orbitOrbsState.orbs) do
+                pcall(function() orb:Destroy() end)
+            end
+            orbitOrbsState.orbs = {}
+        end
+    end
+})
+
+local fireHandsState = { fires = {} }
+
+Tabs.Cosmetics:AddToggle("FireHandsToggle", {
+    Title = "Fire Hands",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if not char then return end
+                for _, name in ipairs({ "LeftHand", "RightHand", "Left Arm", "Right Arm" }) do
+                    local limb = char:FindFirstChild(name)
+                    if limb then
+                        local fire = Instance.new("Fire")
+                        fire.Name = "Gemoroi_FireHand"
+                        fire.Size = 3
+                        fire.Heat = 6
+                        fire.Color = Color3.fromRGB(163, 230, 53)
+                        fire.SecondaryColor = Color3.fromRGB(60, 160, 60)
+                        fire.Parent = limb
+                        table.insert(fireHandsState.fires, fire)
+                    end
+                end
+            end)
+        else
+            for _, fire in ipairs(fireHandsState.fires) do
+                pcall(function() fire:Destroy() end)
+            end
+            fireHandsState.fires = {}
+        end
+    end
+})
+
 Tabs.Cosmetics:AddSection("Atmosphere & Lighting Shaders")
 
 local function ClearShaders()
@@ -6005,7 +6586,7 @@ local function ClearShaders()
     end)
 end
 
-local function ApplyShader(cfg)
+function ApplyShader(cfg)
     ClearShaders()
     pcall(function()
         if cfg.CC then
@@ -6023,6 +6604,14 @@ local function ApplyShader(cfg)
         if cfg.SunRays then
             local sr = Instance.new("SunRaysEffect", Lighting)
             sr.Intensity = cfg.SunRays
+        end
+        if cfg.DoF then
+            local dof = Instance.new("DepthOfFieldEffect", Lighting)
+            for k, v in pairs(cfg.DoF) do dof[k] = v end
+        end
+        if cfg.Atmo then
+            local at = Instance.new("Atmosphere", Lighting)
+            for k, v in pairs(cfg.Atmo) do at[k] = v end
         end
         if cfg.L then
             for k, v in pairs(cfg.L) do Lighting[k] = v end
@@ -6107,6 +6696,55 @@ Tabs.Cosmetics:AddButton({
     Callback = function()
         ClearShaders()
         GemoroiUI:Notify({ Title = "Shaders", Content = "Reset to default!", Duration = 2 })
+    end
+})
+
+-- ================== GEMOROI SHADER PACK ==================
+Tabs.Cosmetics:AddSection("Gemoroi Shader Pack")
+
+local GemoroiShaderPack = {
+    ["Neon Nights"] = {CC={Brightness=0.02,Contrast=0.3,Saturation=0.45,TintColor=Color3.fromRGB(140,220,255)},Bloom={Intensity=1.1,Size=45,Threshold=0.85},L={Brightness=1.2,ClockTime=0,FogEnd=500,FogColor=Color3.fromRGB(8,15,35),Ambient=Color3.fromRGB(25,50,110),OutdoorAmbient=Color3.fromRGB(35,70,130)}},
+    ["Blood Moon"] = {CC={Brightness=-0.05,Contrast=0.25,Saturation=0.1,TintColor=Color3.fromRGB(255,120,110)},Bloom={Intensity=0.6,Size=36,Threshold=0.85},L={Brightness=0.9,ClockTime=0,FogEnd=600,FogColor=Color3.fromRGB(45,10,10),Ambient=Color3.fromRGB(110,35,35),OutdoorAmbient=Color3.fromRGB(130,40,40)}},
+    ["Vaporwave"] = {CC={Brightness=0.08,Contrast=0.18,Saturation=0.5,TintColor=Color3.fromRGB(255,160,230)},Bloom={Intensity=0.9,Size=40,Threshold=0.82},SunRays=0.15,L={Brightness=1.6,ClockTime=18.2,FogEnd=900,FogColor=Color3.fromRGB(90,40,120),Ambient=Color3.fromRGB(150,80,180),OutdoorAmbient=Color3.fromRGB(180,90,200)}},
+    ["Deep Space"] = {CC={Brightness=-0.1,Contrast=0.3,Saturation=-0.1,TintColor=Color3.fromRGB(160,170,255)},Bloom={Intensity=0.7,Size=30,Threshold=0.9},L={Brightness=0.5,ClockTime=0,FogEnd=800,FogColor=Color3.fromRGB(4,4,15),Ambient=Color3.fromRGB(15,15,45),OutdoorAmbient=Color3.fromRGB(20,20,55),GlobalShadows=false}},
+    ["Arctic Storm"] = {CC={Brightness=0.2,Contrast=0.05,Saturation=-0.35,TintColor=Color3.fromRGB(215,235,255)},Blur=0.6,L={Brightness=2.2,ClockTime=10,FogEnd=350,FogStart=15,FogColor=Color3.fromRGB(215,228,240),Ambient=Color3.fromRGB(200,215,235),OutdoorAmbient=Color3.fromRGB(190,205,230)}},
+    ["Hell Inferno"] = {CC={Brightness=0.05,Contrast=0.3,Saturation=0.25,TintColor=Color3.fromRGB(255,150,80)},Bloom={Intensity=1.0,Size=42,Threshold=0.8},Atmo={Density=0.4,Color=Color3.fromRGB(255,110,50),Decay=Color3.fromRGB(120,40,10),Glare=0.4,Haze=1.8},L={Brightness=1.4,ClockTime=17.8,FogEnd=700,FogColor=Color3.fromRGB(80,25,5),Ambient=Color3.fromRGB(160,70,30),OutdoorAmbient=Color3.fromRGB(190,85,35)}},
+    ["Emerald Forest"] = {CC={Brightness=0.08,Contrast=0.12,Saturation=0.3,TintColor=Color3.fromRGB(180,255,190)},SunRays=0.3,L={Brightness=1.9,ClockTime=10.5,FogEnd=1500,FogColor=Color3.fromRGB(40,80,50),Ambient=Color3.fromRGB(110,180,120),OutdoorAmbient=Color3.fromRGB(120,190,130)}},
+    ["Retro VHS"] = {CC={Brightness=0.05,Contrast=0.35,Saturation=-0.25,TintColor=Color3.fromRGB(235,220,200)},Blur=0.35,L={Brightness=1.7,ClockTime=15,FogEnd=1200,Ambient=Color3.fromRGB(180,165,150),OutdoorAmbient=Color3.fromRGB(190,175,160)}},
+    ["Moonlight"] = {CC={Brightness=0,Contrast=0.15,Saturation=-0.15,TintColor=Color3.fromRGB(170,195,255)},Bloom={Intensity=0.5,Size=28,Threshold=0.92},L={Brightness=0.8,ClockTime=0,FogEnd=1000,FogColor=Color3.fromRGB(15,20,40),Ambient=Color3.fromRGB(60,75,120),OutdoorAmbient=Color3.fromRGB(70,85,135)}},
+    ["Candy Pop"] = {CC={Brightness=0.22,Contrast=0.1,Saturation=0.55,TintColor=Color3.fromRGB(255,215,240)},Bloom={Intensity=0.7,Size=36,Threshold=0.85},SunRays=0.25,L={Brightness=2.6,ClockTime=12,FogEnd=3000,Ambient=Color3.fromRGB(255,210,235),OutdoorAmbient=Color3.fromRGB(255,200,230)}},
+    ["Noir B&W"] = {CC={Brightness=0.02,Contrast=0.4,Saturation=-1,TintColor=Color3.fromRGB(255,255,255)},L={Brightness=1.5,ClockTime=16,FogEnd=800,FogColor=Color3.fromRGB(30,30,30),Ambient=Color3.fromRGB(130,130,130),OutdoorAmbient=Color3.fromRGB(140,140,140)}},
+    ["Underwater"] = {CC={Brightness=0.02,Contrast=0.1,Saturation=0.1,TintColor=Color3.fromRGB(120,200,220)},Blur=0.8,DoF={FocusDistance=25,InFocusRadius=30,FarIntensity=0.65,NearIntensity=0.2},L={Brightness=1.3,ClockTime=13,FogEnd=280,FogStart=10,FogColor=Color3.fromRGB(20,90,110),Ambient=Color3.fromRGB(60,140,160),OutdoorAmbient=Color3.fromRGB(50,130,150)}},
+    ["Autumn Vibes"] = {CC={Brightness=0.12,Contrast=0.15,Saturation=0.35,TintColor=Color3.fromRGB(255,200,140)},SunRays=0.35,L={Brightness=2.1,ClockTime=16.5,FogEnd=1600,FogColor=Color3.fromRGB(150,110,70),Ambient=Color3.fromRGB(220,170,120),OutdoorAmbient=Color3.fromRGB(230,180,125)}},
+    ["Galaxy Purple"] = {CC={Brightness=0.03,Contrast=0.25,Saturation=0.4,TintColor=Color3.fromRGB(190,150,255)},Bloom={Intensity=1.0,Size=44,Threshold=0.82},L={Brightness=1.1,ClockTime=0,FogEnd=700,FogColor=Color3.fromRGB(30,15,60),Ambient=Color3.fromRGB(80,50,140),OutdoorAmbient=Color3.fromRGB(95,60,160)}},
+    ["Thunderstorm"] = {CC={Brightness=-0.08,Contrast=0.2,Saturation=-0.3,TintColor=Color3.fromRGB(190,200,215)},Blur=0.25,L={Brightness=0.9,ClockTime=14,FogEnd=450,FogStart=20,FogColor=Color3.fromRGB(55,60,70),Ambient=Color3.fromRGB(85,90,105),OutdoorAmbient=Color3.fromRGB(95,100,115)}},
+    ["Cozy Evening"] = {CC={Brightness=0.08,Contrast=0.1,Saturation=0.2,TintColor=Color3.fromRGB(255,210,160)},Bloom={Intensity=0.45,Size=30,Threshold=0.9},L={Brightness=1.3,ClockTime=18.8,FogEnd=1100,FogColor=Color3.fromRGB(70,50,40),Ambient=Color3.fromRGB(180,140,105),OutdoorAmbient=Color3.fromRGB(190,150,110)}},
+    ["Cinematic DoF"] = {CC={Brightness=0.05,Contrast=0.22,Saturation=0.12,TintColor=Color3.fromRGB(245,240,230)},DoF={FocusDistance=18,InFocusRadius=22,FarIntensity=0.75,NearIntensity=0.35},Bloom={Intensity=0.4,Size=26,Threshold=0.93},L={Brightness=2.0,ClockTime=15.5,FogEnd=4000}},
+    ["Radioactive"] = {CC={Brightness=0.05,Contrast=0.28,Saturation=0.45,TintColor=Color3.fromRGB(180,255,120)},Bloom={Intensity=1.2,Size=48,Threshold=0.78},Atmo={Density=0.35,Color=Color3.fromRGB(150,255,100),Decay=Color3.fromRGB(40,90,20),Glare=0.25,Haze=1.4},L={Brightness=1.5,ClockTime=17,FogEnd=800,FogColor=Color3.fromRGB(35,70,20),Ambient=Color3.fromRGB(100,170,70),OutdoorAmbient=Color3.fromRGB(110,190,75)}},
+}
+
+local GemoroiShaderPackOrder = { "Neon Nights", "Blood Moon", "Vaporwave", "Deep Space", "Arctic Storm", "Hell Inferno", "Emerald Forest", "Retro VHS", "Moonlight", "Candy Pop", "Noir B&W", "Underwater", "Autumn Vibes", "Galaxy Purple", "Thunderstorm", "Cozy Evening", "Cinematic DoF", "Radioactive" }
+
+Tabs.Cosmetics:AddDropdown("GemoroiShaderPackDropdown", {
+    Title = "Shader Pack (" .. #GemoroiShaderPackOrder .. " presets)",
+    Description = "Select a preset to apply it instantly",
+    Values = GemoroiShaderPackOrder,
+    Default = "Neon Nights",
+    Callback = function(name)
+        local cfg = GemoroiShaderPack[name]
+        if cfg then
+            ApplyShader(cfg)
+            GemoroiUI:Notify({ Title = "Shader Pack", Content = name .. " applied!", Duration = 2 })
+        end
+    end
+})
+
+Tabs.Cosmetics:AddButton({
+    Title = "Random Shader",
+    Callback = function()
+        local name = GemoroiShaderPackOrder[math.random(1, #GemoroiShaderPackOrder)]
+        ApplyShader(GemoroiShaderPack[name])
+        GemoroiUI:Notify({ Title = "Shader Pack", Content = "Random: " .. name .. "!", Duration = 2 })
     end
 })
 
@@ -7053,10 +7691,45 @@ end)
 
 if playersInPlotsFolder then
     playersInPlotsFolder.ChildAdded:Connect(RefreshPlayerDropdown)
+    playersInPlotsFolder.ChildRemoved:Connect(RefreshPlayerDropdown)
+end
 
 -- XOCU Integration Logic
 local function getXOCURoot(player)
     return player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+end
+
+-- === Gemoroi Kick Core: shared ownership helpers ===
+local function ClaimNetworkOwnership(part, tries)
+    local claimed = false
+    pcall(function()
+        local GrabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
+        local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
+        for _ = 1, tries or 4 do
+            local owner = part:FindFirstChild("PartOwner")
+            if owner and owner.Value == LocalPlayer.Name then
+                claimed = true
+                return
+            end
+            SetNetworkOwner:FireServer(part, part.CFrame)
+            task.wait()
+        end
+        local owner = part:FindFirstChild("PartOwner")
+        claimed = (owner ~= nil and owner.Value == LocalPlayer.Name)
+    end)
+    return claimed
+end
+
+local function PalletStrike(soundPart, targetRoot, setOwner)
+    if not soundPart or not soundPart.Parent or not targetRoot then return end
+    soundPart.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 0)
+    local owner = soundPart:FindFirstChild("PartOwner")
+    if not owner or owner.Value ~= LocalPlayer.Name then
+        setOwner:FireServer(soundPart, soundPart.CFrame)
+    end
+    task.wait()
+    pcall(function() soundPart.AssemblyLinearVelocity = Vector3.zero end)
+    soundPart.CFrame = CFrame.new(0, 1000000000, 0)
 end
 
 local function applyXOCUForce(target, velocity, name)
@@ -7067,32 +7740,58 @@ local function applyXOCUForce(target, velocity, name)
         local GrabEvents = S.ReplicatedStorage:WaitForChild("GrabEvents")
         local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
         local DestroyGrabLine = GrabEvents:FindFirstChild("DestroyGrabLine")
-        
+
+        ClaimNetworkOwnership(root, 5)
         SetNetworkOwner:FireServer(root, root.CFrame)
         if DestroyGrabLine then DestroyGrabLine:FireServer(root) end
-        
+
         local bv = Instance.new("BodyVelocity")
         bv.Name = name or "XOCUForce"
         bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
         bv.Velocity = velocity
         bv.P = 12500
         bv.Parent = root
-        game:GetService("Debris"):AddItem(bv, 0.1)
+        game:GetService("Debris"):AddItem(bv, 0.25)
+
+        -- keep pushing for a few frames so one reverted frame can't cancel the kick
+        task.spawn(function()
+            for _ = 1, 8 do
+                if not root.Parent then break end
+                root.AssemblyLinearVelocity = velocity
+                task.wait()
+            end
+        end)
     end)
 end
 
 local XOCUKickMethods = {
     ["Fling"] = function(target) applyXOCUForce(target, Vector3.new(0, 90000, 0), "XOCUFling") end,
-    ["Kill"] = function(target) applyXOCUForce(target, Vector3.new(0, 99999999999999, 0), "XOCUKill") end,
-    ["Heaven"] = function(target) 
+    ["Kill"] = function(target)
+        applyXOCUForce(target, Vector3.new(0, 99999999999999, 0), "XOCUKill")
+        task.spawn(function()
+            for _ = 1, 10 do
+                local root = getXOCURoot(target)
+                if not root then break end
+                root.CFrame = CFrame.new(0, 999999999999, 0)
+                task.wait()
+            end
+        end)
+    end,
+    ["Heaven"] = function(target)
         local root = getXOCURoot(target)
         if root then root.CFrame = CFrame.new(0, 200, 0) end
         applyXOCUForce(target, Vector3.new(0, 200, 0), "XOCUHeaven")
     end,
     ["Kick"] = function(target)
-        local root = getXOCURoot(target)
-        if root then root.CFrame = CFrame.new(0, 999999999999, 0) end
         applyXOCUForce(target, Vector3.new(0, 99999999999999, 0), "XOCUKick")
+        task.spawn(function()
+            for _ = 1, 10 do
+                local root = getXOCURoot(target)
+                if not root then break end
+                root.CFrame = CFrame.new(0, 999999999999, 0)
+                task.wait()
+            end
+        end)
     end,
     ["Ragdoll"] = function(target) applyXOCUForce(target, Vector3.new(0, -20, 0), "XOCURagdoll") end,
     ["Hell"] = function(target)
@@ -7102,11 +7801,16 @@ local XOCUKickMethods = {
             end
         end)
         applyXOCUForce(target, Vector3.new(0, -100000000, 0), "XOCUHell")
+        task.spawn(function()
+            for _ = 1, 10 do
+                local root = getXOCURoot(target)
+                if not root then break end
+                root.CFrame = CFrame.new(0, -999999999999, 0)
+                task.wait()
+            end
+        end)
     end
 }
-
-    playersInPlotsFolder.ChildRemoved:Connect(RefreshPlayerDropdown)
-end
 
 
 local function IsTargetAlive(player)
@@ -7161,6 +7865,407 @@ TargetTab:AddToggle("AntiLagToggle", {
 })
 
 
+-- ================== GEMOROI MEGA KICK (Ultimate) ==================
+-- Multi-vector kick: anti-kick neutralization + FPS-adaptive ownership spam
+-- + Terrain-anchored AlignPosition lock + escalating height ramp + physics nuke.
+TargetTab:AddSection("MEGA KICK (Gemoroi Ultimate)")
+
+local MegaKickCfg = {
+    enabled = false,
+    loopThread = nil,
+    kickHeight = 28,
+    aggression = "NUCLEAR",
+    neutralizeAntiKick = true
+}
+
+local MegaKickProfiles = {
+    ["Normal"]     = { stage2 = 2.5, stage3 = 5.0, ownerFires = 2, heightRamp = 6 },
+    ["Aggressive"] = { stage2 = 1.5, stage3 = 3.0, ownerFires = 3, heightRamp = 12 },
+    ["NUCLEAR"]    = { stage2 = 0.8, stage3 = 1.6, ownerFires = 4, heightRamp = 25 }
+}
+
+local MegaKickTracked = {}
+
+local function MegaKickTrack(obj)
+    table.insert(MegaKickTracked, obj)
+    return obj
+end
+
+local function MegaKickCleanup(target)
+    for _, obj in ipairs(MegaKickTracked) do
+        pcall(function() obj:Destroy() end)
+    end
+    MegaKickTracked = {}
+    pcall(function()
+        local tChar = target and target.Character
+        local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+        if tRoot then
+            for _, v in ipairs(tRoot:GetChildren()) do
+                if v.Name:sub(1, 8) == "MegaKick" or v:IsA("BodyPosition") or v:IsA("BodyGyro") or v:IsA("BodyVelocity") then
+                    v:Destroy()
+                end
+            end
+        end
+    end)
+    pcall(function()
+        local char = LocalPlayer.Character
+        local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+        if myRoot then
+            myRoot.Anchored = false
+            myRoot.AssemblyLinearVelocity = Vector3.zero
+            myRoot.AssemblyAngularVelocity = Vector3.zero
+        end
+    end)
+end
+
+-- Phase 1: steal + re-stick the target's anti-kick items (Anti-AntiKick BYPASS)
+local function MegaKickNeutralize(target, remotes)
+    pcall(function()
+        local inv = Workspace:FindFirstChild(target.Name .. "SpawnedInToys")
+        if not inv then return end
+        local tChar = target.Character
+        local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+        local firePart = tRoot and tRoot:FindFirstChild("FirePlayerPart")
+        for _, toy in ipairs(inv:GetChildren()) do
+            local sticky = toy:FindFirstChild("StickyPart")
+            if sticky then
+                for _, part in ipairs(toy:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                        part.CanTouch = false
+                        part.CanQuery = false
+                    end
+                end
+                local owner = sticky:FindFirstChild("PartOwner")
+                if not owner or owner.Value ~= LocalPlayer.Name then
+                    remotes.setOwner:FireServer(sticky, sticky.CFrame)
+                elseif firePart and remotes.stickyEvent then
+                    -- re-stick their anti-kick far below them: protection is neutralized
+                    remotes.stickyEvent:FireServer(sticky, firePart, CFrame.new(0, -10, 5))
+                end
+                local soundPart = toy:FindFirstChild("SoundPart")
+                if soundPart then
+                    local sOwner = soundPart:FindFirstChild("PartOwner")
+                    if not sOwner or sOwner.Value ~= LocalPlayer.Name then
+                        remotes.setOwner:FireServer(soundPart, soundPart.CFrame)
+                    else
+                        soundPart.AssemblyLinearVelocity = Vector3.zero
+                        soundPart.CFrame = CFrame.new(0, -30000, 0)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local megaKickToggle = nil
+
+TargetTab:AddSlider("MegaKickHeightSlider", {
+    Title = "Mega Kick Height",
+    Description = "Base hold height above your head",
+    Default = 28,
+    Min = 10,
+    Max = 150,
+    Rounding = 0,
+    Suffix = " studs",
+    Callback = function(Value)
+        MegaKickCfg.kickHeight = Value
+    end
+})
+
+TargetTab:AddDropdown("MegaKickAggressionDropdown", {
+    Title = "Mega Kick Aggression",
+    Description = "How fast the attack escalates to the physics nuke",
+    Values = { "Normal", "Aggressive", "NUCLEAR" },
+    Default = "NUCLEAR",
+    Callback = function(Value)
+        MegaKickCfg.aggression = Value
+    end
+})
+
+TargetTab:AddToggle("MegaKickNeutralizeToggle", {
+    Title = "Neutralize Anti-Kick First",
+    Description = "Steals and re-sticks the target's anti-kick items",
+    Default = true,
+    Callback = function(Value)
+        MegaKickCfg.neutralizeAntiKick = Value
+    end
+})
+
+megaKickToggle = TargetTab:AddToggle("MegaKickToggle", {
+    Title = "MEGA KICK (auto until kicked)",
+    Description = "Full multi-vector attack, retries until the target is gone",
+    Default = false,
+    Callback = function(state)
+        if state then
+            local target = AmethystFeatures.Selected.kickPlayer
+            if not target then
+                GemoroiUI:Notify({ Title = "MEGA KICK", Content = "Select a target player first!", Duration = 3 })
+                if megaKickToggle then pcall(function() megaKickToggle:SetValue(false) end) end
+                return
+            end
+            MegaKickCfg.enabled = true
+            MegaKickCfg.loopThread = task.spawn(function()
+                local GE = S.ReplicatedStorage:WaitForChild("GrabEvents")
+                local charEvents = S.ReplicatedStorage:FindFirstChild("CharacterEvents")
+                local playerEvents = S.ReplicatedStorage:FindFirstChild("PlayerEvents")
+                local remotes = {
+                    setOwner = GE:WaitForChild("SetNetworkOwner"),
+                    destroyLine = GE:WaitForChild("DestroyGrabLine"),
+                    createLine = GE:FindFirstChild("CreateGrabLine"),
+                    endGrab = GE:FindFirstChild("EndGrabEarly"),
+                    ragdoll = charEvents and charEvents:FindFirstChild("RagdollRemote"),
+                    stickyEvent = playerEvents and playerEvents:FindFirstChild("StickyPartEvent")
+                }
+                local profile = MegaKickProfiles[MegaKickCfg.aggression] or MegaKickProfiles.NUCLEAR
+
+                local myChar = LocalPlayer.Character
+                local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                if not myRoot then
+                    MegaKickCfg.enabled = false
+                    return
+                end
+                local savedPos = myRoot.CFrame
+                local startedAt = tick()
+
+                -- FPS-adaptive ownership spam (from XOCU research)
+                local currentFPS = 60
+                local fpsConn = RunService.RenderStepped:Connect(function(dt)
+                    currentFPS = 1 / dt
+                end)
+
+                local att0, att1, alignPos, alignRot = nil, nil, nil, nil
+                local kickStart = tick()
+                local lastChar = nil
+                local lastNeutralize = 0
+                local lastRagdoll = 0
+                local lastStrike = 0
+                local nukeFlip = false
+
+                local function destroyLock()
+                    for _, obj in ipairs({ att0, att1, alignPos, alignRot }) do
+                        if obj then pcall(function() obj:Destroy() end) end
+                    end
+                    att0, att1, alignPos, alignRot = nil, nil, nil, nil
+                end
+
+                local function buildLock(tRoot)
+                    destroyLock()
+                    -- Terrain attachment: we drive the constraint locally while owning their root
+                    att0 = MegaKickTrack(Instance.new("Attachment", tRoot))
+                    att0.Name = "MegaKickAtt0"
+                    att1 = MegaKickTrack(Instance.new("Attachment", Workspace.Terrain))
+                    att1.Name = "MegaKickAtt1"
+                    alignPos = MegaKickTrack(Instance.new("AlignPosition"))
+                    alignPos.Name = "MegaKickAlign"
+                    alignPos.Attachment0 = att0
+                    alignPos.Attachment1 = att1
+                    alignPos.MaxForce = math.huge
+                    alignPos.Responsiveness = 200
+                    alignPos.Parent = tRoot
+                    alignRot = MegaKickTrack(Instance.new("AlignOrientation"))
+                    alignRot.Name = "MegaKickRot"
+                    alignRot.Attachment0 = att0
+                    alignRot.Mode = Enum.OrientationAlignmentMode.OneAttachment
+                    alignRot.CFrame = CFrame.new()
+                    alignRot.MaxTorque = math.huge
+                    alignRot.Responsiveness = 200
+                    alignRot.Parent = tRoot
+                end
+
+                while MegaKickCfg.enabled and target.Parent do
+                    local tChar = target.Character
+                    local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                    local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+                    myChar = LocalPlayer.Character
+                    myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+                    if not tRoot or not tHum or not myRoot then
+                        destroyLock()
+                        task.wait(0.1)
+                    else
+                        -- target respawned -> restart escalation on the fresh character
+                        if tChar ~= lastChar then
+                            lastChar = tChar
+                            kickStart = tick()
+                            destroyLock()
+                        end
+                        local elapsed = tick() - kickStart
+
+                        -- Phase 1: periodically neutralize their anti-kick
+                        if MegaKickCfg.neutralizeAntiKick and tick() - lastNeutralize > 0.5 then
+                            lastNeutralize = tick()
+                            MegaKickNeutralize(target, remotes)
+                        end
+
+                        -- Phase 2: approach when too far (skip if target already nuked skyward)
+                        local dist = (tRoot.Position - myRoot.Position).Magnitude
+                        if dist > 30 and math.abs(tRoot.Position.Y) < 20000 then
+                            pcall(function()
+                                myChar:PivotTo(tRoot.CFrame * CFrame.new(0, 2, 4))
+                                myRoot.AssemblyLinearVelocity = Vector3.zero
+                            end)
+                        end
+
+                        -- Phase 3: ragdoll + break every grab/hold
+                        pcall(function()
+                            tHum.PlatformStand = true
+                            tHum.Sit = true
+                        end)
+                        if remotes.ragdoll and tick() - lastRagdoll > 0.4 then
+                            lastRagdoll = tick()
+                            pcall(function() remotes.ragdoll:FireServer(tRoot, 0) end)
+                        end
+
+                        -- Phase 4: FPS-adaptive ownership lock
+                        local fires = profile.ownerFires
+                        if currentFPS < 100 then fires = fires + 1 end
+                        pcall(function()
+                            for _ = 1, fires do
+                                remotes.setOwner:FireServer(tRoot, tRoot.CFrame)
+                            end
+                            remotes.destroyLine:FireServer(tRoot)
+                            if remotes.endGrab then
+                                remotes.endGrab:FireServer(tRoot)
+                            end
+                        end)
+
+                        -- Phase 5: Terrain-anchored lock with escalating height ramp
+                        if not alignPos or not alignPos.Parent then
+                            buildLock(tRoot)
+                        end
+                        local height = MegaKickCfg.kickHeight
+                        if elapsed > profile.stage2 then
+                            height = height + math.min((elapsed - profile.stage2) * profile.heightRamp, 150)
+                        end
+                        pcall(function()
+                            local myHead = myChar:FindFirstChild("Head")
+                            local anchor = (myHead and myHead.Position) or myRoot.Position
+                            att1.WorldPosition = anchor + Vector3.new(0, height, 0)
+                            if elapsed > profile.stage3 then
+                                -- violent spin makes the hold impossible to escape
+                                alignRot.CFrame = CFrame.Angles(0, (tick() * 25) % (math.pi * 2), 0)
+                            end
+                        end)
+
+                        -- Phase 6: PHYSICS NUKE
+                        if elapsed > profile.stage3 then
+                            pcall(function()
+                                tRoot.AssemblyLinearVelocity = Vector3.new(0, 1e15, 0)
+                                tRoot.AssemblyAngularVelocity = Vector3.new(9e9, 9e9, 9e9)
+                            end)
+                            nukeFlip = not nukeFlip
+                            if nukeFlip then
+                                pcall(function() tRoot.CFrame = CFrame.new(0, 9e8, 0) end)
+                            end
+                            -- bonus vector: pallet SoundPart strike if Permanent Pallet is running
+                            if PermanentPalletCfg.enabled and PermanentPalletCfg.currentPallet and tick() - lastStrike > 0.3 then
+                                lastStrike = tick()
+                                local sp = PermanentPalletCfg.currentPallet:FindFirstChild("SoundPart")
+                                if sp then
+                                    task.spawn(function()
+                                        pcall(PalletStrike, sp, tRoot, remotes.setOwner)
+                                    end)
+                                end
+                            end
+                        end
+
+                        -- keep myself stable through all of it
+                        pcall(function()
+                            myRoot.AssemblyLinearVelocity = Vector3.zero
+                            myRoot.AssemblyAngularVelocity = Vector3.zero
+                        end)
+                    end
+                    RunService.Heartbeat:Wait()
+                end
+
+                fpsConn:Disconnect()
+                local success = not target.Parent
+                MegaKickCleanup(target.Parent and target or nil)
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    if root then root.CFrame = savedPos end
+                end)
+                MegaKickCfg.enabled = false
+                if success then
+                    GemoroiUI:Notify({
+                        Title = "MEGA KICK",
+                        Content = ("TARGET ELIMINATED in %.1fs!"):format(tick() - startedAt),
+                        Duration = 5
+                    })
+                    if megaKickToggle then pcall(function() megaKickToggle:SetValue(false) end) end
+                end
+            end)
+            GemoroiUI:Notify({ Title = "MEGA KICK", Content = "Attacking " .. target.Name .. " [" .. MegaKickCfg.aggression .. "]", Duration = 3 })
+            PlayEnableSound()
+        else
+            MegaKickCfg.enabled = false
+            if MegaKickCfg.loopThread then
+                task.cancel(MegaKickCfg.loopThread)
+                MegaKickCfg.loopThread = nil
+            end
+            MegaKickCleanup(AmethystFeatures.Selected.kickPlayer)
+            GemoroiUI:Notify({ Title = "MEGA KICK", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+TargetTab:AddButton({
+    Title = "INSTANT NUKE (one-shot burst)",
+    Callback = function()
+        local target = AmethystFeatures.Selected.kickPlayer
+        if not target then
+            GemoroiUI:Notify({ Title = "MEGA KICK", Content = "Select a target player first!", Duration = 3 })
+            return
+        end
+        task.spawn(function()
+            pcall(function()
+                local GE = S.ReplicatedStorage:WaitForChild("GrabEvents")
+                local setOwner = GE:WaitForChild("SetNetworkOwner")
+                local destroyLine = GE:FindFirstChild("DestroyGrabLine")
+                local endGrab = GE:FindFirstChild("EndGrabEarly")
+                local charEvents = S.ReplicatedStorage:FindFirstChild("CharacterEvents")
+                local ragdoll = charEvents and charEvents:FindFirstChild("RagdollRemote")
+                local playerEvents = S.ReplicatedStorage:FindFirstChild("PlayerEvents")
+                MegaKickNeutralize(target, { setOwner = setOwner, stickyEvent = playerEvents and playerEvents:FindFirstChild("StickyPartEvent") })
+                local tChar = target.Character
+                local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+                if not tRoot then return end
+                if ragdoll then pcall(function() ragdoll:FireServer(tRoot, 0) end) end
+                ClaimNetworkOwnership(tRoot, 6)
+                if destroyLine then destroyLine:FireServer(tRoot) end
+                if endGrab then pcall(function() endGrab:FireServer(tRoot) end) end
+                pcall(function()
+                    if tHum then
+                        tHum.PlatformStand = true
+                        tHum.Sit = true
+                    end
+                end)
+                local bv = Instance.new("BodyVelocity")
+                bv.Name = "MegaKickNuke"
+                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bv.Velocity = Vector3.new(0, 1e15, 0)
+                bv.P = 12500
+                bv.Parent = tRoot
+                game:GetService("Debris"):AddItem(bv, 0.3)
+                for i = 1, 20 do
+                    if not tRoot.Parent or not target.Parent then break end
+                    setOwner:FireServer(tRoot, tRoot.CFrame)
+                    tRoot.AssemblyLinearVelocity = Vector3.new(0, 1e15, 0)
+                    tRoot.AssemblyAngularVelocity = Vector3.new(9e9, 9e9, 9e9)
+                    if i % 2 == 0 then
+                        tRoot.CFrame = CFrame.new(0, 9e8, 0)
+                    end
+                    task.wait()
+                end
+            end)
+            GemoroiUI:Notify({ Title = "MEGA KICK", Content = "NUKE burst sent to " .. target.Name .. "!", Duration = 3 })
+        end)
+    end
+})
+
 TargetTab:AddSection("Grabs func")
 
 TargetTab:AddToggle("FastKickToggle", {
@@ -7206,7 +8311,7 @@ TargetTab:AddToggle("FastKickToggle", {
                         local targetChar = target.Character
                         local targetHum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
                         local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
-                        if not targetRoot or not targetHum or not IsTargetAlive(target) then
+                        if not targetRoot or not targetHum or targetHum.Health <= 0 then
                             ClearTargetGroup("ragdollLoopKick")
                             isHeld = false
                             task.wait()
@@ -7266,14 +8371,7 @@ TargetTab:AddToggle("FastKickToggle", {
                                     attachHold.Position = Vector3.new()
                                     attachTarget.CFrame = CFrame.new(0, 14.5, 0) * CFrame.Angles(math.rad((0 + 0 * .016) % 360), 0, 0)
                                 end
-                                if tick() - (isHeld and heldSince or 0) >= 0 then
-                                    soundPart.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 0)
-                                    if not soundPart:FindFirstChild("PartOwner") then
-                                        setOwner:FireServer(soundPart, soundPart.CFrame)
-                                    end
-                                    task.wait()
-                                    soundPart.CFrame = CFrame.new(0, 1000000000, 0)
-                                end
+                                PalletStrike(soundPart, targetRoot, setOwner)
                             end
                         end
                     end
@@ -7347,14 +8445,7 @@ TargetTab:AddToggle("ControlKickToggle", {
                             task.wait()
                         else
                             local soundPart = pallet:FindFirstChild("SoundPart")
-                            if soundPart then
-                                soundPart.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 0)
-                                if not soundPart:FindFirstChild("PartOwner") then
-                                    setOwner:FireServer(soundPart, soundPart.CFrame)
-                                end
-                                task.wait()
-                                soundPart.CFrame = CFrame.new(0, 1000000000, 0)
-                            end
+                            PalletStrike(soundPart, targetRoot, setOwner)
                         end
                     end
                     task.wait()
@@ -7399,6 +8490,7 @@ TargetTab:AddToggle("LoopBringToggle", {
                 local setOwner = grabEvents:WaitForChild("SetNetworkOwner")
                 local soundPart = pallet:FindFirstChild("SoundPart")
                 local attachHold, attachTarget, alignPos, alignOri = nil, nil, nil, nil
+                local holdSince = nil
                 while LoopKickCfg.enabled do
                     local lpChar = LocalPlayer.Character
                     local myRoot = lpChar and lpChar:FindFirstChild("HumanoidRootPart")
@@ -7410,9 +8502,12 @@ TargetTab:AddToggle("LoopBringToggle", {
                         local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
                         if not targetChar or not targetHum or targetHum.Health <= 0 or not targetRoot then
                             ClearTargetGroup("loopBring")
+                            attachHold, attachTarget, alignPos, alignOri = nil, nil, nil, nil
+                            holdSince = nil
                             task.wait()
                         else
                             if IsTargetAlive(target) then
+                                holdSince = nil
                                 task.wait(.4)
                             else
                                 myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, -6, -10)
@@ -7424,8 +8519,10 @@ TargetTab:AddToggle("LoopBringToggle", {
                                 targetRoot.AssemblyLinearVelocity = Vector3.zero
                                 targetRoot.AssemblyAngularVelocity = Vector3.zero
                                 targetRoot.RotVelocity = Vector3.zero
-                                local holdSince = tick()
-                                if tick() - holdSince > .35 then
+                                if not holdSince then
+                                    holdSince = tick()
+                                end
+                                if tick() - holdSince > .35 and not attachHold then
                                     if targetRoot.Velocity.Magnitude < 5 then
                                         attachHold = TrackInstance("loopBring", Instance.new("Attachment", myRoot))
                                         attachHold.Name = "LoopBringAttHold"
@@ -7445,14 +8542,7 @@ TargetTab:AddToggle("LoopBringToggle", {
                                         alignOri.Responsiveness = 1000
                                         alignOri.Name = "LoopBringAlignOri"
                                         alignOri.Parent = targetRoot
-                                        if soundPart then
-                                            soundPart.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 0)
-                                            if not soundPart:FindFirstChild("PartOwner") then
-                                                setOwner:FireServer(soundPart, soundPart.CFrame)
-                                            end
-                                            task.wait()
-                                            soundPart.CFrame = CFrame.new(0, 1000000000, 0)
-                                        end
+                                        PalletStrike(soundPart, targetRoot, setOwner)
                                         for _, part in pairs(targetRoot:GetChildren()) do
                                             if part:IsA("BasePart") then
                                                 part.CustomPhysicalProperties = PhysicalProperties.new(.2, 0, 10)
@@ -7466,14 +8556,7 @@ TargetTab:AddToggle("LoopBringToggle", {
                                 if not targetRoot:FindFirstChild("PartOwner") then
                                     setOwner:FireServer(targetRoot, targetRoot.CFrame)
                                 end
-                                if soundPart then
-                                    soundPart.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 0)
-                                    if not soundPart:FindFirstChild("PartOwner") then
-                                        setOwner:FireServer(soundPart, soundPart.CFrame)
-                                    end
-                                    task.wait()
-                                    soundPart.CFrame = CFrame.new(0, 1000000000, 0)
-                                end
+                                PalletStrike(soundPart, targetRoot, setOwner)
                             end
                         end
                     end
@@ -7673,11 +8756,11 @@ TargetTab:AddToggle("AutoSitBlobTargetToggle", {
                     local canSpawn = lp:FindFirstChild("CanSpawnToy")
                     if canSpawn then
                         local start = tick()
-                        while canSpawn.Value and tick() - start < 3 do
+                        while not canSpawn.Value and tick() - start < 3 do
                             task.wait()
-                            if not lp:FindFirstChild("CanSpawnToy").Value then
-                                return nil
-                            end
+                        end
+                        if not canSpawn.Value then
+                            return nil
                         end
                         local char = lp.Character
                         if not char then
@@ -8069,11 +9152,11 @@ AurasTab:AddToggle("AutoSitBlobAuraToggle", {
                     local canSpawn = lp:FindFirstChild("CanSpawnToy")
                     if canSpawn then
                         local start = tick()
-                        while canSpawn.Value and tick() - start < 3 do
+                        while not canSpawn.Value and tick() - start < 3 do
                             task.wait()
-                            if not lp:FindFirstChild("CanSpawnToy").Value then
-                                return nil
-                            end
+                        end
+                        if not canSpawn.Value then
+                            return nil
                         end
                         local char = lp.Character
                         if not char then
@@ -8577,18 +9660,121 @@ AurasTab:AddToggle("KickAuraFixedToggle", {
                 local grabEvents = S.ReplicatedStorage.GrabEvents
                 local setOwner = grabEvents.SetNetworkOwner
                 local destroyGrabLine = grabEvents.DestroyGrabLine
-                local ragdollRemote = S.ReplicatedStorage.CharacterEvents.RagdollRemote
                 local offsets = {
                     Vector3.new(-4, 15, -4),
                     Vector3.new(4, 15, -4),
                     Vector3.new(-4, 15, 4),
                     Vector3.new(4, 15, 4)
                 }
-                while KickAuraFixedCfg.enabled do
-                    if not LocalPlayer.Character then
-                        break
+                local radius = 30
+                local holdTime = 1.2
+                local function releaseData(data)
+                    for _, key in ipairs({ "alignPos", "alignOri", "attachHold", "attachTarget" }) do
+                        if data[key] then
+                            pcall(function() data[key]:Destroy() end)
+                            data[key] = nil
+                        end
                     end
-                    task.wait()
+                end
+                while KickAuraFixedCfg.enabled do
+                    local char = LocalPlayer.Character
+                    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+                    if not char or not myRoot then
+                        task.wait(0.2)
+                    else
+                        -- release finished / invalid holds (kick on release)
+                        for player, data in pairs(KickAuraFixedCfg.fixedPlayers) do
+                            local pChar = player and player.Character
+                            local pRoot = pChar and pChar:FindFirstChild("HumanoidRootPart")
+                            if not player.Parent or not pRoot then
+                                releaseData(data)
+                                KickAuraFixedCfg.fixedPlayers[player] = nil
+                            elseif tick() - (data.since or 0) > holdTime then
+                                releaseData(data)
+                                pcall(function()
+                                    setOwner:FireServer(pRoot, pRoot.CFrame)
+                                    destroyGrabLine:FireServer(pRoot)
+                                    local bv = Instance.new("BodyVelocity")
+                                    bv.Name = "KickAuraForce"
+                                    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                    bv.Velocity = Vector3.new(0, 99999999999999, 0)
+                                    bv.P = 12500
+                                    bv.Parent = pRoot
+                                    game:GetService("Debris"):AddItem(bv, 0.25)
+                                    task.spawn(function()
+                                        for _ = 1, 8 do
+                                            if not pRoot.Parent then break end
+                                            pRoot.AssemblyLinearVelocity = Vector3.new(0, 99999999999999, 0)
+                                            pRoot.CFrame = CFrame.new(0, 999999999999, 0)
+                                            task.wait()
+                                        end
+                                    end)
+                                end)
+                                KickAuraFixedCfg.fixedPlayers[player] = nil
+                            end
+                        end
+                        -- grab new nearby players
+                        local slot = 0
+                        for _, player in ipairs(S.Players:GetPlayers()) do
+                            if player ~= LocalPlayer and not IsPlayerInPlot(player) then
+                                local pChar = player.Character
+                                local pHum = pChar and pChar:FindFirstChildOfClass("Humanoid")
+                                local pRoot = pChar and pChar:FindFirstChild("HumanoidRootPart")
+                                if pRoot and pHum and pHum.Health > 0 and (pRoot.Position - myRoot.Position).Magnitude <= radius then
+                                    slot = slot + 1
+                                    local data = KickAuraFixedCfg.fixedPlayers[player]
+                                    if not data then
+                                        pcall(function()
+                                            setOwner:FireServer(pRoot, pRoot.CFrame)
+                                            destroyGrabLine:FireServer(pRoot)
+                                        end)
+                                        local offset = offsets[((slot - 1) % #offsets) + 1]
+                                        local attachHold = Instance.new("Attachment", myRoot)
+                                        attachHold.Name = "KickAuraFixedHold"
+                                        attachHold.Position = offset
+                                        local attachTarget = Instance.new("Attachment", pRoot)
+                                        attachTarget.Name = "KickAuraFixedTarget"
+                                        local alignPos = Instance.new("AlignPosition")
+                                        alignPos.Name = "KickAuraFixedAlignPos"
+                                        alignPos.Attachment0 = attachTarget
+                                        alignPos.Attachment1 = attachHold
+                                        alignPos.MaxForce = math.huge
+                                        alignPos.Responsiveness = math.huge
+                                        alignPos.Parent = pRoot
+                                        local alignOri = Instance.new("AlignOrientation")
+                                        alignOri.Name = "KickAuraFixedAlignOri"
+                                        alignOri.Attachment0 = attachTarget
+                                        alignOri.Attachment1 = attachHold
+                                        alignOri.MaxTorque = math.huge
+                                        alignOri.Responsiveness = math.huge
+                                        alignOri.Parent = pRoot
+                                        pcall(function()
+                                            pHum.PlatformStand = true
+                                            pHum:ChangeState(Enum.HumanoidStateType.Physics)
+                                        end)
+                                        KickAuraFixedCfg.fixedPlayers[player] = {
+                                            attachHold = attachHold,
+                                            attachTarget = attachTarget,
+                                            alignPos = alignPos,
+                                            alignOri = alignOri,
+                                            since = tick()
+                                        }
+                                    else
+                                        -- keep network ownership fresh while holding
+                                        local owner = pRoot:FindFirstChild("PartOwner")
+                                        if not owner or owner.Value ~= LocalPlayer.Name then
+                                            pcall(function() setOwner:FireServer(pRoot, pRoot.CFrame) end)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        task.wait(0.1)
+                    end
+                end
+                for player, data in pairs(KickAuraFixedCfg.fixedPlayers) do
+                    releaseData(data)
+                    KickAuraFixedCfg.fixedPlayers[player] = nil
                 end
             end)
             GemoroiUI:Notify({ Title = "Kick Aura (Fixed)", Content = "Enabled", Duration = 3 })
@@ -8600,11 +9786,10 @@ AurasTab:AddToggle("KickAuraFixedToggle", {
                 KickAuraFixedCfg.loopThread = nil
             end
             for _, data in pairs(KickAuraFixedCfg.fixedPlayers) do
-                if data.alignPos and data.alignPos.Parent then
-                    data.alignPos:Destroy()
-                end
-                if data.alignOri and data.alignOri.Parent then
-                    data.alignOri:Destroy()
+                for _, key in ipairs({ "alignPos", "alignOri", "attachHold", "attachTarget" }) do
+                    if data[key] and data[key].Parent then
+                        pcall(function() data[key]:Destroy() end)
+                    end
                 end
             end
             KickAuraFixedCfg.fixedPlayers = {}
@@ -8625,11 +9810,53 @@ AurasTab:AddToggle("JumpKickAuraToggle", {
                 local grabEvents = S.ReplicatedStorage.GrabEvents
                 local setOwner = grabEvents.SetNetworkOwner
                 local destroyGrabLine = grabEvents.DestroyGrabLine
+                local radius = 35
+                local cooldown = 3
                 while JumpKickAuraCfg.enabled do
-                    if not LocalPlayer.Character then
-                        break
+                    local char = LocalPlayer.Character
+                    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+                    if not myRoot then
+                        task.wait(0.2)
+                    else
+                        for player, t in pairs(JumpKickAuraCfg.processedPlayers) do
+                            if not player.Parent or tick() - t > cooldown then
+                                JumpKickAuraCfg.processedPlayers[player] = nil
+                            end
+                        end
+                        for _, player in ipairs(S.Players:GetPlayers()) do
+                            if player ~= LocalPlayer and not JumpKickAuraCfg.processedPlayers[player] and not IsPlayerInPlot(player) then
+                                local pChar = player.Character
+                                local pHum = pChar and pChar:FindFirstChildOfClass("Humanoid")
+                                local pRoot = pChar and pChar:FindFirstChild("HumanoidRootPart")
+                                if pRoot and pHum and pHum.Health > 0
+                                    and (pRoot.Position - myRoot.Position).Magnitude <= radius
+                                    and (pHum.FloorMaterial == Enum.Material.Air or pHum.Jump) then
+                                    JumpKickAuraCfg.processedPlayers[player] = tick()
+                                    task.spawn(function()
+                                        pcall(function()
+                                            setOwner:FireServer(pRoot, pRoot.CFrame)
+                                            destroyGrabLine:FireServer(pRoot)
+                                            task.wait()
+                                            setOwner:FireServer(pRoot, pRoot.CFrame)
+                                            local bv = Instance.new("BodyVelocity")
+                                            bv.Name = "JumpKickForce"
+                                            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                            bv.Velocity = Vector3.new(0, 99999999999999, 0)
+                                            bv.P = 12500
+                                            bv.Parent = pRoot
+                                            game:GetService("Debris"):AddItem(bv, 0.25)
+                                            for _ = 1, 8 do
+                                                if not pRoot.Parent then break end
+                                                pRoot.AssemblyLinearVelocity = Vector3.new(0, 99999999999999, 0)
+                                                task.wait()
+                                            end
+                                        end)
+                                    end)
+                                end
+                            end
+                        end
+                        task.wait(0.1)
                     end
-                    task.wait()
                 end
             end)
             GemoroiUI:Notify({ Title = "Jump Kick Aura", Content = "Enabled", Duration = 3 })
