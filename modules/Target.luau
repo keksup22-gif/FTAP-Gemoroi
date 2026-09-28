@@ -75,6 +75,49 @@ function Target.ExecuteXOCUKick(target, mode)
     Shared.Notify("XOCU Kick", "Applied " .. kickMode .. " to " .. target.Name .. " 💥", 2)
 end
 
+function Target.PerformAdvancedKick(player)
+    Target.ExecuteXOCUKick(player, "Kick")
+end
+
+function Target.BringTarget(player)
+    local char = player and player.Character
+    local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+    local myRoot = Shared.GetRoot(Shared.LocalPlayer)
+    if not root or not myRoot then return end
+    
+    pcall(function()
+        Shared.SetNetworkOwner(root, myRoot.CFrame)
+        root.CFrame = myRoot.CFrame * CFrame.new(0, 0, -5)
+        Shared.StopAllVelocity()
+    end)
+    Shared.Notify("Target", "Brought " .. player.Name, 2)
+end
+
+function Target.KillTarget(player)
+    local char = player and player.Character
+    local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+    if root then
+        Shared.SetNetworkOwner(root, root.CFrame)
+        root.AssemblyLinearVelocity = Vector3.new(0, -1e6, 0)
+        root.CFrame = CFrame.new(root.Position.X, -3000, root.Position.Z)
+        Shared.Notify("Target", "Void Killed " .. player.Name, 2)
+    end
+end
+
+function Target.FreezeTarget(player)
+    local char = player and player.Character
+    local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+    if not root then return end
+    
+    pcall(function()
+        Shared.SetNetworkOwner(root, root.CFrame)
+        root.Anchored = true
+        task.wait(2)
+        root.Anchored = false
+    end)
+    Shared.Notify("Target", "Froze " .. player.Name, 2)
+end
+
 function Target.RefreshPlayerList()
     Target.PlayerNames = { "None" }
     for _, player in ipairs(Shared.Players:GetPlayers()) do
