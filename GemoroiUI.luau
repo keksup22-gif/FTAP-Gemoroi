@@ -1,7 +1,7 @@
 --[[
     ============================================================
-    GemoroiUI v1.0.0 — Custom UI Library for FTAP-Gemoroi
-    Theme  : Lime Dark
+    GemoroiUI v1.1.0 — Custom UI Library for FTAP-Gemoroi
+    Theme  : Lime Dark Neon
     Layout : Vertical Sidebar + Scrollable Content
     Author : keksup22
 
@@ -18,6 +18,7 @@
                            Callback})                                 -> :SetValue / :SetValues / :Refresh
       Tab:AddButton({Title, Description, Callback})
       Tab:AddColorpicker(id, {Title, Default, Callback})              -> :SetValue(Color3)
+      Tab:AddKeybind(id, {Title, Description, Default, Callback})      -> :SetValue(KeyCode)
       Tab:AddParagraph({Title, Content})
       GemoroiUI:Notify({Title, Content, Duration})
 
@@ -33,29 +34,52 @@ local CoreGui          = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 
+local SoundService = game:GetService("SoundService")
+
 local GemoroiUI = {
-    Version   = "1.0.0",
-    ThemeName = "Lime Dark",
+    Version   = "1.1.0",
+    ThemeName = "Lime Dark Neon",
+    Sounds    = true, -- confirmation sounds for notifications
 }
+
+local function playNotifySound()
+    if not GemoroiUI.Sounds then
+        return
+    end
+    pcall(function()
+        local snd = Instance.new("Sound")
+        snd.SoundId = "rbxassetid://6895079853"
+        snd.Volume = 0.3
+        snd.PlaybackSpeed = 1.4
+        snd.Parent = SoundService
+        snd:Play()
+        task.delay(0.6, function()
+            if snd and snd.Parent then
+                snd:Destroy()
+            end
+        end)
+    end)
+end
 
 -- ============================== THEME ==============================
 local Theme = {
-    Background    = Color3.fromRGB(11, 14, 12),
-    Sidebar       = Color3.fromRGB(16, 20, 17),
-    Topbar        = Color3.fromRGB(14, 18, 15),
-    Element       = Color3.fromRGB(21, 26, 22),
-    ElementHover  = Color3.fromRGB(28, 35, 30),
-    ElementActive = Color3.fromRGB(33, 41, 35),
-    OptionHover   = Color3.fromRGB(27, 34, 29),
-    Stroke        = Color3.fromRGB(38, 47, 41),
-    Accent        = Color3.fromRGB(163, 230, 53),  -- lime
-    AccentDark    = Color3.fromRGB(97, 156, 26),
-    KnobOff       = Color3.fromRGB(120, 133, 123),
-    Text          = Color3.fromRGB(233, 240, 234),
-    SubText       = Color3.fromRGB(139, 153, 143),
-    Faint         = Color3.fromRGB(96, 107, 99),
-    Danger        = Color3.fromRGB(248, 113, 113),
-    Track         = Color3.fromRGB(30, 37, 32),
+    -- Lime Dark Neon palette
+    Background    = Color3.fromRGB(15, 17, 22),
+    Sidebar       = Color3.fromRGB(19, 22, 28),
+    Topbar        = Color3.fromRGB(17, 20, 26),
+    Element       = Color3.fromRGB(24, 28, 35),
+    ElementHover  = Color3.fromRGB(31, 36, 45),
+    ElementActive = Color3.fromRGB(37, 43, 53),
+    OptionHover   = Color3.fromRGB(30, 35, 44),
+    Stroke        = Color3.fromRGB(42, 49, 60),
+    Accent        = Color3.fromRGB(57, 255, 20),   -- neon lime
+    AccentDark    = Color3.fromRGB(31, 140, 12),
+    KnobOff       = Color3.fromRGB(110, 120, 132),
+    Text          = Color3.fromRGB(240, 244, 248),
+    SubText       = Color3.fromRGB(148, 158, 170),
+    Faint         = Color3.fromRGB(100, 110, 122),
+    Danger        = Color3.fromRGB(255, 82, 82),
+    Track         = Color3.fromRGB(33, 39, 48),
 }
 
 local ICONS = {
@@ -83,6 +107,7 @@ local ICONS = {
     ["gifts"]        = "🎁",
     ["crown"]        = "👑",
     ["wand"]         = "🪄",
+    ["keyboard"]     = "⌨️",
     ["bolt"]         = "⚡",
 }
 
@@ -290,6 +315,8 @@ function GemoroiUI:Notify(props)
         contentLabel.TextTruncate = Enum.TextTruncate.AtEnd
         contentLabel.Text = tostring(props.Content or "")
         contentLabel.Parent = notif
+
+        playNotifySound()
 
         local item = { frame = notif, height = height }
         local targetY = 0
@@ -557,6 +584,18 @@ function GemoroiUI:CreateWindow(config)
         Dock.Visible = minimized
     end
 
+    -- animated fade cover used on tab switch
+    local ContentCover = Instance.new("Frame")
+    ContentCover.Name = "ContentCover"
+    ContentCover.Position = UDim2.new(0, 0, 0, 43)
+    ContentCover.Size = UDim2.new(1, 0, 1, -43)
+    ContentCover.BackgroundColor3 = Theme.Background
+    ContentCover.BackgroundTransparency = 1
+    ContentCover.BorderSizePixel = 0
+    ContentCover.ZIndex = 50
+    ContentCover.Visible = false
+    ContentCover.Parent = Content
+
     local function selectTab(tab)
         if selectedTab == tab then
             return
@@ -572,8 +611,21 @@ function GemoroiUI:CreateWindow(config)
             tween(t.TitleLabel, 0.15, {
                 TextColor3 = active and Theme.Text or Theme.SubText
             })
+            if active then
+                -- smooth content entrance: slide + fade via TweenService
+                t.Page.Position = UDim2.new(0, 0, 0, 55)
+                t.Page.CanvasPosition = Vector2.new(0, 0)
+                tween(t.Page, 0.22, { Position = UDim2.new(0, 0, 0, 43) }, Enum.EasingStyle.Quint)
+            end
         end
         TopbarTitle.Text = tab.Title
+        -- fade cover flash
+        ContentCover.Visible = true
+        ContentCover.BackgroundTransparency = 0.45
+        tween(ContentCover, 0.25, { BackgroundTransparency = 1 })
+        task.delay(0.3, function()
+            ContentCover.Visible = false
+        end)
     end
 
     -- ===================== ELEMENT FACTORY =====================
@@ -1286,6 +1338,106 @@ function GemoroiUI:CreateWindow(config)
         return Colorpicker
     end
 
+    local function addKeybind(page, id, props)
+        props = props or {}
+        local hasDesc = (type(props.Description) == "string" and props.Description ~= "")
+        local height = hasDesc and 56 or 38
+        local frame = newElement(page, height)
+        addTexts(frame, props, height, 96)
+
+        local keyLabel = Instance.new("TextLabel")
+        keyLabel.Name = "Key"
+        keyLabel.BackgroundTransparency = 1
+        keyLabel.AnchorPoint = Vector2.new(1, 0)
+        keyLabel.Position = UDim2.new(1, -10, 0, hasDesc and 8 or 0)
+        keyLabel.Size = UDim2.new(0, 110, 0, hasDesc and 16 or height)
+        keyLabel.Font = Enum.Font.GothamBold
+        keyLabel.TextSize = 12
+        keyLabel.TextXAlignment = Enum.TextXAlignment.Right
+        keyLabel.TextYAlignment = Enum.TextYAlignment.Center
+        keyLabel.TextColor3 = Theme.Accent
+        keyLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        keyLabel.Text = "None"
+        keyLabel.Parent = frame
+
+        local currentKey = props.Default
+        local listening = false
+        local Keybind = {}
+
+        local function renderKey()
+            if listening then
+                keyLabel.Text = "Listening..."
+                keyLabel.TextColor3 = Theme.Danger
+            elseif currentKey then
+                keyLabel.Text = currentKey.Name
+                keyLabel.TextColor3 = Theme.Accent
+            else
+                keyLabel.Text = "None"
+                keyLabel.TextColor3 = Theme.SubText
+            end
+        end
+
+        local listenConn = nil
+        local function stopListening()
+            listening = false
+            if listenConn then
+                listenConn:Disconnect()
+                listenConn = nil
+            end
+            renderKey()
+        end
+
+        local headerHit = Instance.new("TextButton")
+        headerHit.Name = "HeaderHit"
+        headerHit.Size = UDim2.new(1, 0, 0, height)
+        headerHit.BackgroundColor3 = Theme.Element
+        headerHit.BackgroundTransparency = 1
+        headerHit.BorderSizePixel = 0
+        headerHit.AutoButtonColor = false
+        headerHit.Text = ""
+        headerHit.Parent = frame
+
+        headerHit.MouseEnter:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.ElementHover })
+        end)
+        headerHit.MouseLeave:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.Element })
+        end)
+
+        headerHit.Activated:Connect(function()
+            if listening then
+                stopListening()
+                return
+            end
+            listening = true
+            renderKey()
+            listenConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then
+                    return
+                end
+                if input.KeyCode == Enum.KeyCode.Escape then
+                    stopListening()
+                    return
+                end
+                if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown then
+                    currentKey = input.KeyCode
+                    stopListening()
+                    if type(props.Callback) == "function" then
+                        task.spawn(props.Callback, currentKey)
+                    end
+                end
+            end)
+        end)
+
+        function Keybind:SetValue(keyCode)
+            currentKey = keyCode
+            renderKey()
+        end
+
+        renderKey()
+        return Keybind
+    end
+
     local function addParagraph(page, props)
         props = props or {}
         local frame = newElement(page, 0, true)
@@ -1447,6 +1599,10 @@ function GemoroiUI:CreateWindow(config)
 
         function tab:AddColorpicker(elementId, elementProps)
             return addColorpicker(Page, elementId, elementProps)
+        end
+
+        function tab:AddKeybind(elementId, elementProps)
+            return addKeybind(Page, elementId, elementProps)
         end
 
         function tab:AddParagraph(elementProps)

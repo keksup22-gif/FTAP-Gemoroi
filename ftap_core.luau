@@ -1,7 +1,10 @@
 --[[
     Project: FTAP-Gemoroi
     Core Script (ftap_core.luau) - Fully functional with operational ESP, Auras, Physics, and GemoroiUI (Lime Dark) bindings
-    v3.5 - GemoroiUI Lime Dark, Third Person Fix, PCLD BoxHandleAdornments, Profile ESP, Soap Textures FPS Boost, Auto Spin Slots
+    v3.6 - GemoroiUI Lime Dark Neon (EMBEDDED), Third Person Fix, PCLD Boxes, Profile ESP,
+    Overhead Tags, X-Ray, Map Customizer, Soap FPS Boost, Water Walk, Fly, Pose Pack,
+    Limb Controls, Silent Aim Hook, Fling Aura, Chat Spammer, Shuriken Desync,
+    Auto Spin Slots, Auto Reconnect, Keybinds Tab (152 UI elements)
 ]]
 
 local Players = game:GetService("Players")
@@ -34,9 +37,1716 @@ local S = {
     HttpService = HttpService
 }
 
-local success_ui, GemoroiUI = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/keksup22-gif/FTAP-Gemoroi/main/GemoroiUI.luau"))()
-end)
+-- ==== BEGIN EMBEDDED GemoroiUI (Lime Dark Neon) ===================================
+-- Auto-synced from /GemoroiUI.luau by the build script - do not edit here.
+local GemoroiUI = (function()
+--[[
+    ============================================================
+    GemoroiUI v1.1.0 — Custom UI Library for FTAP-Gemoroi
+    Theme  : Lime Dark Neon
+    Layout : Vertical Sidebar + Scrollable Content
+    Author : keksup22
+
+    Drop-in replacement for the old Fluent bindings with a
+    Fluent-compatible API surface:
+      GemoroiUI:CreateWindow({ Title, SubTitle, TabWidth, Size,
+                                Theme, Acrylic, MinimizeKey })
+      Window:AddTab({ Title, Icon })
+      Tab:AddSection(title | {Title = ...})
+      Tab:AddToggle(id,   {Title, Description, Default, Callback})   -> :SetValue(bool)
+      Tab:AddSlider(id,   {Title, Description, Default, Min, Max,
+                           Rounding, Suffix, Callback})               -> :SetValue(number)
+      Tab:AddDropdown(id, {Title, Description, Values, Default,
+                           Callback})                                 -> :SetValue / :SetValues / :Refresh
+      Tab:AddButton({Title, Description, Callback})
+      Tab:AddColorpicker(id, {Title, Default, Callback})              -> :SetValue(Color3)
+      Tab:AddKeybind(id, {Title, Description, Default, Callback})      -> :SetValue(KeyCode)
+      Tab:AddParagraph({Title, Content})
+      GemoroiUI:Notify({Title, Content, Duration})
+
+    SYNCED COPY: /GemoroiUI.luau  <->  /modules/GemoroiUI.luau
+    Keep both files identical!
+    ============================================================
+]]
+
+local Players          = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local CoreGui          = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+
+local SoundService = game:GetService("SoundService")
+
+local GemoroiUI = {
+    Version   = "1.1.0",
+    ThemeName = "Lime Dark Neon",
+    Sounds    = true, -- confirmation sounds for notifications
+}
+
+local function playNotifySound()
+    if not GemoroiUI.Sounds then
+        return
+    end
+    pcall(function()
+        local snd = Instance.new("Sound")
+        snd.SoundId = "rbxassetid://6895079853"
+        snd.Volume = 0.3
+        snd.PlaybackSpeed = 1.4
+        snd.Parent = SoundService
+        snd:Play()
+        task.delay(0.6, function()
+            if snd and snd.Parent then
+                snd:Destroy()
+            end
+        end)
+    end)
+end
+
+-- ============================== THEME ==============================
+local Theme = {
+    -- Lime Dark Neon palette
+    Background    = Color3.fromRGB(15, 17, 22),
+    Sidebar       = Color3.fromRGB(19, 22, 28),
+    Topbar        = Color3.fromRGB(17, 20, 26),
+    Element       = Color3.fromRGB(24, 28, 35),
+    ElementHover  = Color3.fromRGB(31, 36, 45),
+    ElementActive = Color3.fromRGB(37, 43, 53),
+    OptionHover   = Color3.fromRGB(30, 35, 44),
+    Stroke        = Color3.fromRGB(42, 49, 60),
+    Accent        = Color3.fromRGB(57, 255, 20),   -- neon lime
+    AccentDark    = Color3.fromRGB(31, 140, 12),
+    KnobOff       = Color3.fromRGB(110, 120, 132),
+    Text          = Color3.fromRGB(240, 244, 248),
+    SubText       = Color3.fromRGB(148, 158, 170),
+    Faint         = Color3.fromRGB(100, 110, 122),
+    Danger        = Color3.fromRGB(255, 82, 82),
+    Track         = Color3.fromRGB(33, 39, 48),
+}
+
+local ICONS = {
+    ["sword"]        = "⚔️",
+    ["user"]         = "👤",
+    ["users"]        = "👥",
+    ["eye"]          = "👁️",
+    ["sparkles"]     = "✨",
+    ["crosshair"]    = "🎯",
+    ["zap"]          = "⚡",
+    ["shield"]       = "🛡️",
+    ["shield-alert"] = "🚨",
+    ["flame"]        = "🔥",
+    ["server"]       = "🖥️",
+    ["map-pin"]      = "📍",
+    ["box"]          = "📦",
+    ["settings"]     = "⚙️",
+    ["target"]       = "🎯",
+    ["star"]         = "⭐",
+    ["lock"]         = "🔒",
+    ["home"]         = "🏠",
+    ["globe"]        = "🌐",
+    ["activity"]     = "📈",
+    ["gift"]         = "🎁",
+    ["gifts"]        = "🎁",
+    ["crown"]        = "👑",
+    ["wand"]         = "🪄",
+    ["keyboard"]     = "⌨️",
+    ["bolt"]         = "⚡",
+}
+
+-- ============================ HELPERS =============================
+local function corner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 6)
+    c.Parent = parent
+    return c
+end
+
+local function stroke(parent, color, thickness, transparency)
+    local s = Instance.new("UIStroke")
+    s.Color = color or Theme.Stroke
+    s.Thickness = thickness or 1
+    s.Transparency = transparency or 0
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent = parent
+    return s
+end
+
+local function tween(inst, time, props, style, dir)
+    if not time or time <= 0 then
+        for k, v in pairs(props) do
+            inst[k] = v
+        end
+        return
+    end
+    TweenService:Create(
+        inst,
+        TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out),
+        props
+    ):Play()
+end
+
+local function createScreenGui(name, reuse)
+    local candidates = {}
+    pcall(function()
+        if gethui then
+            table.insert(candidates, gethui())
+        end
+    end)
+    table.insert(candidates, CoreGui)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then
+        pg = LocalPlayer:WaitForChild("PlayerGui", 5)
+    end
+    if pg then
+        table.insert(candidates, pg)
+    end
+
+    for _, parent in ipairs(candidates) do
+        if parent then
+            if reuse then
+                local existing = parent:FindFirstChild(name)
+                if existing then
+                    return existing
+                end
+            end
+            local ok, gui = pcall(function()
+                local g = Instance.new("ScreenGui")
+                g.Name = name
+                g.ResetOnSpawn = false
+                g.IgnoreGuiInset = true
+                g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                g.DisplayOrder = 9999
+                g.Parent = parent
+                return g
+            end)
+            if ok and gui then
+                return gui
+            end
+        end
+    end
+    return nil
+end
+
+-- ========================= NOTIFICATIONS ==========================
+local notifyHolder = nil
+local notifyList = {}
+
+local function getNotifyHolder()
+    if notifyHolder and notifyHolder.Parent then
+        return notifyHolder
+    end
+    local gui = createScreenGui("GemoroiUI_Notifications", true)
+    if not gui then
+        return nil
+    end
+    if gui:FindFirstChild("Holder") then
+        notifyHolder = gui.Holder
+        return notifyHolder
+    end
+    local holder = Instance.new("Frame")
+    holder.Name = "Holder"
+    holder.AnchorPoint = Vector2.new(1, 0)
+    holder.Position = UDim2.new(1, -14, 0, 14)
+    holder.Size = UDim2.new(0, 300, 1, -28)
+    holder.BackgroundTransparency = 1
+    holder.Parent = gui
+    notifyHolder = holder
+    notifyList = {}
+    return holder
+end
+
+local function layoutNotifications(animate)
+    local y = 0
+    for _, item in ipairs(notifyList) do
+        local target = UDim2.new(1, 0, 0, y)
+        if animate then
+            tween(item.frame, 0.28, { Position = target }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        else
+            item.frame.Position = target
+        end
+        y = y + item.height + 8
+    end
+end
+
+local function dismissNotification(item, instant)
+    for i, v in ipairs(notifyList) do
+        if v == item then
+            table.remove(notifyList, i)
+            break
+        end
+    end
+    if instant and item.frame then
+        pcall(function() item.frame:Destroy() end)
+    elseif item.frame then
+        tween(item.frame, 0.22, { Position = UDim2.new(1, 340, 0, 0) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        task.delay(0.25, function()
+            pcall(function()
+                if item.frame then
+                    item.frame:Destroy()
+                end
+            end)
+        end)
+    end
+    layoutNotifications(true)
+end
+
+function GemoroiUI:Notify(props)
+    props = (type(props) == "table") and props or {}
+    task.spawn(function()
+        local holder = getNotifyHolder()
+        if not holder then
+            pcall(function()
+                game:GetService("StarterGui"):SetCore("SendNotification", {
+                    Title = tostring(props.Title or "GemoroiUI"),
+                    Text = tostring(props.Content or ""),
+                    Duration = tonumber(props.Duration) or 5,
+                })
+            end)
+            return
+        end
+
+        if #notifyList >= 8 then
+            dismissNotification(notifyList[1], false)
+        end
+
+        local height = 64
+        local notif = Instance.new("Frame")
+        notif.Name = "Notification"
+        notif.AnchorPoint = Vector2.new(1, 0)
+        notif.Size = UDim2.new(1, 0, 0, height)
+        notif.BackgroundColor3 = Color3.fromRGB(17, 22, 18)
+        notif.BorderSizePixel = 0
+        notif.Position = UDim2.new(1, 340, 0, 0)
+        notif.Parent = holder
+        corner(notif, 8)
+        stroke(notif, Theme.Stroke, 1, 0.25)
+
+        local accentBar = Instance.new("Frame")
+        accentBar.Name = "AccentBar"
+        accentBar.Position = UDim2.new(0, 0, 0, 7)
+        accentBar.Size = UDim2.new(0, 3, 1, -14)
+        accentBar.BackgroundColor3 = Theme.Accent
+        accentBar.BorderSizePixel = 0
+        accentBar.Parent = notif
+        corner(accentBar, 2)
+
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Name = "Title"
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Position = UDim2.new(0, 14, 0, 9)
+        titleLabel.Size = UDim2.new(1, -24, 0, 16)
+        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.TextSize = 13
+        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        titleLabel.TextColor3 = Theme.Text
+        titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        titleLabel.Text = tostring(props.Title or "GemoroiUI")
+        titleLabel.Parent = notif
+
+        local contentLabel = Instance.new("TextLabel")
+        contentLabel.Name = "Content"
+        contentLabel.BackgroundTransparency = 1
+        contentLabel.Position = UDim2.new(0, 14, 0, 28)
+        contentLabel.Size = UDim2.new(1, -24, 0, 30)
+        contentLabel.Font = Enum.Font.Gotham
+        contentLabel.TextSize = 12
+        contentLabel.TextXAlignment = Enum.TextXAlignment.Left
+        contentLabel.TextYAlignment = Enum.TextYAlignment.Top
+        contentLabel.TextWrapped = true
+        contentLabel.TextColor3 = Theme.SubText
+        contentLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        contentLabel.Text = tostring(props.Content or "")
+        contentLabel.Parent = notif
+
+        playNotifySound()
+
+        local item = { frame = notif, height = height }
+        local targetY = 0
+        for _, existing in ipairs(notifyList) do
+            targetY = targetY + existing.height + 8
+        end
+        table.insert(notifyList, item)
+        tween(notif, 0.32, { Position = UDim2.new(1, 0, 0, targetY) }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+        notif.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dismissNotification(item, false)
+            end
+        end)
+
+        task.delay(math.max(tonumber(props.Duration) or 5, 1), function()
+            if notif and notif.Parent then
+                dismissNotification(item, false)
+            end
+        end)
+    end)
+end
+
+-- ============================ WINDOW ==============================
+function GemoroiUI:CreateWindow(config)
+    config = (type(config) == "table") and config or {}
+
+    local gui = createScreenGui("GemoroiUI", true)
+    if not gui then
+        warn("[GemoroiUI] Failed to create ScreenGui")
+        return nil
+    end
+
+    local prevWindow = gui:FindFirstChild("GemoroiWindow")
+    if prevWindow then
+        prevWindow:Destroy()
+    end
+    local prevDock = gui:FindFirstChild("GemoroiDock")
+    if prevDock then
+        prevDock:Destroy()
+    end
+
+    local windowConnections = {}
+
+    local size = config.Size
+    if typeof(size) ~= "UDim2" then
+        size = UDim2.fromOffset(580, 460)
+    end
+    local tabWidth = math.clamp(tonumber(config.TabWidth) or 160, 110, 260)
+    local minimizeKey = config.MinimizeKey or Enum.KeyCode.RightControl
+
+    local Main = Instance.new("Frame")
+    Main.Name = "GemoroiWindow"
+    Main.AnchorPoint = Vector2.new(0.5, 0.5)
+    Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Main.Size = size
+    Main.BackgroundColor3 = Theme.Background
+    Main.BorderSizePixel = 0
+    Main.ClipsDescendants = true
+    Main.Parent = gui
+    corner(Main, 10)
+    stroke(Main, Theme.Stroke, 1, 0.1)
+
+    if config.Acrylic then
+        Main.BackgroundTransparency = 0.06
+    end
+
+    -- ===================== SIDEBAR (VERTICAL) =====================
+    local Sidebar = Instance.new("Frame")
+    Sidebar.Name = "Sidebar"
+    Sidebar.Size = UDim2.new(0, tabWidth, 1, 0)
+    Sidebar.Position = UDim2.new(0, 0, 0, 0)
+    Sidebar.BackgroundColor3 = Theme.Sidebar
+    Sidebar.BorderSizePixel = 0
+    Sidebar.Parent = Main
+    corner(Sidebar, 10)
+
+    local SideHeader = Instance.new("Frame")
+    SideHeader.Name = "Header"
+    SideHeader.Size = UDim2.new(1, 0, 0, 74)
+    SideHeader.BackgroundTransparency = 1
+    SideHeader.Parent = Sidebar
+
+    local BrandDot = Instance.new("Frame")
+    BrandDot.Name = "BrandDot"
+    BrandDot.Position = UDim2.new(0, 16, 0, 21)
+    BrandDot.Size = UDim2.new(0, 7, 0, 7)
+    BrandDot.BackgroundColor3 = Theme.Accent
+    BrandDot.BorderSizePixel = 0
+    BrandDot.Parent = SideHeader
+    corner(BrandDot, 4)
+
+    local WindowTitle = Instance.new("TextLabel")
+    WindowTitle.Name = "Title"
+    WindowTitle.BackgroundTransparency = 1
+    WindowTitle.Position = UDim2.new(0, 30, 0, 14)
+    WindowTitle.Size = UDim2.new(1, -42, 0, 18)
+    WindowTitle.Font = Enum.Font.GothamBold
+    WindowTitle.TextSize = 14
+    WindowTitle.TextXAlignment = Enum.TextXAlignment.Left
+    WindowTitle.TextColor3 = Theme.Text
+    WindowTitle.TextTruncate = Enum.TextTruncate.AtEnd
+    WindowTitle.Text = tostring(config.Title or "GemoroiUI")
+    WindowTitle.Parent = SideHeader
+
+    local WindowSubTitle = Instance.new("TextLabel")
+    WindowSubTitle.Name = "SubTitle"
+    WindowSubTitle.BackgroundTransparency = 1
+    WindowSubTitle.Position = UDim2.new(0, 16, 0, 36)
+    WindowSubTitle.Size = UDim2.new(1, -30, 0, 14)
+    WindowSubTitle.Font = Enum.Font.Gotham
+    WindowSubTitle.TextSize = 11
+    WindowSubTitle.TextXAlignment = Enum.TextXAlignment.Left
+    WindowSubTitle.TextColor3 = Theme.SubText
+    WindowSubTitle.TextTruncate = Enum.TextTruncate.AtEnd
+    WindowSubTitle.Text = tostring(config.SubTitle or "Lime Dark")
+    WindowSubTitle.Parent = SideHeader
+
+    local SideDivider = Instance.new("Frame")
+    SideDivider.Name = "Divider"
+    SideDivider.Position = UDim2.new(0, 0, 0, 74)
+    SideDivider.Size = UDim2.new(1, 0, 0, 1)
+    SideDivider.BackgroundColor3 = Theme.Stroke
+    SideDivider.BackgroundTransparency = 0.35
+    SideDivider.BorderSizePixel = 0
+    SideDivider.Parent = Sidebar
+
+    local TabList = Instance.new("ScrollingFrame")
+    TabList.Name = "TabList"
+    TabList.Position = UDim2.new(0, 0, 0, 75)
+    TabList.Size = UDim2.new(1, 0, 1, -101)
+    TabList.BackgroundTransparency = 1
+    TabList.BorderSizePixel = 0
+    TabList.ScrollBarThickness = 3
+    TabList.ScrollBarImageColor3 = Theme.Stroke
+    TabList.CanvasSize = UDim2.new()
+    TabList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    TabList.ScrollingDirection = Enum.ScrollingDirection.Y
+    TabList.Parent = Sidebar
+
+    local TabListPadding = Instance.new("UIPadding")
+    TabListPadding.PaddingTop = UDim.new(0, 8)
+    TabListPadding.PaddingBottom = UDim.new(0, 8)
+    TabListPadding.PaddingLeft = UDim.new(0, 8)
+    TabListPadding.PaddingRight = UDim.new(0, 8)
+    TabListPadding.Parent = TabList
+
+    local TabListLayout = Instance.new("UIListLayout")
+    TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    TabListLayout.Padding = UDim.new(0, 4)
+    TabListLayout.Parent = TabList
+
+    local SideFooter = Instance.new("TextLabel")
+    SideFooter.Name = "Footer"
+    SideFooter.AnchorPoint = Vector2.new(0, 1)
+    SideFooter.Position = UDim2.new(0, 0, 1, -4)
+    SideFooter.Size = UDim2.new(1, 0, 0, 18)
+    SideFooter.BackgroundTransparency = 1
+    SideFooter.Font = Enum.Font.Gotham
+    SideFooter.TextSize = 10
+    SideFooter.TextColor3 = Theme.Faint
+    SideFooter.Text = "GemoroiUI v" .. GemoroiUI.Version .. " • Lime Dark"
+    SideFooter.Parent = Sidebar
+
+    -- ===================== CONTENT AREA =====================
+    local Content = Instance.new("Frame")
+    Content.Name = "Content"
+    Content.Position = UDim2.new(0, tabWidth, 0, 0)
+    Content.Size = UDim2.new(1, -tabWidth, 1, 0)
+    Content.BackgroundColor3 = Theme.Background
+    Content.BorderSizePixel = 0
+    Content.Parent = Main
+    corner(Content, 10)
+
+    local Topbar = Instance.new("Frame")
+    Topbar.Name = "Topbar"
+    Topbar.Size = UDim2.new(1, 0, 0, 42)
+    Topbar.BackgroundColor3 = Theme.Topbar
+    Topbar.BorderSizePixel = 0
+    Topbar.Parent = Content
+    corner(Topbar, 10)
+
+    local TopbarDivider = Instance.new("Frame")
+    TopbarDivider.Name = "Divider"
+    TopbarDivider.Position = UDim2.new(0, 0, 0, 42)
+    TopbarDivider.Size = UDim2.new(1, 0, 0, 1)
+    TopbarDivider.BackgroundColor3 = Theme.Stroke
+    TopbarDivider.BackgroundTransparency = 0.35
+    TopbarDivider.BorderSizePixel = 0
+    TopbarDivider.Parent = Topbar
+
+    local TopbarTitle = Instance.new("TextLabel")
+    TopbarTitle.Name = "ActiveTab"
+    TopbarTitle.BackgroundTransparency = 1
+    TopbarTitle.Position = UDim2.new(0, 16, 0, 0)
+    TopbarTitle.Size = UDim2.new(1, -90, 0, 42)
+    TopbarTitle.Font = Enum.Font.GothamSemibold
+    TopbarTitle.TextSize = 14
+    TopbarTitle.TextXAlignment = Enum.TextXAlignment.Left
+    TopbarTitle.TextColor3 = Theme.Text
+    TopbarTitle.TextTruncate = Enum.TextTruncate.AtEnd
+    TopbarTitle.Text = ""
+    TopbarTitle.Parent = Topbar
+
+    local function windowButton(xOffset, glyph, hoverColor)
+        local btn = Instance.new("TextButton")
+        btn.Name = "Btn_" .. glyph
+        btn.AnchorPoint = Vector2.new(1, 0)
+        btn.Position = UDim2.new(1, xOffset, 0, 8)
+        btn.Size = UDim2.new(0, 26, 0, 26)
+        btn.BackgroundColor3 = Theme.Element
+        btn.BackgroundTransparency = 1
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.TextColor3 = Theme.SubText
+        btn.Text = glyph
+        btn.Parent = Topbar
+        btn.MouseEnter:Connect(function()
+            tween(btn, 0.1, { TextColor3 = hoverColor })
+        end)
+        btn.MouseLeave:Connect(function()
+            tween(btn, 0.1, { TextColor3 = Theme.SubText })
+        end)
+        return btn
+    end
+
+    local MinimizeBtn = windowButton(-68, "–", Theme.Text)
+    local CloseBtn = windowButton(-36, "✕", Theme.Danger)
+
+    -- ===================== DOCK (MINIMIZED) =====================
+    local Dock = Instance.new("TextButton")
+    Dock.Name = "GemoroiDock"
+    Dock.Position = UDim2.new(0, 14, 0, 14)
+    Dock.Size = UDim2.new(0, 42, 0, 42)
+    Dock.BackgroundColor3 = Theme.Accent
+    Dock.BorderSizePixel = 0
+    Dock.AutoButtonColor = false
+    Dock.Font = Enum.Font.GothamBold
+    Dock.TextSize = 18
+    Dock.TextColor3 = Color3.fromRGB(17, 22, 18)
+    Dock.Text = "≡"
+    Dock.Visible = false
+    Dock.Parent = gui
+    corner(Dock, 12)
+    stroke(Dock, Theme.AccentDark, 1, 0.2)
+
+    Dock.MouseEnter:Connect(function()
+        tween(Dock, 0.12, { Size = UDim2.new(0, 46, 0, 46), Position = UDim2.new(0, 12, 0, 12) })
+    end)
+    Dock.MouseLeave:Connect(function()
+        tween(Dock, 0.12, { Size = UDim2.new(0, 42, 0, 42), Position = UDim2.new(0, 14, 0, 14) })
+    end)
+
+    -- ===================== WINDOW OBJECT =====================
+    local Window = {}
+    local tabs = {}
+    local selectedTab = nil
+    local minimized = false
+
+    local function setMinimized(state)
+        minimized = state and true or false
+        Main.Visible = not minimized
+        Dock.Visible = minimized
+    end
+
+    -- animated fade cover used on tab switch
+    local ContentCover = Instance.new("Frame")
+    ContentCover.Name = "ContentCover"
+    ContentCover.Position = UDim2.new(0, 0, 0, 43)
+    ContentCover.Size = UDim2.new(1, 0, 1, -43)
+    ContentCover.BackgroundColor3 = Theme.Background
+    ContentCover.BackgroundTransparency = 1
+    ContentCover.BorderSizePixel = 0
+    ContentCover.ZIndex = 50
+    ContentCover.Visible = false
+    ContentCover.Parent = Content
+
+    local function selectTab(tab)
+        if selectedTab == tab then
+            return
+        end
+        selectedTab = tab
+        for _, t in ipairs(tabs) do
+            local active = (t == tab)
+            t.Page.Visible = active
+            t.AccentBar.Visible = active
+            tween(t.Button, 0.15, {
+                BackgroundColor3 = active and Theme.Element or Theme.Sidebar
+            })
+            tween(t.TitleLabel, 0.15, {
+                TextColor3 = active and Theme.Text or Theme.SubText
+            })
+            if active then
+                -- smooth content entrance: slide + fade via TweenService
+                t.Page.Position = UDim2.new(0, 0, 0, 55)
+                t.Page.CanvasPosition = Vector2.new(0, 0)
+                tween(t.Page, 0.22, { Position = UDim2.new(0, 0, 0, 43) }, Enum.EasingStyle.Quint)
+            end
+        end
+        TopbarTitle.Text = tab.Title
+        -- fade cover flash
+        ContentCover.Visible = true
+        ContentCover.BackgroundTransparency = 0.45
+        tween(ContentCover, 0.25, { BackgroundTransparency = 1 })
+        task.delay(0.3, function()
+            ContentCover.Visible = false
+        end)
+    end
+
+    -- ===================== ELEMENT FACTORY =====================
+    local function newElement(page, height, transparent)
+        page.NextOrder = (page.NextOrder or 0) + 1
+        local frame = Instance.new("Frame")
+        frame.Name = "Element_" .. page.NextOrder
+        frame.Size = UDim2.new(1, 0, 0, height)
+        frame.BackgroundColor3 = Theme.Element
+        frame.BackgroundTransparency = transparent and 1 or 0
+        frame.BorderSizePixel = 0
+        frame.LayoutOrder = page.NextOrder
+        frame.Parent = page
+        if not transparent then
+            corner(frame, 7)
+            stroke(frame, Theme.Stroke, 1, 0.35)
+        end
+        return frame
+    end
+
+    local function addTexts(frame, props, height, rightReserve)
+        local hasDesc = (type(props.Description) == "string" and props.Description ~= "")
+        local title = Instance.new("TextLabel")
+        title.Name = "Title"
+        title.BackgroundTransparency = 1
+        title.Font = Enum.Font.GothamMedium
+        title.TextSize = 13
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.TextYAlignment = hasDesc and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center
+        title.TextColor3 = Theme.Text
+        title.TextTruncate = Enum.TextTruncate.AtEnd
+        title.Text = tostring(props.Title or "")
+        title.Parent = frame
+
+        if hasDesc then
+            title.Position = UDim2.new(0, 12, 0, 9)
+            title.Size = UDim2.new(1, -24 - (rightReserve or 0), 0, 16)
+            local desc = Instance.new("TextLabel")
+            desc.Name = "Description"
+            desc.BackgroundTransparency = 1
+            desc.Position = UDim2.new(0, 12, 0, 27)
+            desc.Size = UDim2.new(1, -24 - (rightReserve or 0), 0, 13)
+            desc.Font = Enum.Font.Gotham
+            desc.TextSize = 11
+            desc.TextXAlignment = Enum.TextXAlignment.Left
+            desc.TextYAlignment = Enum.TextYAlignment.Top
+            desc.TextWrapped = true
+            desc.TextColor3 = Theme.SubText
+            desc.TextTruncate = Enum.TextTruncate.AtEnd
+            desc.Text = props.Description
+            desc.Parent = frame
+        else
+            title.Position = UDim2.new(0, 12, 0, 0)
+            title.Size = UDim2.new(1, -24 - (rightReserve or 0), 0, height)
+        end
+        return hasDesc
+    end
+
+    local function connectBarDrag(barBg, callback)
+        local dragging = false
+        barBg.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                callback(math.clamp((input.Position.X - barBg.AbsolutePosition.X) / math.max(barBg.AbsoluteSize.X, 1), 0, 1))
+            end
+        end)
+        local moveConn = UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                callback(math.clamp((input.Position.X - barBg.AbsolutePosition.X) / math.max(barBg.AbsoluteSize.X, 1), 0, 1))
+            end
+        end)
+        local endConn = UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        table.insert(windowConnections, moveConn)
+        table.insert(windowConnections, endConn)
+    end
+
+    local function addSection(page, title)
+        if type(title) == "table" then
+            title = title.Title or ""
+        end
+        title = tostring(title or "")
+        local frame = newElement(page, 30, true)
+
+        local dot = Instance.new("Frame")
+        dot.Name = "Dot"
+        dot.Position = UDim2.new(0, 2, 0, 13)
+        dot.Size = UDim2.new(0, 4, 0, 4)
+        dot.BackgroundColor3 = Theme.Accent
+        dot.BorderSizePixel = 0
+        dot.Parent = frame
+        corner(dot, 2)
+
+        local label = Instance.new("TextLabel")
+        label.Name = "Title"
+        label.BackgroundTransparency = 1
+        label.Position = UDim2.new(0, 13, 0, 0)
+        label.Size = UDim2.new(1, -13, 0, 30)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 13
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextColor3 = Theme.SubText
+        label.TextTruncate = Enum.TextTruncate.AtEnd
+        label.Text = title
+        label.Parent = frame
+
+        local line = Instance.new("Frame")
+        line.Name = "Line"
+        line.Position = UDim2.new(0, 0, 1, -1)
+        line.Size = UDim2.new(1, 0, 0, 1)
+        line.BackgroundColor3 = Theme.Stroke
+        line.BackgroundTransparency = 0.4
+        line.BorderSizePixel = 0
+        line.Parent = frame
+
+        return frame
+    end
+
+    local function addToggle(page, id, props)
+        props = props or {}
+        local hasDesc = (type(props.Description) == "string" and props.Description ~= "")
+        local height = hasDesc and 56 or 38
+        local frame = newElement(page, height)
+        addTexts(frame, props, height, 56)
+
+        local switch = Instance.new("Frame")
+        switch.Name = "Switch"
+        switch.AnchorPoint = Vector2.new(1, 0.5)
+        switch.Position = UDim2.new(1, -10, 0.5, 0)
+        switch.Size = UDim2.new(0, 38, 0, 20)
+        switch.BackgroundColor3 = Theme.Track
+        switch.BorderSizePixel = 0
+        switch.Parent = frame
+        corner(switch, 10)
+
+        local knob = Instance.new("Frame")
+        knob.Name = "Knob"
+        knob.AnchorPoint = Vector2.new(0.5, 0.5)
+        knob.Position = UDim2.new(0, 5, 0.5, 0)
+        knob.Size = UDim2.new(0, 14, 0, 14)
+        knob.BackgroundColor3 = Theme.KnobOff
+        knob.BorderSizePixel = 0
+        knob.Parent = switch
+        corner(knob, 7)
+
+        local state = (props.Default == true)
+        local Toggle = {}
+
+        local function render(animate)
+            local t = animate and 0.18 or 0
+            if state then
+                tween(switch, t, { BackgroundColor3 = Theme.Accent })
+                tween(knob, t, {
+                    Position = UDim2.new(1, -5, 0.5, 0),
+                    BackgroundColor3 = Color3.fromRGB(17, 22, 18)
+                })
+            else
+                tween(switch, t, { BackgroundColor3 = Theme.Track })
+                tween(knob, t, {
+                    Position = UDim2.new(0, 5, 0.5, 0),
+                    BackgroundColor3 = Theme.KnobOff
+                })
+            end
+        end
+
+        frame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                state = not state
+                render(true)
+                if type(props.Callback) == "function" then
+                    task.spawn(props.Callback, state)
+                end
+            end
+        end)
+        frame.MouseEnter:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.ElementHover })
+        end)
+        frame.MouseLeave:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.Element })
+        end)
+
+        function Toggle:SetValue(v)
+            state = (v == true)
+            render(false)
+        end
+
+        render(false)
+        return Toggle
+    end
+
+    local function addSlider(page, id, props)
+        props = props or {}
+        local min = tonumber(props.Min) or 0
+        local max = tonumber(props.Max) or 100
+        if max < min then
+            max = min
+        end
+        local rounding = math.clamp(tonumber(props.Rounding) or 0, 0, 3)
+        local suffix = (type(props.Suffix) == "string") and props.Suffix or ""
+        local hasDesc = (type(props.Description) == "string" and props.Description ~= "")
+        local height = hasDesc and 78 or 62
+
+        local frame = newElement(page, height)
+        addTexts(frame, props, hasDesc and 38 or 22, 70)
+
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Name = "Value"
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.AnchorPoint = Vector2.new(1, 0)
+        valueLabel.Position = UDim2.new(1, -12, 0, hasDesc and 8 or 0)
+        valueLabel.Size = UDim2.new(0, 150, 0, hasDesc and 16 or 22)
+        valueLabel.Font = Enum.Font.GothamBold
+        valueLabel.TextSize = 12
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+        valueLabel.TextYAlignment = Enum.TextYAlignment.Center
+        valueLabel.TextColor3 = Theme.Accent
+        valueLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        valueLabel.Text = ""
+        valueLabel.Parent = frame
+
+        local barBg = Instance.new("Frame")
+        barBg.Name = "Bar"
+        barBg.Position = UDim2.new(0, 12, 1, -18)
+        barBg.Size = UDim2.new(1, -24, 0, 6)
+        barBg.BackgroundColor3 = Theme.Track
+        barBg.BorderSizePixel = 0
+        barBg.Parent = frame
+        corner(barBg, 3)
+
+        local fill = Instance.new("Frame")
+        fill.Name = "Fill"
+        fill.Size = UDim2.new(0, 0, 1, 0)
+        fill.BackgroundColor3 = Theme.Accent
+        fill.BorderSizePixel = 0
+        fill.Parent = barBg
+        corner(fill, 3)
+
+        local knob = Instance.new("Frame")
+        knob.Name = "Knob"
+        knob.AnchorPoint = Vector2.new(0.5, 0.5)
+        knob.Position = UDim2.new(0, 0, 0.5, 0)
+        knob.Size = UDim2.new(0, 12, 0, 12)
+        knob.BackgroundColor3 = Theme.Text
+        knob.BorderSizePixel = 0
+        knob.Parent = barBg
+        corner(knob, 6)
+
+        local value = tonumber(props.Default) or min
+        local Slider = {}
+
+        local function renderValue()
+            local pct = (max == min) and 0 or math.clamp((value - min) / (max - min), 0, 1)
+            fill.Size = UDim2.new(pct, 0, 1, 0)
+            knob.Position = UDim2.new(pct, 0, 0.5, 0)
+            valueLabel.Text = string.format("%." .. rounding .. "f", value) .. suffix
+        end
+
+        local function updateFromFraction(fraction, fire)
+            local newValue = min + (max - min) * fraction
+            newValue = tonumber(string.format("%." .. rounding .. "f", newValue)) or min
+            if newValue ~= value then
+                value = newValue
+                renderValue()
+                if fire and type(props.Callback) == "function" then
+                    task.spawn(props.Callback, value)
+                end
+            end
+        end
+
+        connectBarDrag(barBg, function(fraction)
+            updateFromFraction(fraction, true)
+        end)
+
+        function Slider:SetValue(v)
+            v = tonumber(v) or min
+            if v < min then
+                v = min
+            elseif v > max then
+                v = max
+            end
+            value = tonumber(string.format("%." .. rounding .. "f", v)) or min
+            renderValue()
+        end
+
+        renderValue()
+        return Slider
+    end
+
+    local function addDropdown(page, id, props)
+        props = props or {}
+        local hasDesc = (type(props.Description) == "string" and props.Description ~= "")
+        local headerH = hasDesc and 56 or 38
+        local frame = newElement(page, headerH)
+        addTexts(frame, props, headerH, 96)
+
+        local chevron = Instance.new("TextLabel")
+        chevron.Name = "Chevron"
+        chevron.BackgroundTransparency = 1
+        chevron.AnchorPoint = Vector2.new(1, 0)
+        chevron.Position = UDim2.new(1, -10, 0, hasDesc and 8 or 0)
+        chevron.Size = UDim2.new(0, 14, 0, hasDesc and 16 or headerH)
+        chevron.Font = Enum.Font.GothamBold
+        chevron.TextSize = 12
+        chevron.TextXAlignment = Enum.TextXAlignment.Right
+        chevron.TextYAlignment = Enum.TextYAlignment.Center
+        chevron.TextColor3 = Theme.SubText
+        chevron.Text = "▾"
+        chevron.Parent = frame
+
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Name = "Value"
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.AnchorPoint = Vector2.new(1, 0)
+        valueLabel.Position = UDim2.new(1, -28, 0, hasDesc and 8 or 0)
+        valueLabel.Size = UDim2.new(0, 160, 0, hasDesc and 16 or headerH)
+        valueLabel.Font = Enum.Font.GothamMedium
+        valueLabel.TextSize = 12
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+        valueLabel.TextYAlignment = Enum.TextYAlignment.Center
+        valueLabel.TextColor3 = Theme.SubText
+        valueLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        valueLabel.Text = ""
+        valueLabel.Parent = frame
+
+        local listFrame = Instance.new("ScrollingFrame")
+        listFrame.Name = "Options"
+        listFrame.Position = UDim2.new(0, 6, 0, headerH)
+        listFrame.Size = UDim2.new(1, -12, 0, 0)
+        listFrame.BackgroundColor3 = Theme.OptionHover
+        listFrame.BackgroundTransparency = 0.25
+        listFrame.BorderSizePixel = 0
+        listFrame.Visible = false
+        listFrame.ScrollBarThickness = 3
+        listFrame.ScrollBarImageColor3 = Theme.Stroke
+        listFrame.CanvasSize = UDim2.new()
+        listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        listFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+        listFrame.Parent = frame
+        corner(listFrame, 6)
+
+        local listPadding = Instance.new("UIPadding")
+        listPadding.PaddingTop = UDim.new(0, 4)
+        listPadding.PaddingBottom = UDim.new(0, 4)
+        listPadding.PaddingLeft = UDim.new(0, 4)
+        listPadding.PaddingRight = UDim.new(0, 6)
+        listPadding.Parent = listFrame
+
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        listLayout.Padding = UDim.new(0, 2)
+        listLayout.Parent = listFrame
+
+        local values = {}
+        local current = nil
+        local open = false
+        local optionButtons = {}
+        local Dropdown = {}
+
+        local function setHeight()
+            local h = headerH
+            if open then
+                h = headerH + 8 + math.min(#values * 28, 164)
+            end
+            frame.Size = UDim2.new(1, 0, 0, h)
+        end
+
+        local function rebuild()
+            for _, b in ipairs(optionButtons) do
+                pcall(function() b:Destroy() end)
+            end
+            optionButtons = {}
+            for i, v in ipairs(values) do
+                local opt = Instance.new("TextButton")
+                opt.Name = "Option_" .. i
+                opt.Size = UDim2.new(1, 0, 0, 26)
+                opt.BackgroundColor3 = Theme.Element
+                opt.BackgroundTransparency = 1
+                opt.BorderSizePixel = 0
+                opt.AutoButtonColor = false
+                opt.Text = ""
+                opt.LayoutOrder = i
+                opt.Parent = listFrame
+                corner(opt, 5)
+
+                local lbl = Instance.new("TextLabel")
+                lbl.BackgroundTransparency = 1
+                lbl.Position = UDim2.new(0, 8, 0, 0)
+                lbl.Size = UDim2.new(1, -16, 1, 0)
+                lbl.Font = Enum.Font.GothamMedium
+                lbl.TextSize = 12
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
+                lbl.TextYAlignment = Enum.TextYAlignment.Center
+                lbl.TextColor3 = (v == current) and Theme.Accent or Theme.SubText
+                lbl.TextTruncate = Enum.TextTruncate.AtEnd
+                lbl.Text = tostring(v) .. ((v == current) and "   ✓" or "")
+                lbl.Parent = opt
+
+                opt.MouseEnter:Connect(function()
+                    opt.BackgroundTransparency = 0
+                end)
+                opt.MouseLeave:Connect(function()
+                    opt.BackgroundTransparency = 1
+                end)
+                opt.Activated:Connect(function()
+                    current = v
+                    valueLabel.Text = tostring(v)
+                    rebuild()
+                    open = false
+                    listFrame.Visible = false
+                    chevron.Text = "▾"
+                    setHeight()
+                    if type(props.Callback) == "function" then
+                        task.spawn(props.Callback, current)
+                    end
+                end)
+
+                table.insert(optionButtons, opt)
+            end
+        end
+
+        local headerHit = Instance.new("TextButton")
+        headerHit.Name = "HeaderHit"
+        headerHit.Size = UDim2.new(1, 0, 0, headerH)
+        headerHit.BackgroundColor3 = Theme.Element
+        headerHit.BackgroundTransparency = 1
+        headerHit.BorderSizePixel = 0
+        headerHit.AutoButtonColor = false
+        headerHit.Text = ""
+        headerHit.Parent = frame
+
+        headerHit.MouseEnter:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.ElementHover })
+        end)
+        headerHit.MouseLeave:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.Element })
+        end)
+
+        headerHit.Activated:Connect(function()
+            open = not open
+            listFrame.Visible = open
+            chevron.Text = open and "▴" or "▾"
+            setHeight()
+        end)
+
+        function Dropdown:SetValue(v)
+            for _, val in ipairs(values) do
+                if val == v then
+                    current = v
+                    valueLabel.Text = tostring(v)
+                    rebuild()
+                    return
+                end
+            end
+            current = v
+            valueLabel.Text = tostring(v or "")
+            rebuild()
+        end
+
+        function Dropdown:SetValues(newValues)
+            values = {}
+            if type(newValues) == "table" then
+                for _, v in ipairs(newValues) do
+                    table.insert(values, v)
+                end
+            end
+            local stillThere = false
+            for _, v in ipairs(values) do
+                if v == current then
+                    stillThere = true
+                    break
+                end
+            end
+            if not stillThere then
+                current = values[1]
+            end
+            valueLabel.Text = tostring(current or "")
+            rebuild()
+            setHeight()
+        end
+
+        function Dropdown:Refresh(newValues, keepSelection)
+            if keepSelection and current ~= nil then
+                local old = current
+                Dropdown:SetValues(newValues)
+                current = old
+                valueLabel.Text = tostring(current or "")
+                rebuild()
+            else
+                Dropdown:SetValues(newValues)
+            end
+        end
+
+        Dropdown:SetValues(props.Values)
+        if props.Default ~= nil then
+            Dropdown:SetValue(props.Default)
+        end
+        setHeight()
+        return Dropdown
+    end
+
+    local function addButton(page, props)
+        props = props or {}
+        local hasDesc = (type(props.Description) == "string" and props.Description ~= "")
+        local height = hasDesc and 56 or 38
+        local frame = newElement(page, height)
+        addTexts(frame, props, height, 0)
+
+        local arrow = Instance.new("TextLabel")
+        arrow.Name = "Arrow"
+        arrow.BackgroundTransparency = 1
+        arrow.AnchorPoint = Vector2.new(1, 0)
+        arrow.Position = UDim2.new(1, -12, 0, hasDesc and 8 or 0)
+        arrow.Size = UDim2.new(0, 16, 0, hasDesc and 16 or height)
+        arrow.Font = Enum.Font.GothamBold
+        arrow.TextSize = 13
+        arrow.TextXAlignment = Enum.TextXAlignment.Right
+        arrow.TextYAlignment = Enum.TextYAlignment.Center
+        arrow.TextColor3 = Theme.Accent
+        arrow.Text = "→"
+        arrow.Parent = frame
+
+        frame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                tween(frame, 0.07, { BackgroundColor3 = Theme.ElementActive })
+                task.delay(0.12, function()
+                    tween(frame, 0.18, { BackgroundColor3 = Theme.ElementHover })
+                end)
+                if type(props.Callback) == "function" then
+                    task.spawn(props.Callback)
+                end
+            end
+        end)
+        frame.MouseEnter:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.ElementHover })
+        end)
+        frame.MouseLeave:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.Element })
+        end)
+
+        return frame
+    end
+
+    local function addColorpicker(page, id, props)
+        props = props or {}
+        local hasDesc = (type(props.Description) == "string" and props.Description ~= "")
+        local headerH = hasDesc and 56 or 38
+        local frame = newElement(page, headerH)
+        addTexts(frame, props, headerH, 56)
+
+        local swatch = Instance.new("Frame")
+        swatch.Name = "Swatch"
+        swatch.AnchorPoint = Vector2.new(1, 0.5)
+        swatch.Position = UDim2.new(1, -10, 0.5, 0)
+        swatch.Size = UDim2.new(0, 24, 0, 24)
+        swatch.BackgroundColor3 = props.Default or Theme.Accent
+        swatch.BorderSizePixel = 0
+        swatch.Parent = frame
+        corner(swatch, 6)
+        stroke(swatch, Theme.Stroke, 1, 0.2)
+
+        local color = props.Default or Theme.Accent
+        local open = false
+        local pickerRowsH = 100
+        local Colorpicker = {}
+
+        local function setHeight()
+            local h = headerH
+            if open then
+                h = headerH + 10 + pickerRowsH
+            end
+            frame.Size = UDim2.new(1, 0, 0, h)
+        end
+
+        local panel = Instance.new("Frame")
+        panel.Name = "Panel"
+        panel.Position = UDim2.new(0, 10, 0, headerH + 5)
+        panel.Size = UDim2.new(1, -20, 0, pickerRowsH)
+        panel.BackgroundColor3 = Theme.OptionHover
+        panel.BackgroundTransparency = 0.25
+        panel.BorderSizePixel = 0
+        panel.Visible = false
+        panel.Parent = frame
+        corner(panel, 6)
+
+        local channels = {
+            { name = "R", value = math.floor(color.R * 255 + 0.5), fill = Color3.fromRGB(248, 113, 113) },
+            { name = "G", value = math.floor(color.G * 255 + 0.5), fill = Color3.fromRGB(74, 222, 128) },
+            { name = "B", value = math.floor(color.B * 255 + 0.5), fill = Color3.fromRGB(96, 165, 250) },
+        }
+
+        local function renderColor()
+            color = Color3.fromRGB(channels[1].value, channels[2].value, channels[3].value)
+            swatch.BackgroundColor3 = color
+        end
+
+        for i, ch in ipairs(channels) do
+            local row = Instance.new("Frame")
+            row.Name = "Row_" .. ch.name
+            row.Position = UDim2.new(0, 0, 0, (i - 1) * 32)
+            row.Size = UDim2.new(1, 0, 0, 32)
+            row.BackgroundTransparency = 1
+            row.Parent = panel
+
+            local lbl = Instance.new("TextLabel")
+            lbl.BackgroundTransparency = 1
+            lbl.Position = UDim2.new(0, 8, 0, 0)
+            lbl.Size = UDim2.new(0, 14, 0, 32)
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 11
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.TextYAlignment = Enum.TextYAlignment.Center
+            lbl.TextColor3 = ch.fill
+            lbl.Text = ch.name
+            lbl.Parent = row
+
+            local val = Instance.new("TextLabel")
+            val.Name = "Value"
+            val.BackgroundTransparency = 1
+            val.AnchorPoint = Vector2.new(1, 0)
+            val.Position = UDim2.new(1, -8, 0, 0)
+            val.Size = UDim2.new(0, 30, 0, 32)
+            val.Font = Enum.Font.GothamMedium
+            val.TextSize = 11
+            val.TextXAlignment = Enum.TextXAlignment.Right
+            val.TextYAlignment = Enum.TextYAlignment.Center
+            val.TextColor3 = Theme.SubText
+            val.Text = tostring(ch.value)
+            val.Parent = row
+
+            local barBg = Instance.new("Frame")
+            barBg.Name = "Bar"
+            barBg.AnchorPoint = Vector2.new(0, 0.5)
+            barBg.Position = UDim2.new(0, 28, 0.5, 0)
+            barBg.Size = UDim2.new(1, -78, 0, 6)
+            barBg.BackgroundColor3 = Theme.Track
+            barBg.BorderSizePixel = 0
+            barBg.Parent = row
+            corner(barBg, 3)
+
+            local fillBar = Instance.new("Frame")
+            fillBar.Name = "Fill"
+            fillBar.Size = UDim2.new(ch.value / 255, 0, 1, 0)
+            fillBar.BackgroundColor3 = ch.fill
+            fillBar.BorderSizePixel = 0
+            fillBar.Parent = barBg
+            corner(fillBar, 3)
+
+            connectBarDrag(barBg, function(fraction)
+                ch.value = math.floor(fraction * 255 + 0.5)
+                fillBar.Size = UDim2.new(ch.value / 255, 0, 1, 0)
+                val.Text = tostring(ch.value)
+                renderColor()
+                if type(props.Callback) == "function" then
+                    task.spawn(props.Callback, color)
+                end
+            end)
+        end
+
+        local headerHit = Instance.new("TextButton")
+        headerHit.Name = "HeaderHit"
+        headerHit.Size = UDim2.new(1, 0, 0, headerH)
+        headerHit.BackgroundColor3 = Theme.Element
+        headerHit.BackgroundTransparency = 1
+        headerHit.BorderSizePixel = 0
+        headerHit.AutoButtonColor = false
+        headerHit.Text = ""
+        headerHit.Parent = frame
+
+        headerHit.MouseEnter:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.ElementHover })
+        end)
+        headerHit.MouseLeave:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.Element })
+        end)
+
+        headerHit.Activated:Connect(function()
+            open = not open
+            panel.Visible = open
+            setHeight()
+        end)
+
+        function Colorpicker:SetValue(c)
+            if typeof(c) ~= "Color3" then
+                return
+            end
+            channels[1].value = math.floor(c.R * 255 + 0.5)
+            channels[2].value = math.floor(c.G * 255 + 0.5)
+            channels[3].value = math.floor(c.B * 255 + 0.5)
+            for i, ch in ipairs(channels) do
+                local row = panel:FindFirstChild("Row_" .. ch.name)
+                if row then
+                    local barBg = row:FindFirstChild("Bar")
+                    local fillBar = barBg and barBg:FindFirstChild("Fill")
+                    local val = row:FindFirstChild("Value")
+                    if fillBar then
+                        fillBar.Size = UDim2.new(ch.value / 255, 0, 1, 0)
+                    end
+                    if val then
+                        val.Text = tostring(ch.value)
+                    end
+                end
+            end
+            renderColor()
+        end
+
+        setHeight()
+        return Colorpicker
+    end
+
+    local function addKeybind(page, id, props)
+        props = props or {}
+        local hasDesc = (type(props.Description) == "string" and props.Description ~= "")
+        local height = hasDesc and 56 or 38
+        local frame = newElement(page, height)
+        addTexts(frame, props, height, 96)
+
+        local keyLabel = Instance.new("TextLabel")
+        keyLabel.Name = "Key"
+        keyLabel.BackgroundTransparency = 1
+        keyLabel.AnchorPoint = Vector2.new(1, 0)
+        keyLabel.Position = UDim2.new(1, -10, 0, hasDesc and 8 or 0)
+        keyLabel.Size = UDim2.new(0, 110, 0, hasDesc and 16 or height)
+        keyLabel.Font = Enum.Font.GothamBold
+        keyLabel.TextSize = 12
+        keyLabel.TextXAlignment = Enum.TextXAlignment.Right
+        keyLabel.TextYAlignment = Enum.TextYAlignment.Center
+        keyLabel.TextColor3 = Theme.Accent
+        keyLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        keyLabel.Text = "None"
+        keyLabel.Parent = frame
+
+        local currentKey = props.Default
+        local listening = false
+        local Keybind = {}
+
+        local function renderKey()
+            if listening then
+                keyLabel.Text = "Listening..."
+                keyLabel.TextColor3 = Theme.Danger
+            elseif currentKey then
+                keyLabel.Text = currentKey.Name
+                keyLabel.TextColor3 = Theme.Accent
+            else
+                keyLabel.Text = "None"
+                keyLabel.TextColor3 = Theme.SubText
+            end
+        end
+
+        local listenConn = nil
+        local function stopListening()
+            listening = false
+            if listenConn then
+                listenConn:Disconnect()
+                listenConn = nil
+            end
+            renderKey()
+        end
+
+        local headerHit = Instance.new("TextButton")
+        headerHit.Name = "HeaderHit"
+        headerHit.Size = UDim2.new(1, 0, 0, height)
+        headerHit.BackgroundColor3 = Theme.Element
+        headerHit.BackgroundTransparency = 1
+        headerHit.BorderSizePixel = 0
+        headerHit.AutoButtonColor = false
+        headerHit.Text = ""
+        headerHit.Parent = frame
+
+        headerHit.MouseEnter:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.ElementHover })
+        end)
+        headerHit.MouseLeave:Connect(function()
+            tween(frame, 0.12, { BackgroundColor3 = Theme.Element })
+        end)
+
+        headerHit.Activated:Connect(function()
+            if listening then
+                stopListening()
+                return
+            end
+            listening = true
+            renderKey()
+            listenConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then
+                    return
+                end
+                if input.KeyCode == Enum.KeyCode.Escape then
+                    stopListening()
+                    return
+                end
+                if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown then
+                    currentKey = input.KeyCode
+                    stopListening()
+                    if type(props.Callback) == "function" then
+                        task.spawn(props.Callback, currentKey)
+                    end
+                end
+            end)
+        end)
+
+        function Keybind:SetValue(keyCode)
+            currentKey = keyCode
+            renderKey()
+        end
+
+        renderKey()
+        return Keybind
+    end
+
+    local function addParagraph(page, props)
+        props = props or {}
+        local frame = newElement(page, 0, true)
+        frame.AutomaticSize = Enum.AutomaticSize.Y
+        frame.Size = UDim2.new(1, 0, 0, 0)
+
+        local title = Instance.new("TextLabel")
+        title.Name = "Title"
+        title.BackgroundTransparency = 1
+        title.Position = UDim2.new(0, 2, 0, 6)
+        title.Size = UDim2.new(1, -4, 0, 16)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 13
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.TextColor3 = Theme.Accent
+        title.TextTruncate = Enum.TextTruncate.AtEnd
+        title.Text = tostring(props.Title or "")
+        title.Parent = frame
+
+        local content = Instance.new("TextLabel")
+        content.Name = "Content"
+        content.BackgroundTransparency = 1
+        content.Position = UDim2.new(0, 2, 0, 24)
+        content.Size = UDim2.new(1, -4, 0, 0)
+        content.AutomaticSize = Enum.AutomaticSize.Y
+        content.Font = Enum.Font.Gotham
+        content.TextSize = 12
+        content.TextXAlignment = Enum.TextXAlignment.Left
+        content.TextYAlignment = Enum.TextYAlignment.Top
+        content.TextWrapped = true
+        content.TextColor3 = Theme.SubText
+        content.Text = tostring(props.Content or "")
+        content.Parent = frame
+
+        return frame
+    end
+
+    -- ===================== TAB CREATION =====================
+    function Window:AddTab(tabConfig)
+        tabConfig = tabConfig or {}
+        local tab = {}
+        tab.Title = tostring(tabConfig.Title or "Tab")
+        tab.NextOrder = 0
+
+        local Button = Instance.new("Frame")
+        Button.Name = "TabButton"
+        Button.Size = UDim2.new(1, 0, 0, 34)
+        Button.BackgroundColor3 = Theme.Sidebar
+        Button.BorderSizePixel = 0
+        Button.LayoutOrder = (#tabs + 1)
+        Button.Parent = TabList
+        corner(Button, 6)
+
+        local AccentBar = Instance.new("Frame")
+        AccentBar.Name = "AccentBar"
+        AccentBar.Position = UDim2.new(0, 0, 0, 6)
+        AccentBar.Size = UDim2.new(0, 3, 1, -12)
+        AccentBar.BackgroundColor3 = Theme.Accent
+        AccentBar.BorderSizePixel = 0
+        AccentBar.Visible = false
+        AccentBar.Parent = Button
+        corner(AccentBar, 2)
+
+        local iconKey = tostring(tabConfig.Icon or "")
+        local iconText = ICONS[iconKey] or ""
+
+        local IconLabel = Instance.new("TextLabel")
+        IconLabel.Name = "Icon"
+        IconLabel.BackgroundTransparency = 1
+        IconLabel.Position = UDim2.new(0, 9, 0, 0)
+        IconLabel.Size = UDim2.new(0, 22, 1, 0)
+        IconLabel.Font = Enum.Font.GothamMedium
+        IconLabel.TextSize = 14
+        IconLabel.TextXAlignment = Enum.TextXAlignment.Center
+        IconLabel.TextYAlignment = Enum.TextYAlignment.Center
+        IconLabel.TextColor3 = Theme.SubText
+        IconLabel.Text = iconText
+        IconLabel.Parent = Button
+
+        local TitleLabel = Instance.new("TextLabel")
+        TitleLabel.Name = "Title"
+        TitleLabel.BackgroundTransparency = 1
+        TitleLabel.Position = UDim2.new(0, iconText ~= "" and 34 or 12, 0, 0)
+        TitleLabel.Size = UDim2.new(1, (iconText ~= "" and 44 or 22), 1, 0)
+        TitleLabel.Font = Enum.Font.GothamMedium
+        TitleLabel.TextSize = 12
+        TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        TitleLabel.TextYAlignment = Enum.TextYAlignment.Center
+        TitleLabel.TextColor3 = Theme.SubText
+        TitleLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        TitleLabel.Text = tab.Title
+        TitleLabel.Parent = Button
+
+        Button.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                selectTab(tab)
+            end
+        end)
+        Button.MouseEnter:Connect(function()
+            if selectedTab ~= tab then
+                tween(Button, 0.12, { BackgroundColor3 = Theme.ElementHover })
+            end
+        end)
+        Button.MouseLeave:Connect(function()
+            if selectedTab ~= tab then
+                tween(Button, 0.12, { BackgroundColor3 = Theme.Sidebar })
+            end
+        end)
+
+        local Page = Instance.new("ScrollingFrame")
+        Page.Name = "Page"
+        Page.Position = UDim2.new(0, 0, 0, 43)
+        Page.Size = UDim2.new(1, 0, 1, -43)
+        Page.BackgroundTransparency = 1
+        Page.BorderSizePixel = 0
+        Page.ScrollBarThickness = 4
+        Page.ScrollBarImageColor3 = Theme.Stroke
+        Page.CanvasSize = UDim2.new()
+        Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        Page.ScrollingDirection = Enum.ScrollingDirection.Y
+        Page.Visible = false
+        Page.Parent = Content
+
+        local pagePadding = Instance.new("UIPadding")
+        pagePadding.PaddingTop = UDim.new(0, 10)
+        pagePadding.PaddingBottom = UDim.new(0, 12)
+        pagePadding.PaddingLeft = UDim.new(0, 12)
+        pagePadding.PaddingRight = UDim.new(0, 12)
+        pagePadding.Parent = Page
+
+        local pageLayout = Instance.new("UIListLayout")
+        pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        pageLayout.Padding = UDim.new(0, 6)
+        pageLayout.Parent = Page
+
+        tab.Button = Button
+        tab.AccentBar = AccentBar
+        tab.Page = Page
+
+        function tab:AddSection(title)
+            return addSection(Page, title)
+        end
+
+        function tab:AddToggle(elementId, elementProps)
+            return addToggle(Page, elementId, elementProps)
+        end
+
+        function tab:AddSlider(elementId, elementProps)
+            return addSlider(Page, elementId, elementProps)
+        end
+
+        function tab:AddDropdown(elementId, elementProps)
+            return addDropdown(Page, elementId, elementProps)
+        end
+
+        function tab:AddButton(elementProps)
+            return addButton(Page, elementProps)
+        end
+
+        function tab:AddColorpicker(elementId, elementProps)
+            return addColorpicker(Page, elementId, elementProps)
+        end
+
+        function tab:AddKeybind(elementId, elementProps)
+            return addKeybind(Page, elementId, elementProps)
+        end
+
+        function tab:AddParagraph(elementProps)
+            return addParagraph(Page, elementProps)
+        end
+
+        table.insert(tabs, tab)
+        if #tabs == 1 then
+            selectTab(tab)
+        end
+        return tab
+    end
+
+    -- ===================== WINDOW CONTROLS =====================
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+
+    local function makeDraggable(handle)
+        handle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = Main.Position
+            end
+        end)
+    end
+    makeDraggable(Topbar)
+    makeDraggable(SideHeader)
+
+    local dragMoveConn = UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            Main.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    local dragEndConn = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    table.insert(windowConnections, dragMoveConn)
+    table.insert(windowConnections, dragEndConn)
+
+    MinimizeBtn.Activated:Connect(function()
+        setMinimized(true)
+    end)
+    CloseBtn.Activated:Connect(function()
+        Window:Destroy()
+    end)
+    Dock.Activated:Connect(function()
+        setMinimized(false)
+    end)
+
+    local keyConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then
+            return
+        end
+        if input.KeyCode == minimizeKey then
+            setMinimized(not minimized)
+        end
+    end)
+    table.insert(windowConnections, keyConn)
+
+    function Window:Destroy()
+        for _, c in ipairs(windowConnections) do
+            pcall(function() c:Disconnect() end)
+        end
+        windowConnections = {}
+        pcall(function() Main:Destroy() end)
+        pcall(function() Dock:Destroy() end)
+    end
+
+    function Window:Toggle()
+        setMinimized(not minimized)
+    end
+
+    function Window:Minimize()
+        setMinimized(true)
+    end
+
+    function Window:SetTitle(title, subTitle)
+        if title then
+            WindowTitle.Text = tostring(title)
+        end
+        if subTitle then
+            WindowSubTitle.Text = tostring(subTitle)
+        end
+    end
+
+    return Window
+end
+
+return GemoroiUI
+
+end)()
+-- ==== END EMBEDDED GemoroiUI =====================================================
 
 local function Notify(title, content, duration)
     pcall(function()
@@ -812,8 +2522,22 @@ local Config = {
     ThirdPersonFix = false,
     ThirdPersonDistance = 8,
     PCLD_BoxesEnabled = false,
-    PCLD_BoxColor = Color3.fromRGB(163, 230, 53),
-    ProfileESPEnabled = false
+    PCLD_BoxColor = Color3.fromRGB(57, 255, 20),
+    ProfileESPEnabled = false,
+    OverheadTagsEnabled = false,
+    XRayEnabled = false,
+    XRayTransparency = 0.6,
+    NoFogEnabled = false,
+    WaterWalkEnabled = false,
+    ChatSpamEnabled = false,
+    ChatSpamDelay = 1,
+    ShurikenDesyncEnabled = false,
+    FlingAuraEnabled = false,
+    FlingAuraRadius = 30,
+    LaunchGrab = false,
+    ZeroVelocityGrab = false,
+    SilentAimHook = false,
+    ClickTPEnabled = false
 }
 
 -- Safe FOV Circle
@@ -1018,7 +2742,7 @@ local function updatePCLDESP()
     end
 
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector") then
+        if obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector" or obj.Name == "FirePlayerPart") then
             if not pcldHighlights[obj] then
                 local hl = Instance.new("Highlight")
                 hl.Name = "PCLD_ESP_Highlight"
@@ -1184,7 +2908,7 @@ local pcldBoxAdornments = {}
 local pcldBoxWatchers = {}
 
 local function isPCLDPart(obj)
-    return obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector")
+    return obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector" or obj.Name == "FirePlayerPart")
 end
 
 local function addPCLDBox(obj)
@@ -1270,30 +2994,9 @@ end
 -- health bar floating above their head.
 local profileESP = { records = {}, loop = nil, thumbCache = {} }
 
+-- Avatar headshots via rbxthumb:// (synchronous, no API call needed)
 local function getProfileThumb(player)
-    local cached = profileESP.thumbCache[player.UserId]
-    if cached then
-        if cached.content then
-            return cached.content
-        end
-        if cached.retryAt and tick() < cached.retryAt then
-            return nil
-        end
-    end
-    local ok, content = pcall(function()
-        return Players:GetUserThumbnailAsync(
-            player.UserId,
-            Enum.ThumbnailType.HeadShot,
-            Enum.ThumbnailSize.Size420x420
-        )
-    end)
-    if ok and type(content) == "string" and content ~= "" then
-        profileESP.thumbCache[player.UserId] = { content = content }
-        return content
-    end
-    -- retry a failed fetch at most once every 15 seconds
-    profileESP.thumbCache[player.UserId] = { retryAt = tick() + 15 }
-    return nil
+    return "rbxthumb://type=HeadShot&id=" .. tostring(player.UserId) .. "&w=420&h=420"
 end
 
 local function createProfileBillboard(player)
@@ -1535,7 +3238,7 @@ local SlotsFarm = {
     thread = nil,
     slotHandle = nil,
     timeText = nil,
-    teleportPosition = Vector3.new(-224.941177, 91.364975, 425.75116)
+    teleportPosition = Vector3.new(177, 91.4, 425.8), -- slot machine wheel (XOCU farm point)
 }
 
 local function resolveSlotsRefs()
@@ -1622,6 +3325,1102 @@ local function setAutoSpinSlots(state)
     end
 end
 
+
+-- ============================================================================
+-- GemoroiUI v3.6 FEATURES (part 2): Overhead Tags, X-Ray, Map Customizer,
+-- NoFog, Water Walk, Chat Spammer, Shuriken Desync, Pose Pack, Limb Controls,
+-- Mirror Animations, Fling Aura, Silent Aim Hook, Phantom Cosmetics,
+-- Click TP, Player TP, Auto Reconnect, Keybinds
+-- ============================================================================
+
+local function getTargetChar()
+    local target = AmethystFeatures.Selected.kickPlayer
+    return target and target.Character or nil
+end
+
+-- === OVERHEAD BILLBOARD TAGS (name, @user, distance, health bar) ===
+local overheadTags = { records = {}, loop = nil }
+
+local function createOverheadTag(player)
+    if overheadTags.records[player] then
+        return
+    end
+    local char = player.Character
+    local head = char and (char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart"))
+    if not head then
+        return
+    end
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "Gemoroi_OverheadTag"
+    bb.Adornee = head
+    bb.Size = UDim2.new(0, 140, 0, 44)
+    bb.StudsOffset = Vector3.new(0, 2.2, 0)
+    bb.AlwaysOnTop = true
+    bb.MaxDistance = 2000
+    bb.Parent = CoreGui
+
+    local name = Instance.new("TextLabel")
+    name.BackgroundTransparency = 1
+    name.Position = UDim2.new(0, 0, 0, 0)
+    name.Size = UDim2.new(1, 0, 0, 14)
+    name.Font = Enum.Font.GothamBold
+    name.TextSize = 12
+    name.TextColor3 = Color3.fromRGB(240, 244, 248)
+    name.TextStrokeTransparency = 0.4
+    name.TextTruncate = Enum.TextTruncate.AtEnd
+    name.Text = player.DisplayName or player.Name
+    name.Parent = bb
+
+    local user = Instance.new("TextLabel")
+    user.BackgroundTransparency = 1
+    user.Position = UDim2.new(0, 0, 0, 14)
+    user.Size = UDim2.new(1, 0, 0, 11)
+    user.Font = Enum.Font.Gotham
+    user.TextSize = 10
+    user.TextColor3 = Color3.fromRGB(148, 158, 170)
+    user.TextStrokeTransparency = 0.4
+    user.TextTruncate = Enum.TextTruncate.AtEnd
+    user.Text = "@" .. player.Name
+    user.Parent = bb
+
+    local dist = Instance.new("TextLabel")
+    dist.BackgroundTransparency = 1
+    dist.Position = UDim2.new(0, 0, 0, 25)
+    dist.Size = UDim2.new(1, 0, 0, 11)
+    dist.Font = Enum.Font.Gotham
+    dist.TextSize = 10
+    dist.TextColor3 = Color3.fromRGB(57, 255, 20)
+    dist.TextStrokeTransparency = 0.4
+    dist.Text = "0 studs"
+    dist.Parent = bb
+
+    local hpBg = Instance.new("Frame")
+    hpBg.AnchorPoint = Vector2.new(0.5, 0)
+    hpBg.Position = UDim2.new(0.5, 0, 0, 38)
+    hpBg.Size = UDim2.new(0, 100, 0, 4)
+    hpBg.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+    hpBg.BackgroundTransparency = 0.25
+    hpBg.BorderSizePixel = 0
+    hpBg.Parent = bb
+    local hpC = Instance.new("UICorner")
+    hpC.CornerRadius = UDim.new(0, 2)
+    hpC.Parent = hpBg
+
+    local hpFill = Instance.new("Frame")
+    hpFill.Size = UDim2.new(1, 0, 1, 0)
+    hpFill.BackgroundColor3 = Color3.fromRGB(57, 255, 20)
+    hpFill.BorderSizePixel = 0
+    hpFill.Parent = hpBg
+    local hpFC = Instance.new("UICorner")
+    hpFC.CornerRadius = UDim.new(0, 2)
+    hpFC.Parent = hpFill
+
+    overheadTags.records[player] = { gui = bb, fill = hpFill, dist = dist }
+end
+
+local function updateOverheadTags()
+    local myRoot = getRoot(LocalPlayer)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and not overheadTags.records[player] and player.Character then
+            createOverheadTag(player)
+        end
+    end
+    for player, record in pairs(overheadTags.records) do
+        if not player.Parent or not record.gui or not record.gui.Parent then
+            if record.gui then
+                pcall(function() record.gui:Destroy() end)
+            end
+            overheadTags.records[player] = nil
+        else
+            local char = player.Character
+            local head = char and (char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart"))
+            if head and record.gui.Adornee ~= head then
+                record.gui.Adornee = head
+            end
+            local root = char and (char:FindFirstChild("HumanoidRootPart") or head)
+            if root and myRoot and record.dist then
+                record.dist.Text = string.format("%d studs", (root.Position - myRoot.Position).Magnitude)
+            end
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum and record.fill then
+                local pct = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+                record.fill.Size = UDim2.new(pct, 0, 1, 0)
+                record.fill.BackgroundColor3 = Color3.fromRGB(
+                    math.floor(255 * (1 - pct)),
+                    math.floor(255 * pct * 0.85 + 30),
+                    20
+                )
+            end
+        end
+    end
+end
+
+local function setOverheadTags(state)
+    Config.OverheadTagsEnabled = state
+    if state then
+        overheadTags.loop = task.spawn(function()
+            while Config.OverheadTagsEnabled do
+                pcall(updateOverheadTags)
+                task.wait(0.25)
+            end
+        end)
+        pcall(updateOverheadTags)
+        Notify("Overhead Tags", "Enabled - names, distance & health above heads", 2)
+    else
+        if overheadTags.loop then
+            task.cancel(overheadTags.loop)
+            overheadTags.loop = nil
+        end
+        for _, record in pairs(overheadTags.records) do
+            if record.gui then
+                pcall(function() record.gui:Destroy() end)
+            end
+        end
+        overheadTags.records = {}
+        Notify("Overhead Tags", "Disabled", 2)
+    end
+end
+
+-- === X-RAY VISION ===
+local xraySaved = setmetatable({}, { __mode = "k" })
+
+local function isCharacterPart(part)
+    local model = part:FindFirstAncestorOfClass("Model")
+    return model ~= nil and Players:GetPlayerFromCharacter(model) ~= nil
+end
+
+local function setXRay(state)
+    Config.XRayEnabled = state
+    if state then
+        task.spawn(function()
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                pcall(function()
+                    if obj:IsA("BasePart") and not obj:IsA("Terrain") and not isCharacterPart(obj)
+                        and obj.Name ~= "HoldPart" and obj.Transparency < 0.5 then
+                        if not xraySaved[obj] then
+                            xraySaved[obj] = { Transparency = obj.Transparency }
+                            obj.Transparency = Config.XRayTransparency
+                        end
+                    elseif (obj:IsA("Decal") or obj:IsA("Texture")) and obj.Transparency < 1 then
+                        if not xraySaved[obj] then
+                            xraySaved[obj] = { Transparency = obj.Transparency }
+                            obj.Transparency = 1
+                        end
+                    end
+                end)
+            end
+            Notify("X-Ray Vision", "Enabled - walls are see-through (Transparency 0.6)", 2)
+        end)
+    else
+        task.spawn(function()
+            for obj, orig in pairs(xraySaved) do
+                pcall(function()
+                    if obj and obj.Parent and orig.Transparency then
+                        obj.Transparency = orig.Transparency
+                    end
+                end)
+            end
+            xraySaved = setmetatable({}, { __mode = "k" })
+            Notify("X-Ray Vision", "Disabled - map restored", 2)
+        end)
+    end
+end
+
+-- === MAP CUSTOMIZER (Grass / Rock / Sand / Snow live recolor + Reset) ===
+local mapCustomizer = { savedParts = setmetatable({}, { __mode = "k" }), savedTerrain = {} }
+
+local function applyMapColor(material, color)
+    local matName = material.Name
+    task.spawn(function()
+        local count = 0
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("BasePart") and obj.Material == material and not isCharacterPart(obj) then
+                    if not mapCustomizer.savedParts[obj] then
+                        mapCustomizer.savedParts[obj] = { Color = obj.Color }
+                    end
+                    obj.Color = color
+                    count = count + 1
+                end
+            end)
+        end
+        pcall(function()
+            local terrain = Workspace:FindFirstChildOfClass("Terrain")
+            if terrain then
+                if not mapCustomizer.savedTerrain[matName] then
+                    mapCustomizer.savedTerrain[matName] = terrain:GetMaterialColor(material)
+                end
+                terrain:SetMaterialColor(material, color)
+            end
+        end)
+        Notify("Map Customizer", matName .. " recolored (" .. count .. " parts)", 2)
+    end)
+end
+
+local function resetMapColors()
+    task.spawn(function()
+        for obj, orig in pairs(mapCustomizer.savedParts) do
+            pcall(function()
+                if obj and obj.Parent and orig.Color then
+                    obj.Color = orig.Color
+                end
+            end)
+        end
+        mapCustomizer.savedParts = setmetatable({}, { __mode = "k" })
+        pcall(function()
+            local terrain = Workspace:FindFirstChildOfClass("Terrain")
+            if terrain then
+                for matName, color in pairs(mapCustomizer.savedTerrain) do
+                    local material = Enum.Material[matName]
+                    if material then
+                        terrain:SetMaterialColor(material, color)
+                    end
+                end
+            end
+        end)
+        mapCustomizer.savedTerrain = {}
+        Notify("Map Customizer", "Map colors reset to original", 2)
+    end)
+end
+
+-- === NOFOG ===
+local noFogSaved = nil
+
+local function setNoFog(state)
+    Config.NoFogEnabled = state
+    pcall(function()
+        if state then
+            noFogSaved = { FogEnd = Lighting.FogEnd, FogStart = Lighting.FogStart, FogColor = Lighting.FogColor }
+            Lighting.FogEnd = 100000
+            Lighting.FogStart = 0
+            Notify("NoFog", "Enabled - fog removed", 2)
+        else
+            if noFogSaved then
+                Lighting.FogEnd = noFogSaved.FogEnd
+                Lighting.FogStart = noFogSaved.FogStart
+                Lighting.FogColor = noFogSaved.FogColor
+            end
+            Notify("NoFog", "Disabled", 2)
+        end
+    end)
+end
+
+-- === WATER WALK (Amethyst method) ===
+local waterWalk = { parts = {}, originals = {}, loopThread = nil, platform = nil }
+
+local function collectWaterParts()
+    local found = 0
+    pcall(function()
+        local ocean = Workspace:FindFirstChild("Ocean")
+        local object = ocean and ocean:FindFirstChild("Object")
+        if object then
+            for _, p in ipairs(object:GetDescendants()) do
+                if p:IsA("BasePart") and waterWalk.originals[p] == nil then
+                    waterWalk.originals[p] = p.CanCollide
+                    table.insert(waterWalk.parts, p)
+                    p.CanCollide = true
+                    found = found + 1
+                end
+            end
+        end
+        for _, name in ipairs({ "Water", "Ocean", "Sea", "Lake", "River", "Pool" }) do
+            local folder = Workspace:FindFirstChild(name)
+            if folder then
+                for _, p in ipairs(folder:GetDescendants()) do
+                    if p:IsA("BasePart") and p.Transparency > 0.5 and waterWalk.originals[p] == nil then
+                        waterWalk.originals[p] = p.CanCollide
+                        table.insert(waterWalk.parts, p)
+                        p.CanCollide = true
+                        found = found + 1
+                    end
+                end
+            end
+        end
+    end)
+    return found
+end
+
+local function setWaterWalk(state)
+    Config.WaterWalkEnabled = state
+    if state then
+        local found = collectWaterParts()
+        if waterWalk.platform == nil then
+            local platform = Instance.new("Part")
+            platform.Name = "Gemoroi_WaterWalkPlatform"
+            platform.Size = Vector3.new(6, 0.5, 6)
+            platform.Transparency = 1
+            platform.Anchored = true
+            platform.CanCollide = true
+            platform.Parent = Workspace
+            waterWalk.platform = platform
+        end
+        waterWalk.loopThread = task.spawn(function()
+            while Config.WaterWalkEnabled do
+                pcall(function()
+                    for _, p in ipairs(waterWalk.parts) do
+                        if p and p.Parent then
+                            p.CanCollide = true
+                        end
+                    end
+                    local myRoot = getRoot(LocalPlayer)
+                    if waterWalk.platform and myRoot then
+                        local ray = Workspace:Raycast(myRoot.Position, Vector3.new(0, -8, 0), RaycastParams.new())
+                        local inWater = ray == nil or (ray.Instance and ray.Instance.Material == Enum.Material.Water)
+                        if inWater then
+                            waterWalk.platform.Position = Vector3.new(myRoot.Position.X, myRoot.Position.Y - 3.4, myRoot.Position.Z)
+                            waterWalk.platform.CanCollide = true
+                        else
+                            waterWalk.platform.CanCollide = false
+                        end
+                    end
+                end)
+                task.wait(0.1)
+            end
+        end)
+        Notify("Water Walk", "Enabled - found " .. found .. " water parts", 2)
+    else
+        if waterWalk.loopThread then
+            task.cancel(waterWalk.loopThread)
+            waterWalk.loopThread = nil
+        end
+        for p, st in pairs(waterWalk.originals) do
+            pcall(function()
+                if p and p.Parent then
+                    p.CanCollide = st
+                end
+            end)
+        end
+        if waterWalk.platform then
+            pcall(function() waterWalk.platform:Destroy() end)
+            waterWalk.platform = nil
+        end
+        waterWalk.parts = {}
+        waterWalk.originals = {}
+        Notify("Water Walk", "Disabled", 2)
+    end
+end
+
+-- === CHAT TROLL SPAMMER ===
+local chatSpam = {
+    phrases = {
+        "FTAP-Gemoroi on top!",
+        "GemoroiUI Lime Dark Neon",
+        "subscribe to keksup22",
+        "get grabbed lol",
+        "I love this game :3",
+    },
+    thread = nil,
+}
+
+local function sendChat(message)
+    pcall(function()
+        local TCS = game:GetService("TextChatService")
+        local channel = TCS.ChatInputBarConfiguration and TCS.ChatInputBarConfiguration.TargetTextChannel
+        if channel then
+            channel:SendAsync(message)
+            return
+        end
+    end)
+    pcall(function()
+        LocalPlayer.Character:Chat(message)
+    end)
+end
+
+local function setChatSpam(state)
+    Config.ChatSpamEnabled = state
+    if state then
+        chatSpam.thread = task.spawn(function()
+            local i = 1
+            while Config.ChatSpamEnabled do
+                sendChat(chatSpam.phrases[((i - 1) % #chatSpam.phrases) + 1])
+                i = i + 1
+                task.wait(math.max(Config.ChatSpamDelay, 0.5))
+            end
+        end)
+        Notify("Chat Spam", "Enabled - trolling the chat", 2)
+    else
+        if chatSpam.thread then
+            task.cancel(chatSpam.thread)
+            chatSpam.thread = nil
+        end
+        Notify("Chat Spam", "Disabled", 2)
+    end
+end
+
+-- === NINJASHURIKEN DESYNC / CRASH (PoopHub method) ===
+local shurikenDesync = { thread = nil }
+
+local function setShurikenDesync(state)
+    Config.ShurikenDesyncEnabled = state
+    if state then
+        local targetChar = getTargetChar()
+        if not targetChar then
+            Notify("Desync", "Select a target player first!", 2)
+            return
+        end
+        shurikenDesync.thread = task.spawn(function()
+            while Config.ShurikenDesyncEnabled do
+                pcall(function()
+                    if not targetChar or not targetChar.Parent then
+                        return
+                    end
+                    local root = targetChar:FindFirstChild("HumanoidRootPart")
+                    if not root then return end
+                    for i = 1, 4 do
+                        local spawnCF = root.CFrame * CFrame.new(math.random(-3, 3), 4 + i, math.random(-3, 3))
+                        local toy = nil
+                        pcall(function()
+                            local inv = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                            local remote = S.ReplicatedStorage:FindFirstChild("MenuToys")
+                            remote = remote and remote:FindFirstChild("SpawnToyRemoteFunction")
+                            if remote then
+                                toy = remote:InvokeServer("NinjaShuriken", spawnCF, Vector3.zero)
+                            end
+                        end)
+                        if toy then
+                            task.spawn(function()
+                                pcall(function()
+                                    local basePart = toy:IsA("Model") and (toy.PrimaryPart or toy:FindFirstChildWhichIsA("BasePart")) or toy
+                                    if basePart then
+                                        local ge = S.ReplicatedStorage:FindFirstChild("GrabEvents")
+                                        local sno = ge and ge:FindFirstChild("SetNetworkOwner")
+                                        if sno then
+                                            sno:FireServer(basePart, basePart.CFrame)
+                                        end
+                                        basePart.AssemblyLinearVelocity = Vector3.new(0, -500, 0)
+                                        basePart.AssemblyAngularVelocity = Vector3.new(500, 500, 500)
+                                    end
+                                end)
+                            end)
+                        end
+                        task.wait(0.05)
+                    end
+                end)
+                task.wait(0.4)
+            end
+        end)
+        Notify("Desync", "NinjaShuriken Desync enabled on target", 2)
+    else
+        if shurikenDesync.thread then
+            task.cancel(shurikenDesync.thread)
+            shurikenDesync.thread = nil
+        end
+        Notify("Desync", "NinjaShuriken Desync disabled", 2)
+    end
+end
+
+
+-- === FIGURE GRAB POSE PACK (akirra4) ===
+local CorePoses = {
+    DogPoseQuickV1 = {
+        Parts = {
+            Torso    = { Offset = CFrame.new(0, -1, -2) * CFrame.Angles(math.rad(-90), 0, math.rad(180)) },
+            Head     = { Offset = CFrame.new(0, 1, 0) * CFrame.Angles(math.rad(90), 0, 0), RelativeTo = "Torso" },
+            ["Left Arm"]  = { Offset = CFrame.new(-1, 0.5, 0) * CFrame.Angles(math.rad(60), 0, math.rad(-30)), RelativeTo = "Torso" },
+            ["Right Arm"] = { Offset = CFrame.new(1, 0.5, 0) * CFrame.Angles(math.rad(60), 0, math.rad(30)), RelativeTo = "Torso" },
+            ["Left Leg"]  = { Offset = CFrame.new(-0.5, -1, 0) * CFrame.Angles(math.rad(40), 0, 0), RelativeTo = "Torso" },
+            ["Right Leg"] = { Offset = CFrame.new(0.5, -1, 0) * CFrame.Angles(math.rad(40), 0, 0), RelativeTo = "Torso" },
+        }
+    },
+    DogPoseQuickV2 = {
+        Parts = {
+            Torso    = { Offset = CFrame.new(0, -1.2, -2.2) * CFrame.Angles(math.rad(-85), 0, math.rad(180)) },
+            Head     = { Offset = CFrame.new(0, 1.1, 0.2) * CFrame.Angles(math.rad(85), 0, 0), RelativeTo = "Torso" },
+            ["Left Arm"]  = { Offset = CFrame.new(-1.1, 0.6, -0.2) * CFrame.Angles(math.rad(70), 0, math.rad(-40)), RelativeTo = "Torso" },
+            ["Right Arm"] = { Offset = CFrame.new(1.1, 0.6, -0.2) * CFrame.Angles(math.rad(70), 0, math.rad(40)), RelativeTo = "Torso" },
+            ["Left Leg"]  = { Offset = CFrame.new(-0.5, -1.1, 0.3) * CFrame.Angles(math.rad(55), 0, math.rad(-10)), RelativeTo = "Torso" },
+            ["Right Leg"] = { Offset = CFrame.new(0.5, -1.1, 0.3) * CFrame.Angles(math.rad(55), 0, math.rad(10)), RelativeTo = "Torso" },
+        }
+    },
+    BangSlow = {
+        Slow = true,
+        Parts = {
+            Torso    = { Offset = CFrame.new(0, -2.1, -3) * CFrame.Angles(math.rad(90), 0, 0) },
+            Head     = { Offset = CFrame.new(0, 0.9, -0.4) * CFrame.Angles(math.rad(-20), 0, 0), RelativeTo = "Torso" },
+            ["Left Arm"]  = { Offset = CFrame.new(-0.6, 0.4, -0.6) * CFrame.Angles(math.rad(-80), 0, math.rad(-15)), RelativeTo = "Torso" },
+            ["Right Arm"] = { Offset = CFrame.new(0.6, 0.4, -0.6) * CFrame.Angles(math.rad(-80), 0, math.rad(15)), RelativeTo = "Torso" },
+            ["Left Leg"]  = { Offset = CFrame.new(-0.4, -0.9, 0.1) * CFrame.Angles(math.rad(10), 0, 0), RelativeTo = "Torso" },
+            ["Right Leg"] = { Offset = CFrame.new(0.4, -0.9, 0.1) * CFrame.Angles(math.rad(10), 0, 0), RelativeTo = "Torso" },
+        }
+    },
+}
+
+local activeCorePose = { thread = nil, name = nil, coconuts = {} }
+
+local function stopCorePose()
+    if activeCorePose.thread then
+        task.cancel(activeCorePose.thread)
+        activeCorePose.thread = nil
+    end
+    for _, coconut in ipairs(activeCorePose.coconuts) do
+        pcall(function()
+            local inv = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+            local remote = S.ReplicatedStorage:FindFirstChild("MenuToys")
+            remote = remote and remote:FindFirstChild("DestroyToy")
+            if remote and coconut and coconut.Parent then
+                remote:FireServer(coconut)
+            end
+        end)
+    end
+    activeCorePose.coconuts = {}
+    activeCorePose.name = nil
+end
+
+local function applyCorePose(presetName)
+    local preset = CorePoses[presetName]
+    local targetChar = getTargetChar()
+    if not preset or not targetChar then
+        Notify("Figure Pose", "Select a target player first!", 2)
+        return
+    end
+    stopCorePose()
+    activeCorePose.name = presetName
+    activeCorePose.thread = task.spawn(function()
+        local phase = 0
+        while activeCorePose.name == presetName do
+            pcall(function()
+                local myRoot = getRoot(LocalPlayer)
+                if not myRoot or not targetChar or not targetChar.Parent then
+                    stopCorePose()
+                    return
+                end
+                local torso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChild("HumanoidRootPart")
+                if not torso then return end
+                local ge = S.ReplicatedStorage:FindFirstChild("GrabEvents")
+                local sno = ge and ge:FindFirstChild("SetNetworkOwner")
+                if sno then
+                    sno:FireServer(torso, torso.CFrame)
+                end
+                for _, x in ipairs(targetChar:GetDescendants()) do
+                    if x:IsA("BasePart") then
+                        x.CanCollide = false
+                    end
+                end
+                local hum = targetChar:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.Health = math.max(hum.Health, 50)
+                end
+                phase = phase + (preset.Slow and 0.045 or 0.12)
+                local bob = math.sin(phase) * (preset.Slow and 0.55 or 0.1)
+                local base = myRoot.CFrame * CFrame.new(0, bob, 0)
+                local torsoCF = nil
+                for partName, def in pairs(preset.Parts) do
+                    local part = targetChar:FindFirstChild(partName)
+                    if part then
+                        if def.RelativeTo == "Torso" and torsoCF then
+                            part.CFrame = torsoCF * def.Offset
+                        else
+                            torsoCF = base * def.Offset
+                            part.CFrame = torsoCF
+                        end
+                    end
+                end
+            end)
+            task.wait()
+        end
+    end)
+    Notify("Figure Pose", "Applied pose: " .. presetName, 2)
+end
+
+local function attachCoreCoconuts(mode)
+    local targetChar = getTargetChar()
+    if not targetChar then
+        Notify("Figure Pose", "Select a target player first!", 2)
+        return
+    end
+    stopCorePose()
+    local torso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+    if not torso then return end
+    local offsets
+    if mode == "BoobsAss" then
+        offsets = {
+            CFrame.new(-0.55, 0.6, -0.45),
+            CFrame.new(0.55, 0.6, -0.45),
+            CFrame.new(-0.45, -0.85, 0.5),
+            CFrame.new(0.45, -0.85, 0.5),
+        }
+    elseif mode == "Penis" then
+        offsets = { CFrame.new(0, -1.15, -0.9) }
+    else
+        return
+    end
+    activeCorePose.name = "Coconut" .. tostring(mode)
+    for _, off in ipairs(offsets) do
+        pcall(function()
+            local remote = S.ReplicatedStorage:FindFirstChild("MenuToys")
+            remote = remote and remote:FindFirstChild("SpawnToyRemoteFunction")
+            if remote then
+                local toy = remote:InvokeServer("FoodCoconut", torso.CFrame * off, Vector3.zero)
+                if toy then
+                    table.insert(activeCorePose.coconuts, toy)
+                end
+            end
+        end)
+    end
+    activeCorePose.thread = task.spawn(function()
+        while activeCorePose.name == "Coconut" .. tostring(mode) do
+            pcall(function()
+                if not targetChar or not targetChar.Parent or not torso or not torso.Parent then
+                    stopCorePose()
+                    return
+                end
+                for i, coconut in ipairs(activeCorePose.coconuts) do
+                    if coconut and coconut.Parent then
+                        local basePart = coconut:IsA("Model") and (coconut.PrimaryPart or coconut:FindFirstChildWhichIsA("BasePart")) or coconut
+                        if basePart then
+                            basePart.CFrame = torso.CFrame * offsets[i]
+                        end
+                    end
+                end
+            end)
+            task.wait()
+        end
+    end)
+    Notify("Figure Pose", "Coconuts attached (" .. mode .. ")", 2)
+end
+
+local function resetCorePose()
+    stopCorePose()
+    local targetChar = getTargetChar()
+    if targetChar then
+        pcall(function()
+            local hum = targetChar:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
+            for _, x in ipairs(targetChar:GetDescendants()) do
+                if x:IsA("BasePart") then
+                    x.CanCollide = true
+                end
+            end
+        end)
+    end
+    Notify("Figure Pose", "Pose reset - target restored", 2)
+end
+
+-- === TARGET LIMB CONTROLS ===
+local function freezeLimbs()
+    local targetChar = getTargetChar()
+    if not targetChar then Notify("Limbs", "Select a target player first!", 2) return end
+    pcall(function()
+        for _, name in ipairs({ "Left Arm", "Right Arm", "Left Leg", "Right Leg",
+            "LeftLowerArm", "RightLowerArm", "LeftUpperArm", "RightUpperArm",
+            "LeftLowerLeg", "RightLowerLeg", "LeftUpperLeg", "RightUpperLeg" }) do
+            local limb = targetChar:FindFirstChild(name)
+            if limb then
+                limb.Anchored = true
+            end
+        end
+    end)
+    Notify("Limbs", "Target limbs frozen", 2)
+end
+
+local function unfreezeLimbs()
+    local targetChar = getTargetChar()
+    if not targetChar then Notify("Limbs", "Select a target player first!", 2) return end
+    pcall(function()
+        for _, part in ipairs(targetChar:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Anchored = false
+            end
+        end
+    end)
+    Notify("Limbs", "Target limbs unfrozen", 2)
+end
+
+local function removeLimbs(mode)
+    local targetChar = getTargetChar()
+    if not targetChar then Notify("Limbs", "Select a target player first!", 2) return end
+    pcall(function()
+        local names
+        if mode == "Arms" then
+            names = { "Left Arm", "Right Arm", "LeftLowerArm", "RightLowerArm", "LeftUpperArm", "RightUpperArm" }
+        else
+            names = { "Left Leg", "Right Leg", "LeftLowerLeg", "RightLowerLeg", "LeftUpperLeg", "RightUpperLeg" }
+        end
+        for _, name in ipairs(names) do
+            local limb = targetChar:FindFirstChild(name)
+            if limb then
+                limb:Destroy()
+            end
+        end
+    end)
+    Notify("Limbs", "Removed target " .. (mode == "Arms" and "arms" or "legs"), 2)
+end
+
+-- === MIRROR MY ANIMATIONS / FACE TOWARD ME / LOCK TORSO ===
+local mirrorAnims = { connection = nil }
+local faceTowardMe = { connection = nil }
+
+local function setMirrorAnimations(state)
+    if state then
+        local targetChar = getTargetChar()
+        local myChar = LocalPlayer.Character
+        if not targetChar or not myChar then
+            Notify("Mirror", "Select a target player first!", 2)
+            return
+        end
+        if mirrorAnims.connection then mirrorAnims.connection:Disconnect() end
+        mirrorAnims.connection = RunService.RenderStepped:Connect(function()
+            pcall(function()
+                if not targetChar or not targetChar.Parent or not myChar or not myChar.Parent then
+                    return
+                end
+                for _, myMotor in ipairs(myChar:GetDescendants()) do
+                    if myMotor:IsA("Motor6D") then
+                        local theirMotor = targetChar:FindFirstChild(myMotor.Name, true)
+                        if theirMotor and theirMotor:IsA("Motor6D") then
+                            theirMotor.Transform = myMotor.Transform
+                        end
+                    end
+                end
+            end)
+        end)
+        Notify("Mirror", "Mirroring my animations onto target", 2)
+    else
+        if mirrorAnims.connection then
+            mirrorAnims.connection:Disconnect()
+            mirrorAnims.connection = nil
+        end
+        Notify("Mirror", "Mirror Animations disabled", 2)
+    end
+end
+
+local function setFaceTowardMe(state)
+    if state then
+        local targetChar = getTargetChar()
+        if not targetChar then
+            Notify("Face", "Select a target player first!", 2)
+            return
+        end
+        if faceTowardMe.connection then faceTowardMe.connection:Disconnect() end
+        faceTowardMe.connection = RunService.RenderStepped:Connect(function()
+            pcall(function()
+                if not targetChar or not targetChar.Parent then return end
+                local root = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso")
+                local myRoot = getRoot(LocalPlayer)
+                if root and myRoot then
+                    local ge = S.ReplicatedStorage:FindFirstChild("GrabEvents")
+                    local sno = ge and ge:FindFirstChild("SetNetworkOwner")
+                    if sno then
+                        sno:FireServer(root, root.CFrame)
+                    end
+                    root.CFrame = CFrame.new(root.Position, Vector3.new(myRoot.Position.X, root.Position.Y, myRoot.Position.Z))
+                end
+            end)
+        end)
+        Notify("Face", "Target now faces me", 2)
+    else
+        if faceTowardMe.connection then
+            faceTowardMe.connection:Disconnect()
+            faceTowardMe.connection = nil
+        end
+        Notify("Face", "Face Toward Me disabled", 2)
+    end
+end
+
+local function setLockTorso(state)
+    local targetChar = getTargetChar()
+    if state then
+        if not targetChar then
+            Notify("Torso", "Select a target player first!", 2)
+            return
+        end
+        local torso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+        if torso then
+            torso.Anchored = true
+            Notify("Torso", "Target torso rotation locked", 2)
+        end
+    else
+        if targetChar then
+            local torso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+            if torso then
+                torso.Anchored = false
+            end
+        end
+        Notify("Torso", "Torso lock released", 2)
+    end
+end
+
+-- === FLING AURA ===
+local flingAura = { thread = nil }
+
+local function setFlingAura(state)
+    Config.FlingAuraEnabled = state
+    if state then
+        if flingAura.thread then task.cancel(flingAura.thread) end
+        flingAura.thread = task.spawn(function()
+            while Config.FlingAuraEnabled do
+                pcall(function()
+                    local myRoot = getRoot(LocalPlayer)
+                    if not myRoot then return end
+                    for _, player in ipairs(Players:GetPlayers()) do
+                        if player ~= LocalPlayer then
+                            local root = getRoot(player)
+                            if root and (root.Position - myRoot.Position).Magnitude <= Config.FlingAuraRadius then
+                                local ge = S.ReplicatedStorage:FindFirstChild("GrabEvents")
+                                local sno = ge and ge:FindFirstChild("SetNetworkOwner")
+                                if sno then
+                                    sno:FireServer(root, root.CFrame)
+                                end
+                                local angle = math.rad(math.random(0, 360))
+                                root.AssemblyLinearVelocity = Vector3.new(
+                                    math.cos(angle) * 250,
+                                    math.random(150, 300),
+                                    math.sin(angle) * 250
+                                )
+                                root.AssemblyAngularVelocity = Vector3.new(
+                                    math.random(-60, 60),
+                                    math.random(-60, 60),
+                                    math.random(-60, 60)
+                                )
+                            end
+                        end
+                    end
+                end)
+                task.wait(0.25)
+            end
+        end)
+        Notify("Auras", "Fling Aura Enabled - enemies get randomly flung", 2)
+    else
+        if flingAura.thread then
+            task.cancel(flingAura.thread)
+            flingAura.thread = nil
+        end
+        Notify("Auras", "Fling Aura Disabled", 2)
+    end
+end
+
+-- === SILENT AIM HOOK (__namecall) ===
+local silentAimHookInstalled = false
+
+local function setSilentAimHook(state)
+    Config.SilentAimHook = state
+    if state then
+        local ok, err = pcall(function()
+            if not hookmetamethod or not getnamecallmethod then
+                error("hookmetamethod is not available in this executor")
+            end
+            if silentAimHookInstalled then
+                return
+            end
+            local oldNamecall
+            oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+                local method = getnamecallmethod()
+                if Config.SilentAimHook and Config.SilentAimEnabled
+                    and (method == "Raycast" or method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList"
+                        or method == "FindPartOnRayWithWhitelist") then
+                    local target = getClosestPlayer()
+                    if target then
+                        local origin
+                        local args = { ... }
+                        if method == "Raycast" then
+                            if typeof(args[1]) == "CFrame" then
+                                origin = args[1].Position
+                            elseif typeof(args[1]) == "Vector3" then
+                                origin = args[1]
+                            end
+                            if origin then
+                                return oldNamecall(self, origin, target.Position - origin, select(3, ...))
+                            end
+                        else
+                            if typeof(args[1]) == "Ray" then
+                                origin = args[1].Origin
+                                local direction = Ray.new(origin, target.Position - origin)
+                                return oldNamecall(self, direction, select(2, ...))
+                            end
+                        end
+                    end
+                end
+                return oldNamecall(self, ...)
+            end))
+            silentAimHookInstalled = true
+        end)
+        if ok then
+            Notify("Silent Aim", "__namecall hook installed (Raycast / FindPartOnRay redirect)", 3)
+        else
+            Config.SilentAimHook = false
+            Notify("Silent Aim", "Hook unavailable: " .. tostring(err), 4)
+        end
+    else
+        Notify("Silent Aim", "__namecall hook redirect disabled", 2)
+    end
+end
+
+-- === CLICK TP / TP TO PLAYER ===
+local clickTPConn = nil
+
+local function setClickTP(state)
+    Config.ClickTPEnabled = state
+    if state then
+        if clickTPConn then clickTPConn:Disconnect() end
+        clickTPConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                pcall(function()
+                    if Mouse.Hit then
+                        local root = getRoot(LocalPlayer)
+                        if root then
+                            root.CFrame = CFrame.new(Mouse.Hit.Position + Vector3.new(0, 3, 0))
+                        end
+                    end
+                end)
+            end
+        end)
+        Notify("Click TP", "Enabled - click anywhere to teleport", 2)
+    else
+        if clickTPConn then
+            clickTPConn:Disconnect()
+            clickTPConn = nil
+        end
+        Notify("Click TP", "Disabled", 2)
+    end
+end
+
+local function teleportToPlayerByName(name)
+    local player = Players:FindFirstChild(name)
+    if not player then
+        Notify("Teleport", "Player not found!", 2)
+        return
+    end
+    local root = getRoot(player)
+    local myRoot = getRoot(LocalPlayer)
+    if root and myRoot then
+        myRoot.CFrame = root.CFrame * CFrame.new(0, 0, 3)
+        Notify("Teleport", "Teleported to " .. player.Name, 2)
+    end
+end
+
+-- === AUTO RECONNECT ===
+local autoReconnect = { enabled = false, connection = nil }
+
+local function rejoinServer()
+    pcall(function()
+        TeleportService:Teleport(game.PlaceId)
+    end)
+end
+
+local function setAutoReconnect(state)
+    autoReconnect.enabled = state
+    if state then
+        autoReconnect.connection = Players.PlayerRemoving:Connect(function(player)
+            if player == LocalPlayer and autoReconnect.enabled then
+                task.wait(1)
+                rejoinServer()
+            end
+        end)
+        task.spawn(function()
+            while autoReconnect.enabled do
+                if not LocalPlayer.Parent then
+                    rejoinServer()
+                end
+                task.wait(2)
+            end
+        end)
+        Notify("Server", "Auto Reconnect enabled", 2)
+    else
+        if autoReconnect.connection then
+            autoReconnect.connection:Disconnect()
+            autoReconnect.connection = nil
+        end
+        Notify("Server", "Auto Reconnect disabled", 2)
+    end
+end
+
+-- === FLY ENGINE (BodyVelocity + BodyGyro, WASD + Space/Shift) ===
+local flyBV, flyBG = nil, nil
+local flyKeys = { W = false, A = false, S = false, D = false, Space = false, Shift = false }
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.W then flyKeys.W = true end
+    if input.KeyCode == Enum.KeyCode.A then flyKeys.A = true end
+    if input.KeyCode == Enum.KeyCode.S then flyKeys.S = true end
+    if input.KeyCode == Enum.KeyCode.D then flyKeys.D = true end
+    if input.KeyCode == Enum.KeyCode.Space then flyKeys.Space = true end
+    if input.KeyCode == Enum.KeyCode.LeftShift then flyKeys.Shift = true end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.W then flyKeys.W = false end
+    if input.KeyCode == Enum.KeyCode.A then flyKeys.A = false end
+    if input.KeyCode == Enum.KeyCode.S then flyKeys.S = false end
+    if input.KeyCode == Enum.KeyCode.D then flyKeys.D = false end
+    if input.KeyCode == Enum.KeyCode.Space then flyKeys.Space = false end
+    if input.KeyCode == Enum.KeyCode.LeftShift then flyKeys.Shift = false end
+end)
+
+local function updateFly()
+    local root = getRoot(LocalPlayer)
+    if not root then return end
+    if AmethystFeatures.Fly.Enabled then
+        if not flyBV or not flyBV.Parent then
+            flyBV = Instance.new("BodyVelocity")
+            flyBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            flyBV.Velocity = Vector3.zero
+            flyBV.Parent = root
+        end
+        if not flyBG or not flyBG.Parent then
+            flyBG = Instance.new("BodyGyro")
+            flyBG.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            flyBG.P = 9000
+            flyBG.D = 500
+            flyBG.Parent = root
+        end
+        local speed = AmethystFeatures.Fly.Speed or 100
+        local move = Vector3.zero
+        local camCF = Camera.CFrame
+        if flyKeys.W then move = move + camCF.LookVector end
+        if flyKeys.S then move = move - camCF.LookVector end
+        if flyKeys.D then move = move + camCF.RightVector end
+        if flyKeys.A then move = move - camCF.RightVector end
+        if flyKeys.Space then move = move + Vector3.new(0, 1, 0) end
+        if flyKeys.Shift then move = move - Vector3.new(0, 1, 0) end
+        if move.Magnitude > 0 then
+            move = move.Unit * speed
+        end
+        flyBV.Velocity = move
+        flyBG.CFrame = CFrame.new(root.Position, root.Position + Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z))
+    else
+        if flyBV and flyBV.Parent then
+            flyBV:Destroy()
+            flyBV = nil
+        end
+        if flyBG and flyBG.Parent then
+            flyBG:Destroy()
+            flyBG = nil
+        end
+    end
+end
+
+-- === KEYBINDS SYSTEM (bind ANY registered function) ===
+local KeybindRegistry = {}
+local KeybindOrder = {}
+
+local function registerKeybindAction(actionName, defaultKey, fn)
+    KeybindRegistry[actionName] = { fn = fn, key = defaultKey }
+    table.insert(KeybindOrder, actionName)
+end
+
+local function bindActionKey(actionName, keyCode)
+    local action = KeybindRegistry[actionName]
+    if not action then return end
+    if action.conn then
+        pcall(function() action.conn:Disconnect() end)
+        action.conn = nil
+    end
+    action.key = keyCode
+    if keyCode then
+        action.conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.KeyCode == keyCode then
+                pcall(action.fn)
+            end
+        end)
+    end
+end
+
 -- === COMBAT TAB ===
 Tabs.Combat:AddSection("Silent Aim & Targeting")
 
@@ -1689,6 +4488,33 @@ Tabs.Combat:AddDropdown("HitboxDropdown", {
     end
 })
 
+Tabs.Combat:AddToggle("SilentAimHookToggle", {
+    Title = "Silent Aim (__namecall Hook)",
+    Description = "Redirects Raycast / FindPartOnRay to the target hitbox",
+    Default = false,
+    Callback = function(Value)
+        setSilentAimHook(Value)
+    end
+})
+
+Tabs.Combat:AddSection("Grab Modifiers")
+
+Tabs.Combat:AddToggle("LaunchGrabToggle", {
+    Title = "Launch Grab (200 speed upkick)",
+    Default = false,
+    Callback = function(Value)
+        Config.LaunchGrab = Value
+    end
+})
+
+Tabs.Combat:AddToggle("ZeroVelocityGrabToggle", {
+    Title = "Zero Velocity Grab",
+    Default = false,
+    Callback = function(Value)
+        Config.ZeroVelocityGrab = Value
+    end
+})
+
 -- === PLAYER TAB ===
 Tabs.Player:AddSection("Movement & Physics")
 
@@ -1740,8 +4566,8 @@ Tabs.Player:AddToggle("ThirdPersonFixToggle", {
 Tabs.Player:AddSlider("ThirdPersonDistanceSlider", {
     Title = "Third Person Camera Distance",
     Default = 8,
-    Min = 2,
-    Max = 30,
+    Min = 5,
+    Max = 100,
     Rounding = 0,
     Suffix = " studs",
     Callback = function(Value)
@@ -1749,6 +4575,15 @@ Tabs.Player:AddSlider("ThirdPersonDistanceSlider", {
         if Config.ThirdPersonFix then
             LocalPlayer.CameraMaxZoomDistance = Value
         end
+    end
+})
+
+Tabs.Player:AddToggle("WaterWalkToggle", {
+    Title = "Water Walk",
+    Description = "Walk on water like a god",
+    Default = false,
+    Callback = function(Value)
+        setWaterWalk(Value)
     end
 })
 
@@ -1825,6 +4660,59 @@ Tabs.Visuals:AddToggle("SoapTexturesToggle", {
     Default = false,
     Callback = function(Value)
         setSoapTextures(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("OverheadTagsToggle", {
+    Title = "Overhead Tags",
+    Description = "Name, @user, distance in studs & health bar",
+    Default = false,
+    Callback = function(Value)
+        setOverheadTags(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("XRayToggle", {
+    Title = "X-Ray Vision",
+    Description = "Semi-transparent map walls (Transparency 0.6)",
+    Default = false,
+    Callback = function(Value)
+        setXRay(Value)
+    end
+})
+
+Tabs.Visuals:AddToggle("NoFogToggle", {
+    Title = "NoFog",
+    Description = "Removes all fog from the map",
+    Default = false,
+    Callback = function(Value)
+        setNoFog(Value)
+    end
+})
+
+Tabs.Visuals:AddSection("Map Customizer (Live Recolor)")
+
+local mapMaterials = {
+    { Name = "Grass", Material = Enum.Material.Grass },
+    { Name = "Rock",  Material = Enum.Material.Rock },
+    { Name = "Sand",  Material = Enum.Material.Sand },
+    { Name = "Snow",  Material = Enum.Material.Snow },
+}
+
+for _, mat in ipairs(mapMaterials) do
+    Tabs.Visuals:AddColorpicker("MapColor" .. mat.Name, {
+        Title = mat.Name .. " Color",
+        Default = Color3.fromRGB(57, 255, 20),
+        Callback = function(Value)
+            applyMapColor(mat.Material, Value)
+        end
+    })
+end
+
+Tabs.Visuals:AddButton({
+    Title = "Reset Map Colors",
+    Callback = function()
+        resetMapColors()
     end
 })
 
@@ -2356,11 +5244,45 @@ Tabs.Protection:AddToggle("AntiGucciToggle", {
                     local seat = blob and blob:FindFirstChild("VehicleSeat")
                     if seat and seat:IsA("VehicleSeat") then
                         seat:Sit(hum)
-                        GemoroiUI:Notify({ Title = "Anti-Gucci", Content = "Protected inside Blobman seat!", Duration = 3 })
+                        -- GUCCI GODMODE: lift the seat to 50,000 studs and enable
+                        -- free WASD movement via hum.MoveDirection
+                        pcall(function()
+                            local seatRoot = blob.PrimaryPart or seat
+                            local ge = ReplicatedStorage:FindFirstChild("GrabEvents")
+                            local sno = ge and ge:FindFirstChild("SetNetworkOwner")
+                            if sno then
+                                sno:FireServer(seatRoot, seatRoot.CFrame)
+                            end
+                            seat.Anchored = false
+                            AmethystFeatures.Gucci.active = true
+                            AmethystFeatures.Gucci.blobman = blob
+                            if AmethystFeatures.Gucci.connection then
+                                AmethystFeatures.Gucci.connection:Disconnect()
+                            end
+                            AmethystFeatures.Gucci.connection = RunService.RenderStepped:Connect(function()
+                                if not AmethystFeatures.Gucci.active then return end
+                                pcall(function()
+                                    local move = hum.MoveDirection
+                                    local dir = Vector3.new(move.X, 0, move.Z)
+                                    if dir.Magnitude > 0 then
+                                        seat.AssemblyLinearVelocity = dir.Unit * 60
+                                    end
+                                    if seat.Position.Y < 50000 then
+                                        seat.AssemblyLinearVelocity = seat.AssemblyLinearVelocity + Vector3.new(0, 500, 0)
+                                    end
+                                end)
+                            end)
+                        end)
+                        GemoroiUI:Notify({ Title = "Anti-Gucci Godmode", Content = "Seat rising to 50,000 studs - WASD to move!", Duration = 4 })
                     end
                 end)
             end)
         else
+            AmethystFeatures.Gucci.active = false
+            if AmethystFeatures.Gucci.connection then
+                AmethystFeatures.Gucci.connection:Disconnect()
+                AmethystFeatures.Gucci.connection = nil
+            end
             pcall(function()
                 local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
                 if folder and folder:FindFirstChild("CreatureBlobman") then
@@ -2458,6 +5380,29 @@ Tabs.Auras:AddSlider("AuraRadiusSlider", {
     end
 })
 
+AurasTab:AddSection("Fling Aura")
+
+AurasTab:AddToggle("FlingAuraToggle", {
+    Title = "Fling Aura",
+    Description = "Randomly flings nearby enemies at extreme speed",
+    Default = false,
+    Callback = function(Value)
+        setFlingAura(Value)
+    end
+})
+
+AurasTab:AddSlider("FlingAuraRadiusSlider", {
+    Title = "Fling Aura Radius",
+    Default = 30,
+    Min = 5,
+    Max = 100,
+    Rounding = 0,
+    Suffix = " studs",
+    Callback = function(Value)
+        Config.FlingAuraRadius = Value
+    end
+})
+
 -- === TELEPORTS TAB ===
 Tabs.Teleports:AddSection("Location Teleports")
 
@@ -2467,7 +5412,12 @@ local houseTeleports = {
     {"Purple House", CFrame.new(250, -6, 463)},
     {"China House", CFrame.new(554, 123, -72)},
     {"Blue House", CFrame.new(510, 83, -339)},
-    {"Spawn", CFrame.new(3, -7, -2)}
+    {"Spawn", CFrame.new(3, -7, -2)},
+    {"Train Station", CFrame.new(-210, 60, -420)},
+    {"High Mountain", CFrame.new(700, 320, -600)},
+    {"Sky Safe Base", CFrame.new(0, 500, 0)},
+    {"Void", CFrame.new(0, -250, 0)},
+    {"Secret Cave", CFrame.new(-620, -40, 300)},
 }
 
 for _, house in ipairs(houseTeleports) do
@@ -2482,6 +5432,68 @@ for _, house in ipairs(houseTeleports) do
         end
     })
 end
+
+Tabs.Teleports:AddSection("Plot Bases")
+
+do
+    local plotsFolder = Workspace:FindFirstChild("Plots")
+    if plotsFolder then
+        for i = 1, 12 do
+            local plot = plotsFolder:FindFirstChild("Plot" .. i)
+            if plot then
+                local base = plot:FindFirstChild("PlotArea") or plot:FindFirstChildOfClass("BasePart") or plot.PrimaryPart
+                if base then
+                    local plotCF = base.CFrame * CFrame.new(0, 5, 0)
+                    Tabs.Teleports:AddButton({
+                        Title = "Teleport to Plot " .. i,
+                        Callback = function()
+                            local root = getRoot(LocalPlayer)
+                            if root then
+                                root.CFrame = plotCF
+                                Notify("Teleport", "Teleported to Plot " .. i, 2)
+                            end
+                        end
+                    })
+                end
+            end
+        end
+    end
+end
+
+Tabs.Teleports:AddSection("Click & Player Teleports")
+
+Tabs.Teleports:AddToggle("ClickTPToggle", {
+    Title = "Click TP (teleport on mouse click)",
+    Default = false,
+    Callback = function(Value)
+        setClickTP(Value)
+    end
+})
+
+local tpPlayerDropdown
+local function refreshTpPlayers()
+    local names = { "None" }
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    if tpPlayerDropdown then
+        tpPlayerDropdown:SetValues(names)
+    end
+end
+
+tpPlayerDropdown = Tabs.Teleports:AddDropdown("TeleportPlayerDropdown", {
+    Title = "Teleport to Player",
+    Values = { "None" },
+    Default = "None",
+    Callback = function(Value)
+        if Value ~= "None" then
+            teleportToPlayerByName(Value)
+        end
+    end
+})
+refreshTpPlayers()
 
 -- === MAIN RUNTIME LOOPS ===
 RunService.RenderStepped:Connect(function()
@@ -2529,6 +5541,9 @@ RunService.RenderStepped:Connect(function()
             LocalPlayer.CameraMaxZoomDistance = Config.ThirdPersonDistance
         end)
     end
+
+    -- Fly engine update
+    pcall(updateFly)
 
     -- ESP highlights update
     if Config.ESPEnabled then
@@ -2649,7 +5664,7 @@ task.spawn(function()
             end
 
             if Config.AntiFlingEnabled and hrp then
-                if hrp.AssemblyLinearVelocity.Magnitude > 120 then
+                if hrp.AssemblyLinearVelocity.Magnitude > 150 then
                     hrp.AssemblyLinearVelocity = Vector3.zero
                     hrp.AssemblyAngularVelocity = Vector3.zero
                 end
@@ -2675,6 +5690,172 @@ task.spawn(function()
 end)
 
 -- === COSMETICS & SHADERS TAB ===
+Tabs.Cosmetics:AddSection("Phantom Parts & Rainbow")
+
+Tabs.Cosmetics:AddToggle("PhantomHeadlessToggle", {
+    Title = "Phantom Headless Mesh",
+    Default = false,
+    Callback = function(Value)
+        pcall(function()
+            local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+            if not head then return end
+            if Value then
+                head.Transparency = 1
+                for _, d in ipairs(head:GetDescendants()) do
+                    if d:IsA("Decal") or d:IsA("Texture") then
+                        d.Transparency = 1
+                    end
+                end
+            else
+                head.Transparency = 0
+                for _, d in ipairs(head:GetDescendants()) do
+                    if d:IsA("Decal") or d:IsA("Texture") then
+                        d.Transparency = 0
+                    end
+                end
+            end
+        end)
+    end
+})
+
+Tabs.Cosmetics:AddToggle("PhantomKorbloxToggle", {
+    Title = "Phantom Korblox Leg",
+    Default = false,
+    Callback = function(Value)
+        pcall(function()
+            local leg = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("Right Leg") or LocalPlayer.Character:FindFirstChild("RightLowerLeg"))
+            if not leg then return end
+            if Value then
+                leg.Transparency = 0.45
+                leg.Material = Enum.Material.Neon
+                leg.Color = Color3.fromRGB(57, 255, 20)
+            else
+                leg.Transparency = 0
+                leg.Material = Enum.Material.Plastic
+                leg.Color = Color3.fromRGB(255, 204, 153)
+            end
+        end)
+    end
+})
+
+local rainbowHatState = { part = nil, thread = nil }
+
+Tabs.Cosmetics:AddToggle("RainbowHatToggle", {
+    Title = "Rainbow Hat",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local head = char and (char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart"))
+                if not head then return end
+                if rainbowHatState.part and rainbowHatState.part.Parent then
+                    rainbowHatState.part:Destroy()
+                end
+                local hat = Instance.new("Part")
+                hat.Name = "Gemoroi_RainbowHat"
+                hat.Size = Vector3.new(1.6, 0.9, 1.6)
+                hat.Material = Enum.Material.Neon
+                hat.CanCollide = false
+                hat.Massless = true
+                hat.Parent = char
+                local weld = Instance.new("WeldConstraint")
+                weld.Part0 = hat
+                weld.Part1 = head
+                weld.Parent = hat
+                hat.CFrame = head.CFrame * CFrame.new(0, 1.1, 0)
+                rainbowHatState.part = hat
+                if rainbowHatState.thread then task.cancel(rainbowHatState.thread) end
+                rainbowHatState.thread = task.spawn(function()
+                    local hue = 0
+                    while rainbowHatState.part and rainbowHatState.part.Parent do
+                        rainbowHatState.part.Color = Color3.fromHSV(hue % 1, 1, 1)
+                        hue = hue + 0.01
+                        task.wait(0.03)
+                    end
+                end)
+            end)
+        else
+            if rainbowHatState.thread then
+                task.cancel(rainbowHatState.thread)
+                rainbowHatState.thread = nil
+            end
+            if rainbowHatState.part then
+                pcall(function() rainbowHatState.part:Destroy() end)
+                rainbowHatState.part = nil
+            end
+        end
+    end
+})
+
+local rainbowFFState = { highlight = nil, thread = nil }
+
+Tabs.Cosmetics:AddToggle("RainbowForceFieldToggle", {
+    Title = "Rainbow ForceField Skin",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if not char then return end
+                if not rainbowFFState.highlight then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "Gemoroi_RainbowFF"
+                    hl.Adornee = char
+                    hl.FillTransparency = 0.55
+                    hl.OutlineTransparency = 0
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.Parent = CoreGui
+                    rainbowFFState.highlight = hl
+                end
+                if rainbowFFState.thread then task.cancel(rainbowFFState.thread) end
+                rainbowFFState.thread = task.spawn(function()
+                    local hue = 0
+                    while rainbowFFState.highlight do
+                        local color = Color3.fromHSV(hue % 1, 1, 1)
+                        rainbowFFState.highlight.FillColor = color
+                        rainbowFFState.highlight.OutlineColor = color
+                        hue = hue + 0.005
+                        task.wait(0.03)
+                    end
+                end)
+            end)
+        else
+            if rainbowFFState.thread then
+                task.cancel(rainbowFFState.thread)
+                rainbowFFState.thread = nil
+            end
+            if rainbowFFState.highlight then
+                pcall(function() rainbowFFState.highlight:Destroy() end)
+                rainbowFFState.highlight = nil
+            end
+        end
+    end
+})
+
+Tabs.Cosmetics:AddSection("Gemoroi Lighting Presets")
+
+for _, preset in ipairs({
+    { Name = "Cyberpunk City",
+      Shader = {CC={Brightness=0.05,Contrast=0.25,Saturation=0.35,TintColor=Color3.fromRGB(120,200,255)},Bloom={Intensity=0.8,Size=40,Threshold=0.9},SunRays=0.15,L={Brightness=1.6,ClockTime=0,FogEnd=450,FogColor=Color3.fromRGB(10,20,40),Ambient=Color3.fromRGB(30,60,120),OutdoorAmbient=Color3.fromRGB(40,80,140)}} },
+    { Name = "Midnight Purple",
+      Shader = {CC={Brightness=-0.05,Contrast=0.15,Saturation=0.1,TintColor=Color3.fromRGB(160,120,255)},Bloom={Intensity=0.5,Size=32,Threshold=0.8},SunRays=0.05,L={Brightness=0.9,ClockTime=0,FogEnd=600,FogColor=Color3.fromRGB(40,20,70),Ambient=Color3.fromRGB(60,40,100),OutdoorAmbient=Color3.fromRGB(70,50,110)}} },
+    { Name = "Dreamy Sunset",
+      Shader = {CC={Brightness=0.1,Contrast=0.1,Saturation=0.25,TintColor=Color3.fromRGB(255,180,140)},Bloom={Intensity=0.7,Size=36,Threshold=0.85},SunRays=0.4,L={Brightness=1.4,ClockTime=17.6,FogEnd=800,FogColor=Color3.fromRGB(255,150,100),Ambient=Color3.fromRGB(200,140,120),OutdoorAmbient=Color3.fromRGB(255,170,120)}} },
+    { Name = "Rainy Day",
+      Shader = {CC={Brightness=-0.1,Contrast=0.05,Saturation=-0.15,TintColor=Color3.fromRGB(180,200,220)},Bloom={Intensity=0.3,Size=24,Threshold=0.9},L={Brightness=1.0,ClockTime=14,FogEnd=250,FogStart=20,FogColor=Color3.fromRGB(150,165,180),Ambient=Color3.fromRGB(120,130,145),OutdoorAmbient=Color3.fromRGB(130,140,155)}} },
+    { Name = "Desert Heat",
+      Shader = {CC={Brightness=0.15,Contrast=0.2,Saturation=0.15,TintColor=Color3.fromRGB(255,220,160)},Bloom={Intensity=0.6,Size=34,Threshold=0.88},SunRays=0.5,L={Brightness=2.0,ClockTime=13.5,FogEnd=900,FogColor=Color3.fromRGB(230,200,150),Ambient=Color3.fromRGB(220,190,150),OutdoorAmbient=Color3.fromRGB(235,205,160)}} },
+}) do
+    Tabs.Cosmetics:AddButton({
+        Title = "Shader: " .. preset.Name,
+        Callback = function()
+            ApplyShader(preset.Shader)
+            Notify("Shaders", preset.Name .. " applied!", 2)
+        end
+    })
+end
+
 Tabs.Cosmetics:AddSection("Wings & Accessories")
 
 Tabs.Cosmetics:AddToggle("AngelWingsToggle", {
@@ -2752,6 +5933,10 @@ local function ApplyShader(cfg)
         if cfg.Blur then
             local bu = Instance.new("BlurEffect", Lighting)
             bu.Size = cfg.Blur
+        end
+        if cfg.Bloom then
+            local bl = Instance.new("BloomEffect", Lighting)
+            for k, v in pairs(cfg.Bloom) do bl[k] = v end
         end
         if cfg.SunRays then
             local sr = Instance.new("SunRaysEffect", Lighting)
@@ -4229,6 +7414,69 @@ TargetTab:AddToggle("LoopBringToggle", {
 })
 
 
+TargetTab:AddSection("Figure Poses (Grab)")
+
+TargetTab:AddButton({
+    Title = "Dog Pose Quick V1",
+    Callback = function() applyCorePose("DogPoseQuickV1") end
+})
+
+TargetTab:AddButton({
+    Title = "Dog Pose Quick V2",
+    Callback = function() applyCorePose("DogPoseQuickV2") end
+})
+
+TargetTab:AddButton({
+    Title = "Bang (Slow)",
+    Callback = function() applyCorePose("BangSlow") end
+})
+
+TargetTab:AddButton({
+    Title = "Coconut Boobs & Ass",
+    Callback = function() attachCoreCoconuts("BoobsAss") end
+})
+
+TargetTab:AddButton({
+    Title = "Coconut Penis",
+    Callback = function() attachCoreCoconuts("Penis") end
+})
+
+TargetTab:AddButton({
+    Title = "Reset Pose",
+    Callback = function() resetCorePose() end
+})
+
+TargetTab:AddSection("Target Limb Controls")
+
+TargetTab:AddButton({ Title = "Freeze Limbs", Callback = function() freezeLimbs() end })
+TargetTab:AddButton({ Title = "Unfreeze Limbs", Callback = function() unfreezeLimbs() end })
+TargetTab:AddButton({ Title = "Remove Arms", Callback = function() removeLimbs("Arms") end })
+TargetTab:AddButton({ Title = "Remove Legs", Callback = function() removeLimbs("Legs") end })
+
+TargetTab:AddToggle("MirrorAnimationsToggle", {
+    Title = "Mirror My Animations",
+    Default = false,
+    Callback = function(Value)
+        setMirrorAnimations(Value)
+    end
+})
+
+TargetTab:AddToggle("FaceTowardMeToggle", {
+    Title = "Face Toward Me",
+    Default = false,
+    Callback = function(Value)
+        setFaceTowardMe(Value)
+    end
+})
+
+TargetTab:AddToggle("LockTorsoRotationToggle", {
+    Title = "Lock Torso Rotation",
+    Default = false,
+    Callback = function(Value)
+        setLockTorso(Value)
+    end
+})
+
 TargetTab:AddSection("removed")
 
 
@@ -5524,8 +8772,153 @@ ServerTab:AddButton({
     end
 })
 
+-- === MASS TAB: TROLL & DESYNC ===
+Tabs.Mass:AddSection("Troll & Desync")
+
+Tabs.Mass:AddToggle("ChatSpamToggle", {
+    Title = "Chat Troll Spammer",
+    Default = false,
+    Callback = function(Value)
+        setChatSpam(Value)
+    end
+})
+
+Tabs.Mass:AddSlider("ChatSpamDelaySlider", {
+    Title = "Spam Delay",
+    Default = 1,
+    Min = 0.5,
+    Max = 10,
+    Rounding = 1,
+    Suffix = "s",
+    Callback = function(Value)
+        Config.ChatSpamDelay = Value
+    end
+})
+
+Tabs.Mass:AddToggle("ShurikenDesyncToggle", {
+    Title = "NinjaShuriken Desync / Crash",
+    Description = "Spams ownership-abused shurikens at the target",
+    Default = false,
+    Callback = function(Value)
+        setShurikenDesync(Value)
+    end
+})
+
+-- === SERVER TAB: AUTO RECONNECT ===
+ServerTab:AddSection("Connection")
+
+ServerTab:AddToggle("AutoReconnectToggle", {
+    Title = "Auto Reconnect",
+    Description = "Automatically rejoins after a kick / disconnect",
+    Default = false,
+    Callback = function(Value)
+        setAutoReconnect(Value)
+    end
+})
+
+ServerTab:AddButton({
+    Title = "Server Hop (find a new server)",
+    Callback = function()
+        pcall(function()
+            local servers = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=2&limit=10")
+            local data = HttpService:JSONDecode(servers)
+            for _, server in ipairs(data.data) do
+                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+                    break
+                end
+            end
+        end)
+    end
+})
+
+-- === KEYBINDS TAB: bind ANY registered function ===
+local KeybindsTab = Window:AddTab({ Title = "Keybinds", Icon = "keyboard" })
+
+KeybindsTab:AddSection("Bind Any Function to a Key")
+
+registerKeybindAction("Toggle UI", Enum.KeyCode.RightControl, function()
+    Window:Toggle()
+end)
+registerKeybindAction("Toggle Silent Aim", Enum.KeyCode.Q, function()
+    Config.SilentAimEnabled = not Config.SilentAimEnabled
+    Notify("Keybind", "Silent Aim: " .. tostring(Config.SilentAimEnabled), 2)
+end)
+registerKeybindAction("Toggle Player ESP", nil, function()
+    Config.ESPEnabled = not Config.ESPEnabled
+    updateESPHighlights()
+    Notify("Keybind", "Player ESP: " .. tostring(Config.ESPEnabled), 2)
+end)
+registerKeybindAction("Toggle Profile ESP", nil, function()
+    setProfileESP(not Config.ProfileESPEnabled)
+end)
+registerKeybindAction("Toggle Fly", Enum.KeyCode.F, function()
+    AmethystFeatures.Fly.Enabled = not AmethystFeatures.Fly.Enabled
+    Notify("Keybind", "Fly: " .. tostring(AmethystFeatures.Fly.Enabled), 2)
+end)
+registerKeybindAction("Toggle Noclip", Enum.KeyCode.N, function()
+    Config.NoclipEnabled = not Config.NoclipEnabled
+    Notify("Keybind", "Noclip: " .. tostring(Config.NoclipEnabled), 2)
+end)
+registerKeybindAction("Toggle Speed Boost", nil, function()
+    Config.WalkspeedEnabled = not Config.WalkspeedEnabled
+    Notify("Keybind", "Speed: " .. tostring(Config.WalkspeedEnabled), 2)
+end)
+registerKeybindAction("Toggle 3rd Person Fix", Enum.KeyCode.T, function()
+    setThirdPersonFix(not Config.ThirdPersonFix)
+end)
+registerKeybindAction("Toggle Spin Bot", nil, function()
+    Notify("Keybind", "Spin Bot is on the Target tab", 2)
+end)
+registerKeybindAction("Toggle Water Walk", nil, function()
+    setWaterWalk(not Config.WaterWalkEnabled)
+end)
+registerKeybindAction("Toggle X-Ray", Enum.KeyCode.X, function()
+    setXRay(not Config.XRayEnabled)
+end)
+registerKeybindAction("Toggle Fullbright", nil, function()
+    pcall(function()
+        Lighting.Brightness = 2.5
+        Lighting.ClockTime = 14
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 100000
+        Notify("Fullbright", "Applied!", 2)
+    end)
+end)
+registerKeybindAction("Toggle Soap Textures", nil, function()
+    setSoapTextures(not Soap.enabled)
+end)
+registerKeybindAction("Fling Closest Target", Enum.KeyCode.G, function()
+    flingClosestTarget()
+end)
+registerKeybindAction("Teleport to Spawn", nil, function()
+    local root = getRoot(LocalPlayer)
+    if root then
+        root.CFrame = CFrame.new(3, -7, -2)
+        Notify("Keybind", "Teleported to Spawn", 2)
+    end
+end)
+registerKeybindAction("Toggle Chat Spam", nil, function()
+    setChatSpam(not Config.ChatSpamEnabled)
+end)
+registerKeybindAction("Toggle Click TP", Enum.KeyCode.C, function()
+    setClickTP(not Config.ClickTPEnabled)
+end)
+
+for _, actionName in ipairs(KeybindOrder) do
+    local action = KeybindRegistry[actionName]
+    KeybindsTab:AddKeybind("KB_" .. actionName, {
+        Title = actionName,
+        Default = action.key,
+        Callback = function(newKey)
+            bindActionKey(actionName, newKey)
+            Notify("Keybinds", actionName .. " bound to " .. (newKey and newKey.Name or "None"), 2)
+        end
+    })
+end
+
 GemoroiUI:Notify({
-    Title = "FTAP-Gemoroi v3.5",
-    Content = "Lime Dark Edition loaded - GemoroiUI, Profile ESP, Soap Textures, Auto Slots ready!",
+    Title = "FTAP-Gemoroi v3.6",
+    Content = "Lime Dark Neon Edition loaded - all systems operational!",
     Duration = 5
 })

@@ -17,8 +17,13 @@ Visuals.Config = {
     ModelHighlightEnabled = false,
     ModelBillboardEnabled = false,
     PCLD_BoxesEnabled = false,
-    PCLD_BoxColor = Color3.fromRGB(163, 230, 53),
-    ProfileESPEnabled = false
+    PCLD_BoxColor = Color3.fromRGB(57, 255, 20),
+    ProfileESPEnabled = false,
+    OverheadTagsEnabled = false,
+    XRayEnabled = false,
+    XRayTransparency = 0.6,
+    FullbrightEnabled = false,
+    NoFogEnabled = false
 }
 
 Visuals.RainbowConnection = nil
@@ -58,7 +63,7 @@ function Visuals.UpdatePCLDESP()
     end
 
     for _, obj in ipairs(Shared.Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector") then
+        if obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector" or obj.Name == "FirePlayerPart") then
             if not Visuals.PCLDHighlights[obj] or not Visuals.PCLDHighlights[obj].Parent then
                 local hl = Instance.new("Highlight")
                 hl.Name = "PCLD_ESP_Highlight"
@@ -448,7 +453,7 @@ Visuals.Soap = { enabled = false, saved = setmetatable({}, { __mode = "k" }), co
 
 -- === PCLD BOXHANDLEADORNMENTS ===
 local function isPCLDPart(obj)
-    return obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector")
+    return obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector" or obj.Name == "FirePlayerPart")
 end
 
 local function addPCLDBox(obj)
@@ -516,30 +521,9 @@ function Visuals.SetPCLDBoxColor(color)
 end
 
 -- === PROFILE ESP (AVATARS ABOVE HEAD) ===
+-- Avatar headshots via rbxthumb:// (synchronous, no API call needed)
 local function getProfileThumb(player)
-    local cached = Visuals.ProfileESP.thumbCache[player.UserId]
-    if cached then
-        if cached.content then
-            return cached.content
-        end
-        if cached.retryAt and tick() < cached.retryAt then
-            return nil
-        end
-    end
-    local ok, content = pcall(function()
-        return Shared.Players:GetUserThumbnailAsync(
-            player.UserId,
-            Enum.ThumbnailType.HeadShot,
-            Enum.ThumbnailSize.Size420x420
-        )
-    end)
-    if ok and type(content) == "string" and content ~= "" then
-        Visuals.ProfileESP.thumbCache[player.UserId] = { content = content }
-        return content
-    end
-    -- retry a failed fetch at most once every 15 seconds
-    Visuals.ProfileESP.thumbCache[player.UserId] = { retryAt = tick() + 15 }
-    return nil
+    return "rbxthumb://type=HeadShot&id=" .. tostring(player.UserId) .. "&w=420&h=420"
 end
 
 local function createProfileBillboard(player)
@@ -724,6 +708,327 @@ local function soapifyObject(obj)
             obj.Transparency = 1
         end
     end
+end
+
+-- === OVERHEAD BILLBOARD TAGS (name, @user, distance, health bar) ===
+Visuals.OverheadTags = { records = {}, loop = nil }
+
+local function createOverheadTag(player)
+    if Visuals.OverheadTags.records[player] then
+        return
+    end
+    local char = player.Character
+    local head = char and (char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart"))
+    if not head then
+        return
+    end
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "Gemoroi_OverheadTag"
+    bb.Adornee = head
+    bb.Size = UDim2.new(0, 140, 0, 44)
+    bb.StudsOffset = Vector3.new(0, 2.2, 0)
+    bb.AlwaysOnTop = true
+    bb.MaxDistance = 2000
+    bb.Parent = Shared.CoreGui
+
+    local name = Instance.new("TextLabel")
+    name.Name = "Name"
+    name.BackgroundTransparency = 1
+    name.Position = UDim2.new(0, 0, 0, 0)
+    name.Size = UDim2.new(1, 0, 0, 14)
+    name.Font = Enum.Font.GothamBold
+    name.TextSize = 12
+    name.TextColor3 = Color3.fromRGB(240, 244, 248)
+    name.TextStrokeTransparency = 0.4
+    name.TextTruncate = Enum.TextTruncate.AtEnd
+    name.Text = (player.DisplayName or player.Name)
+    name.Parent = bb
+
+    local user = Instance.new("TextLabel")
+    user.Name = "User"
+    user.BackgroundTransparency = 1
+    user.Position = UDim2.new(0, 0, 0, 14)
+    user.Size = UDim2.new(1, 0, 0, 11)
+    user.Font = Enum.Font.Gotham
+    user.TextSize = 10
+    user.TextColor3 = Color3.fromRGB(148, 158, 170)
+    user.TextStrokeTransparency = 0.4
+    user.TextTruncate = Enum.TextTruncate.AtEnd
+    user.Text = "@" .. player.Name
+    user.Parent = bb
+
+    local dist = Instance.new("TextLabel")
+    dist.Name = "Distance"
+    dist.BackgroundTransparency = 1
+    dist.Position = UDim2.new(0, 0, 0, 25)
+    dist.Size = UDim2.new(1, 0, 0, 11)
+    dist.Font = Enum.Font.Gotham
+    dist.TextSize = 10
+    dist.TextColor3 = Color3.fromRGB(57, 255, 20)
+    dist.TextStrokeTransparency = 0.4
+    dist.Text = "0 studs"
+    dist.Parent = bb
+
+    local hpBg = Instance.new("Frame")
+    hpBg.Name = "HealthBg"
+    hpBg.AnchorPoint = Vector2.new(0.5, 0)
+    hpBg.Position = UDim2.new(0.5, 0, 0, 38)
+    hpBg.Size = UDim2.new(0, 100, 0, 4)
+    hpBg.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+    hpBg.BackgroundTransparency = 0.25
+    hpBg.BorderSizePixel = 0
+    hpBg.Parent = bb
+    local hpC = Instance.new("UICorner")
+    hpC.CornerRadius = UDim.new(0, 2)
+    hpC.Parent = hpBg
+
+    local hpFill = Instance.new("Frame")
+    hpFill.Name = "HealthFill"
+    hpFill.Size = UDim2.new(1, 0, 1, 0)
+    hpFill.BackgroundColor3 = Color3.fromRGB(57, 255, 20)
+    hpFill.BorderSizePixel = 0
+    hpFill.Parent = hpBg
+    local hpFC = Instance.new("UICorner")
+    hpFC.CornerRadius = UDim.new(0, 2)
+    hpFC.Parent = hpFill
+
+    Visuals.OverheadTags.records[player] = { gui = bb, fill = hpFill, dist = dist }
+end
+
+function Visuals.UpdateOverheadTags()
+    local myRoot = Shared.GetRoot(Shared.LocalPlayer)
+    for _, player in ipairs(Shared.Players:GetPlayers()) do
+        if player ~= Shared.LocalPlayer and not Visuals.OverheadTags.records[player] and player.Character then
+            createOverheadTag(player)
+        end
+    end
+    for player, record in pairs(Visuals.OverheadTags.records) do
+        if not player.Parent or not record.gui or not record.gui.Parent then
+            if record.gui then
+                pcall(function() record.gui:Destroy() end)
+            end
+            Visuals.OverheadTags.records[player] = nil
+        else
+            local char = player.Character
+            local head = char and (char:FindFirstChild("Head") or char:FindFirstChildOfClass("BasePart"))
+            if head and record.gui.Adornee ~= head then
+                record.gui.Adornee = head
+            end
+            local root = char and (char:FindFirstChild("HumanoidRootPart") or head)
+            if root and myRoot and record.dist then
+                record.dist.Text = string.format("%d studs", (root.Position - myRoot.Position).Magnitude)
+            end
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum and record.fill then
+                local pct = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+                record.fill.Size = UDim2.new(pct, 0, 1, 0)
+                record.fill.BackgroundColor3 = Color3.fromRGB(
+                    math.floor(255 * (1 - pct)),
+                    math.floor(255 * pct * 0.85 + 30),
+                    20
+                )
+            end
+        end
+    end
+end
+
+function Visuals.ToggleOverheadTags(state)
+    Visuals.Config.OverheadTagsEnabled = state
+    if state then
+        Visuals.OverheadTags.loop = task.spawn(function()
+            while Visuals.Config.OverheadTagsEnabled do
+                pcall(Visuals.UpdateOverheadTags)
+                task.wait(0.25)
+            end
+        end)
+        pcall(Visuals.UpdateOverheadTags)
+        Shared.Notify("Overhead Tags", "Enabled - names, distance & health above heads", 2)
+    else
+        if Visuals.OverheadTags.loop then
+            task.cancel(Visuals.OverheadTags.loop)
+            Visuals.OverheadTags.loop = nil
+        end
+        for _, record in pairs(Visuals.OverheadTags.records) do
+            if record.gui then
+                pcall(function() record.gui:Destroy() end)
+            end
+        end
+        Visuals.OverheadTags.records = {}
+        Shared.Notify("Overhead Tags", "Disabled", 2)
+    end
+end
+
+-- === X-RAY VISION (semi-transparent map walls) ===
+Visuals.XRay = { saved = setmetatable({}, { __mode = "k" }) }
+
+local function isCharacterPart(part)
+    local model = part:FindFirstAncestorOfClass("Model")
+    return model ~= nil and Shared.Players:GetPlayerFromCharacter(model) ~= nil
+end
+
+function Visuals.ToggleXRay(state)
+    Visuals.Config.XRayEnabled = state
+    if state then
+        task.spawn(function()
+            for _, obj in ipairs(Shared.Workspace:GetDescendants()) do
+                pcall(function()
+                    if obj:IsA("BasePart") and not obj:IsA("Terrain") and not isCharacterPart(obj)
+                        and obj.Name ~= "HoldPart" and obj.Transparency < 0.5 then
+                        if not Visuals.XRay.saved[obj] then
+                            Visuals.XRay.saved[obj] = { Transparency = obj.Transparency }
+                            obj.Transparency = Visuals.Config.XRayTransparency
+                        end
+                    elseif (obj:IsA("Decal") or obj:IsA("Texture")) and obj.Transparency < 1 then
+                        if not Visuals.XRay.saved[obj] then
+                            Visuals.XRay.saved[obj] = { Transparency = obj.Transparency }
+                            obj.Transparency = 1
+                        end
+                    end
+                end)
+            end
+            Shared.Notify("X-Ray Vision", "Enabled - walls are see-through (Transparency 0.6)", 2)
+        end)
+    else
+        task.spawn(function()
+            for obj, orig in pairs(Visuals.XRay.saved) do
+                pcall(function()
+                    if obj and obj.Parent and orig.Transparency then
+                        obj.Transparency = orig.Transparency
+                    end
+                end)
+            end
+            Visuals.XRay.saved = setmetatable({}, { __mode = "k" })
+            Shared.Notify("X-Ray Vision", "Disabled - map restored", 2)
+        end)
+    end
+end
+
+-- === MAP CUSTOMIZER (live Grass/Rock/Sand/Snow recolor + Reset) ===
+Visuals.MapCustomizer = { savedParts = setmetatable({}, { __mode = "k" }), savedTerrain = {} }
+
+local MapMaterials = {
+    Enum.Material.Grass,
+    Enum.Material.Rock,
+    Enum.Material.Sand,
+    Enum.Material.Snow,
+}
+
+function Visuals.ApplyMapColor(material, color)
+    local matName = material.Name
+    task.spawn(function()
+        local count = 0
+        for _, obj in ipairs(Shared.Workspace:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("BasePart") and obj.Material == material and not isCharacterPart(obj) then
+                    if not Visuals.MapCustomizer.savedParts[obj] then
+                        Visuals.MapCustomizer.savedParts[obj] = { Color = obj.Color }
+                    end
+                    obj.Color = color
+                    count = count + 1
+                end
+            end)
+        end
+        pcall(function()
+            local terrain = Shared.Workspace:FindFirstChildOfClass("Terrain")
+            if terrain then
+                if not Visuals.MapCustomizer.savedTerrain[matName] then
+                    Visuals.MapCustomizer.savedTerrain[matName] = terrain:GetMaterialColor(material)
+                end
+                terrain:SetMaterialColor(material, color)
+            end
+        end)
+        Shared.Notify("Map Customizer", matName .. " recolored (" .. count .. " parts)", 2)
+    end)
+end
+
+function Visuals.ResetMapColors()
+    task.spawn(function()
+        for obj, orig in pairs(Visuals.MapCustomizer.savedParts) do
+            pcall(function()
+                if obj and obj.Parent and orig.Color then
+                    obj.Color = orig.Color
+                end
+            end)
+        end
+        Visuals.MapCustomizer.savedParts = setmetatable({}, { __mode = "k" })
+        pcall(function()
+            local terrain = Shared.Workspace:FindFirstChildOfClass("Terrain")
+            if terrain then
+                for matName, color in pairs(Visuals.MapCustomizer.savedTerrain) do
+                    local material = Enum.Material[matName]
+                    if material then
+                        terrain:SetMaterialColor(material, color)
+                    end
+                end
+            end
+        end)
+        Visuals.MapCustomizer.savedTerrain = {}
+        Shared.Notify("Map Customizer", "Map colors reset to original", 2)
+    end)
+end
+
+-- === FULLBRIGHT & NOFOG ===
+Visuals.LightingSaved = {}
+
+function Visuals.ToggleFullbright(state)
+    Visuals.Config.FullbrightEnabled = state
+    pcall(function()
+        local L = Shared.Lighting
+        if state then
+            Visuals.LightingSaved.Fullbright = {
+                Brightness = L.Brightness,
+                ClockTime = L.ClockTime,
+                GlobalShadows = L.GlobalShadows,
+                FogEnd = L.FogEnd,
+                Ambient = L.Ambient,
+                OutdoorAmbient = L.OutdoorAmbient,
+            }
+            L.Brightness = 2.5
+            L.ClockTime = 14
+            L.GlobalShadows = false
+            L.FogEnd = 100000
+            L.Ambient = Color3.fromRGB(178, 178, 178)
+            L.OutdoorAmbient = Color3.fromRGB(178, 178, 178)
+            Shared.Notify("Fullbright", "Enabled - 100% lighting", 2)
+        else
+            local saved = Visuals.LightingSaved.Fullbright
+            if saved then
+                L.Brightness = saved.Brightness
+                L.ClockTime = saved.ClockTime
+                L.GlobalShadows = saved.GlobalShadows
+                L.FogEnd = saved.FogEnd
+                L.Ambient = saved.Ambient
+                L.OutdoorAmbient = saved.OutdoorAmbient
+            end
+            Shared.Notify("Fullbright", "Disabled", 2)
+        end
+    end)
+end
+
+function Visuals.ToggleNoFog(state)
+    Visuals.Config.NoFogEnabled = state
+    pcall(function()
+        local L = Shared.Lighting
+        if state then
+            Visuals.LightingSaved.NoFog = {
+                FogEnd = L.FogEnd,
+                FogStart = L.FogStart,
+                FogColor = L.FogColor,
+            }
+            L.FogEnd = 100000
+            L.FogStart = 0
+            Shared.Notify("NoFog", "Enabled - fog removed", 2)
+        else
+            local saved = Visuals.LightingSaved.NoFog
+            if saved then
+                L.FogEnd = saved.FogEnd
+                L.FogStart = saved.FogStart
+                L.FogColor = saved.FogColor
+            end
+            Shared.Notify("NoFog", "Disabled", 2)
+        end
+    end)
 end
 
 function Visuals.ToggleSoapTextures(state)

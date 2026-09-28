@@ -26,6 +26,7 @@ function UI.CreateWindow()
         Server     = Window:AddTab({ Title = "Server", Icon = "server" }),
         Teleports  = Window:AddTab({ Title = "Teleports", Icon = "map-pin" }),
         Misc       = Window:AddTab({ Title = "Misc & Figures", Icon = "box" }),
+        Keybinds   = Window:AddTab({ Title = "Keybinds", Icon = "keyboard" }),
         Settings   = Window:AddTab({ Title = "Settings", Icon = "settings" })
     }
 

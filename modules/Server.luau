@@ -146,4 +146,39 @@ function Server.ServerHop()
     end)
 end
 
+-- Auto Reconnect: automatically rejoins the server after a kick / disconnect
+Server.AutoReconnect = { enabled = false, connection = nil }
+
+function Server.ToggleAutoReconnect(state)
+    Server.AutoReconnect.enabled = state
+    if state then
+        Server.AutoReconnect.connection = Shared.Players.PlayerRemoving:Connect(function(player)
+            if player == Shared.LocalPlayer and Server.AutoReconnect.enabled then
+                task.wait(1)
+                pcall(function()
+                    Server.Rejoin()
+                end)
+            end
+        end)
+        -- also handle the case where LocalPlayer is already gone (kick in progress)
+        task.spawn(function()
+            while Server.AutoReconnect.enabled do
+                if not Shared.LocalPlayer.Parent then
+                    pcall(function()
+                        Server.Rejoin()
+                    end)
+                end
+                task.wait(2)
+            end
+        end)
+        Shared.Notify("Server", "Auto Reconnect enabled", 2)
+    else
+        if Server.AutoReconnect.connection then
+            Server.AutoReconnect.connection:Disconnect()
+            Server.AutoReconnect.connection = nil
+        end
+        Shared.Notify("Server", "Auto Reconnect disabled", 2)
+    end
+end
+
 return Server

@@ -32,6 +32,11 @@ Auras.DualKickAura = {
 }
 
 -- Remove Anti-Kick Aura
+Auras.FlingAura = {
+    enabled = false,
+    radius = 30,
+    loopThread = nil
+}
 Auras.RemoveAntiKickAura = {
     enabled = false,
     radius = 30,
@@ -80,8 +85,9 @@ function Auras.ToggleLaunchAura(state, radius)
                     for _, player in ipairs(targets) do
                         local root = Shared.GetRoot(player)
                         if root then
-                            Shared.SetNetworkOwner(root, root.CFrame)
-                            root.AssemblyLinearVelocity = Vector3.new(0, 500, 0)
+                            -- guaranteed order: RagdollRemote(target, 0) fires BEFORE SetNetworkOwner
+                            Shared.TransferOwnership(root, root.CFrame)
+                            root.AssemblyLinearVelocity = Vector3.new(0, 200, 0)
                         end
                     end
                 end)
@@ -208,6 +214,48 @@ function Auras.ToggleDualKickAura(state, radius)
             Auras.DualKickAura.loopThread = nil
         end
         Shared.Notify("Auras", "Dual Hand Kick Aura Disabled", 2)
+    end
+end
+
+-- Fling Aura: launches nearby enemies in random directions at extreme speed
+function Auras.ToggleFlingAura(state, radius)
+    Auras.FlingAura.enabled = state
+    Auras.FlingAura.radius = radius or Auras.FlingAura.radius or 30
+
+    if state then
+        if Auras.FlingAura.loopThread then task.cancel(Auras.FlingAura.loopThread) end
+        Auras.FlingAura.loopThread = task.spawn(function()
+            while Auras.FlingAura.enabled do
+                pcall(function()
+                    local targets = Auras.GetNearbyPlayers(Auras.FlingAura.radius)
+                    for _, player in ipairs(targets) do
+                        local root = Shared.GetRoot(player)
+                        if root then
+                            Shared.SetNetworkOwner(root, root.CFrame)
+                            local angle = math.rad(math.random(0, 360))
+                            root.AssemblyLinearVelocity = Vector3.new(
+                                math.cos(angle) * 250,
+                                math.random(150, 300),
+                                math.sin(angle) * 250
+                            )
+                            root.AssemblyAngularVelocity = Vector3.new(
+                                math.random(-60, 60),
+                                math.random(-60, 60),
+                                math.random(-60, 60)
+                            )
+                        end
+                    end
+                end)
+                task.wait(0.25)
+            end
+        end)
+        Shared.Notify("Auras", "Fling Aura Enabled - enemies get randomly flung", 2)
+    else
+        if Auras.FlingAura.loopThread then
+            task.cancel(Auras.FlingAura.loopThread)
+            Auras.FlingAura.loopThread = nil
+        end
+        Shared.Notify("Auras", "Fling Aura Disabled", 2)
     end
 end
 
